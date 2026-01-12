@@ -369,3 +369,13 @@ model BlacklistedHotkey {
 
   @@map("blacklisted_hotkeys")
 }
+
+/// Historical TAO/USD price data
+model TaoUsdPrice {
+  id        Int      @id @default(autoincrement())
+  taoPrice  Float    @map("tao_price")
+  date      DateTime @default(now()) @db.Timestamptz
+
+  @@index([date], name: "idx_tao_usd_price_date")
+  @@map("tao_usd_price")
+}
