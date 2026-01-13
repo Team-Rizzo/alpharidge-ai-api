@@ -12,7 +12,7 @@ Only validators with valid signatures are allowed to access the API.
 
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # Blocked hotkeys - silently reject requests from these addresses
@@ -44,12 +44,10 @@ class SuppressBlockedHotkeyLogFilter(logging.Filter):
 
 
 class SuppressBlockedRequestsFilter(logging.Filter):
-    """Suppress uvicorn access logs for 403 Forbidden responses (blocked hotkeys)."""
+    """Suppress uvicorn access logs for 403 Forbidden responses."""
     def filter(self, record: logging.LogRecord) -> bool:
-        if not BLOCKED_HOTKEYS:
-            return True
         message = record.getMessage()
-        # Suppress 403 Forbidden access logs when blocklist is active
+        # Suppress all 403 Forbidden access logs
         if '" 403 Forbidden' in message or '" 403 ' in message:
             return False
         return True
@@ -64,6 +62,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from prisma import Prisma
 
+import httpx
+
 # Local imports
 from models import (
     Tweet, TweetWithAuthor, Account, TweetAnalysis,
@@ -73,12 +73,7 @@ from models import (
     BlacklistedHotkey, BlacklistedHotkeyCreate, BlacklistedHotkeyBulkCreate,
     TweetsForScoringResponse, CompletedTweetsSubmission,
     SubmissionResponse, ErrorResponse, TaoPriceResponse,
-)
-from services.tao_price import (
-    start_refresh_task,
-    stop_refresh_task,
-    get_cached_price,
-    is_price_stale,
+    AxonCheckRequest, AxonCheckResponse,
 )
 from utils.auth import (
     AuthRequest,
@@ -108,8 +103,12 @@ uvicorn_access_logger.addFilter(SuppressV2LogFilter())
 uvicorn_access_logger.addFilter(SuppressBlockedHotkeyLogFilter())
 uvicorn_access_logger.addFilter(SuppressBlockedRequestsFilter())
 
-# Initialize Prisma client
+# Initialize Prisma clients
 prisma = Prisma()
+
+# Optional separate database for price data
+PRICE_DATABASE_URL = os.getenv("PRICE_DATABASE_URL", "")
+price_prisma: Optional[Prisma] = None  # Will be set if PRICE_DATABASE_URL is configured
 
 
 def _setup_log_filters():
@@ -141,6 +140,8 @@ def _setup_log_filters():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown events."""
+    global price_prisma
+    
     # Startup
     logger.info("Starting Talisman AI API...")
     
@@ -154,7 +155,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize whitelists: {e}")
     
-    # Connect to database
+    # Connect to main database
     try:
         await prisma.connect()
         logger.info("Connected to database")
@@ -162,14 +163,26 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to connect to database: {e}")
         raise
     
-    # Start TAO price refresh background task
-    start_refresh_task()
+    # Connect to price database if configured
+    if PRICE_DATABASE_URL:
+        try:
+            price_prisma = Prisma(datasource={"url": PRICE_DATABASE_URL})
+            await price_prisma.connect()
+            db_host = PRICE_DATABASE_URL.split('@')[-1] if '@' in PRICE_DATABASE_URL else "configured"
+            logger.info(f"Connected to price database: {db_host}")
+        except Exception as e:
+            logger.error(f"Failed to connect to price database: {e}")
+            raise
     
     yield
     
     # Shutdown
     logger.info("Shutting down Talisman AI API...")
-    stop_refresh_task()
+    
+    if price_prisma is not None:
+        await price_prisma.disconnect()
+        logger.info("Disconnected from price database")
+    
     await prisma.disconnect()
     logger.info("Disconnected from database")
 
@@ -200,7 +213,14 @@ class BlockedHotkeyMiddleware(BaseHTTPMiddleware):
     with minimal processing and no logging.
     """
     
+    # Paths that don't need hotkey checking (no auth required)
+    SKIP_PATHS = {"/health", "/price/tao-usd"}
+    
     async def dispatch(self, request: Request, call_next):
+        # Skip middleware for paths that don't use authentication
+        if request.url.path in self.SKIP_PATHS:
+            return await call_next(request)
+        
         hotkey = request.headers.get("X-Auth-SS58Address", "")
         
         if hotkey and hotkey in BLOCKED_HOTKEYS:
@@ -217,6 +237,40 @@ class BlockedHotkeyMiddleware(BaseHTTPMiddleware):
 if BLOCKED_HOTKEYS:
     app.add_middleware(BlockedHotkeyMiddleware)
     logger.info(f"Hotkey blocklist enabled with {len(BLOCKED_HOTKEYS)} hotkeys")
+
+
+class FilteredAccessLogMiddleware(BaseHTTPMiddleware):
+    """
+    Custom access logging middleware that filters out 403 and /v2 requests.
+    Used instead of uvicorn's built-in access logging.
+    """
+    
+    # Paths that should skip custom logging (use uvicorn default)
+    SKIP_PATHS = {"/health", "/price/tao-usd"}
+    
+    async def dispatch(self, request: Request, call_next):
+        # Fast path: skip middleware overhead for frequent/fast endpoints
+        if request.url.path in self.SKIP_PATHS:
+            return await call_next(request)
+        
+        response = await call_next(request)
+        
+        # Skip logging for 403 responses and /v2 paths
+        if response.status_code == 403:
+            return response
+        if "/v2/" in request.url.path or request.url.path == "/v2":
+            return response
+        
+        # Log the access
+        client_host = request.client.host if request.client else "-"
+        logger.info(
+            f'{client_host} - "{request.method} {request.url.path}" {response.status_code}'
+        )
+        return response
+
+
+# Add custom access log middleware
+app.add_middleware(FilteredAccessLogMiddleware)
 
 
 # ============================================================================
@@ -329,25 +383,92 @@ async def health_check():
 )
 async def get_tao_price():
     """
-    Get the cached TAO/USD price.
+    Get the latest TAO/USD price from the database.
     
-    Returns the TAO price in USD, fetched from TaoStats and cached every 15 minutes.
-    If the cache is empty (e.g., on first startup before fetch completes), returns 503.
+    Returns the most recent TAO price in USD from the tao_usd_price table.
+    If no price data exists, returns 503.
     """
-    cache = get_cached_price()
+    # Use price database if configured, otherwise use main database
+    db = price_prisma if price_prisma is not None else prisma
     
-    if cache.price_usd is None or cache.last_updated is None:
+    # Query the most recent price from the database
+    latest_price = await db.taousdprice.find_first(
+        order={"date": "desc"}
+    )
+    
+    if latest_price is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="TAO price not yet available. Please retry shortly.",
         )
     
+    # Check if price is stale (older than 1 hour)
+    age_seconds = (datetime.now(timezone.utc) - latest_price.date).total_seconds()
+    is_stale = age_seconds > 3600  # 1 hour
+    
     return TaoPriceResponse(
-        price_usd=cache.price_usd,
-        last_updated=cache.last_updated,
-        source=cache.source,
-        stale=is_price_stale(),
+        price_usd=latest_price.taoPrice,
+        last_updated=latest_price.date,
+        source="taostats",
+        stale=is_stale,
     )
+
+
+# ============================================================================
+# Axon Check Endpoint
+# ============================================================================
+
+@app.post(
+    "/axon/check",
+    response_model=AxonCheckResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def check_axon(
+    request: AxonCheckRequest,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Verify a validator's axon is reachable from the internet.
+    
+    The API attempts to connect to the validator's axon at the provided IP:port.
+    Used during validator startup to ensure the axon port is properly configured.
+    
+    Only accessible by validators.
+    """
+    axon_timeout = float(os.getenv("AXON_CHECK_TIMEOUT", "5.0"))
+    
+    try:
+        async with httpx.AsyncClient(timeout=axon_timeout) as client:
+            # Bittensor axons expose an HTTP server; attempt a simple GET request
+            url = f"http://{request.ip}:{request.port}/"
+            response = await client.get(url)
+            # Any response (even 4xx/5xx) means the port is open and responding
+            logger.info(
+                f"Axon check PASSED for {validator_hotkey}: "
+                f"{request.ip}:{request.port} responded with status {response.status_code}"
+            )
+            return AxonCheckResponse(reachable=True)
+    except httpx.ConnectError as e:
+        error_msg = f"Connection refused or host unreachable: {e}"
+        logger.warning(
+            f"Axon check FAILED for {validator_hotkey}: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+    except httpx.TimeoutException:
+        error_msg = f"Connection timed out after {axon_timeout}s"
+        logger.warning(
+            f"Axon check FAILED for {validator_hotkey}: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+    except Exception as e:
+        error_msg = f"Unexpected error: {type(e).__name__}: {e}"
+        logger.warning(
+            f"Axon check FAILED for {validator_hotkey}: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
 
 
 # ============================================================================
@@ -949,4 +1070,5 @@ if __name__ == "__main__":
         host=host,
         port=port,
         reload=os.getenv("API_RELOAD", "false").lower() == "true",
+        access_log=False,  # Disable uvicorn access logging entirely
     )

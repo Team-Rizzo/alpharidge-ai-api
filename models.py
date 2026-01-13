@@ -350,3 +350,19 @@ class TaoPriceResponse(BaseModel):
     last_updated: datetime
     source: str
     stale: bool
+
+
+# ============================================================================
+# Axon Check Models
+# ============================================================================
+
+class AxonCheckRequest(BaseModel):
+    """Request model for axon reachability check."""
+    ip: str
+    port: int
+
+
+class AxonCheckResponse(BaseModel):
+    """Response model for axon reachability check."""
+    reachable: bool
+    error: Optional[str] = None
