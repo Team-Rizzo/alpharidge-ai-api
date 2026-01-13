@@ -62,6 +62,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from prisma import Prisma
 
+import httpx
+
 # Local imports
 from models import (
     Tweet, TweetWithAuthor, Account, TweetAnalysis,
@@ -71,6 +73,7 @@ from models import (
     BlacklistedHotkey, BlacklistedHotkeyCreate, BlacklistedHotkeyBulkCreate,
     TweetsForScoringResponse, CompletedTweetsSubmission,
     SubmissionResponse, ErrorResponse, TaoPriceResponse,
+    AxonCheckRequest, AxonCheckResponse,
 )
 from utils.auth import (
     AuthRequest,
@@ -409,6 +412,63 @@ async def get_tao_price():
         source="taostats",
         stale=is_stale,
     )
+
+
+# ============================================================================
+# Axon Check Endpoint
+# ============================================================================
+
+@app.post(
+    "/axon/check",
+    response_model=AxonCheckResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def check_axon(
+    request: AxonCheckRequest,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Verify a validator's axon is reachable from the internet.
+    
+    The API attempts to connect to the validator's axon at the provided IP:port.
+    Used during validator startup to ensure the axon port is properly configured.
+    
+    Only accessible by validators.
+    """
+    axon_timeout = float(os.getenv("AXON_CHECK_TIMEOUT", "5.0"))
+    
+    try:
+        async with httpx.AsyncClient(timeout=axon_timeout) as client:
+            # Bittensor axons expose an HTTP server; attempt a simple GET request
+            url = f"http://{request.ip}:{request.port}/"
+            response = await client.get(url)
+            # Any response (even 4xx/5xx) means the port is open and responding
+            logger.info(
+                f"Axon check PASSED for {validator_hotkey}: "
+                f"{request.ip}:{request.port} responded with status {response.status_code}"
+            )
+            return AxonCheckResponse(reachable=True)
+    except httpx.ConnectError as e:
+        error_msg = f"Connection refused or host unreachable: {e}"
+        logger.warning(
+            f"Axon check FAILED for {validator_hotkey}: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+    except httpx.TimeoutException:
+        error_msg = f"Connection timed out after {axon_timeout}s"
+        logger.warning(
+            f"Axon check FAILED for {validator_hotkey}: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+    except Exception as e:
+        error_msg = f"Unexpected error: {type(e).__name__}: {e}"
+        logger.warning(
+            f"Axon check FAILED for {validator_hotkey}: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
 
 
 # ============================================================================
