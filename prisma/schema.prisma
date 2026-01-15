@@ -379,3 +379,105 @@ model TaoUsdPrice {
   @@index([date], name: "idx_tao_usd_price_date")
   @@map("tao_usd_price")
 }
+
+// ============================================================================
+// Telegram Models
+// ============================================================================
+
+/// Telegram groups being monitored
+model TelegramGroup {
+  id          String             @id @default(cuid())
+  telegramId  BigInt             @unique @map("telegram_id")
+  title       String
+  isMonitored Boolean            @default(false) @map("is_monitored")
+  isMuted     Boolean            @default(false) @map("is_muted")
+  mutedUntil  DateTime?          @map("muted_until")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  messages    TelegramMessage[]
+
+  @@index([telegramId], name: "idx_telegram_groups_telegram_id")
+  @@index([isMonitored], name: "idx_telegram_groups_monitored")
+  @@map("telegram_groups")
+}
+
+/// Telegram messages
+model TelegramMessage {
+  id             String                    @id @default(cuid())
+  telegramId     BigInt                    @unique @map("telegram_id")
+  groupId        String                    @map("group_id")
+  senderId       BigInt                    @map("sender_id")
+  senderUsername String?                   @map("sender_username")
+  senderName     String                    @map("sender_name")
+  content        String
+  replyToId      BigInt?                   @map("reply_to_id")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  
+  // Relations
+  group          TelegramGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  scorings       TelegramScoring[]
+  analysis       TelegramMessageAnalysis?
+
+  @@index([groupId], name: "idx_telegram_messages_group")
+  @@index([createdAt], name: "idx_telegram_messages_created")
+  @@index([replyToId], name: "idx_telegram_messages_reply_to")
+  @@index([senderId], name: "idx_telegram_messages_sender")
+  @@map("telegram_messages")
+}
+
+/// Telegram message analysis/classification results
+model TelegramMessageAnalysis {
+  id                  Int              @id @default(autoincrement())
+  messageId           String           @unique @map("message_id")
+  
+  // Sentiment analysis
+  sentiment           String?          // very_bullish, bullish, neutral, bearish, very_bearish
+  
+  // Subnet classification
+  subnetId            Int?             @map("subnet_id")
+  subnetName          String?          @map("subnet_name")
+  
+  // Content analysis
+  contentType         String?          @map("content_type")
+  technicalQuality    String?          @map("technical_quality")
+  marketAnalysis      String?          @map("market_analysis")
+  impactPotential     String?          @map("impact_potential")
+  relevanceConfidence String?          @map("relevance_confidence")
+  
+  // Full analysis data (JSON blob)
+  analysisData        Json?            @map("analysis_data") @db.JsonB
+  
+  // Timestamps
+  analyzedAt          DateTime         @default(now()) @map("analyzed_at")
+  updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  message             TelegramMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([sentiment], name: "idx_telegram_analysis_sentiment")
+  @@index([subnetId], name: "idx_telegram_analysis_subnet")
+  @@index([analyzedAt], name: "idx_telegram_analysis_analyzed_at")
+  @@map("telegram_message_analysis")
+}
+
+/// Scoring records for telegram message validation
+model TelegramScoring {
+  id              Int              @id @default(autoincrement())
+  messageId       String           @map("message_id")
+  status          String           @default("pending") // pending, in_progress, completed
+  startTime       DateTime?        @map("start_time")
+  validatorHotkey String?          @map("validator_hotkey")
+  score           Float?
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  message         TelegramMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId], name: "idx_telegram_scoring_message")
+  @@index([status], name: "idx_telegram_scoring_status")
+  @@index([validatorHotkey], name: "idx_telegram_scoring_validator")
+  @@index([status, startTime], name: "idx_telegram_scoring_status_start_time")
+  @@map("telegram_scoring")
+}

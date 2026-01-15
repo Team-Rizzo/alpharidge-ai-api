@@ -74,6 +74,10 @@ from models import (
     TweetsForScoringResponse, CompletedTweetsSubmission,
     SubmissionResponse, ErrorResponse, TaoPriceResponse,
     AxonCheckRequest, AxonCheckResponse,
+    # Telegram models
+    TelegramGroup, TelegramMessage, TelegramMessageAnalysis,
+    TelegramMessageWithContext, TelegramMessageForScoring,
+    TelegramMessagesForScoringResponse, CompletedTelegramMessagesSubmission,
 )
 from utils.auth import (
     AuthRequest,
@@ -744,6 +748,395 @@ async def submit_completed_tweets(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to submit completed tweets: {str(e)}",
+        )
+
+
+# ============================================================================
+# Telegram Message Routes
+# ============================================================================
+
+@app.get(
+    "/telegram/messages/unscored",
+    response_model=TelegramMessagesForScoringResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+) 
+async def get_unscored_telegram_messages(
+    limit: int = 3,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Get telegram messages that need scoring.
+
+    Returns up to `limit` messages (default 3) that either:
+    - Have no scoring records at all, or
+    - Have no TelegramMessageAnalysis record
+
+    For each message, context is provided:
+    - If the message is a reply, check if the parent message has been classified (has subnetId).
+      If so, include that classification as inherited_subnet_id.
+    - If not a reply, grab the previous 2 messages in the same group and check their classification.
+      If any have a classification, include that as inherited_subnet_id.
+
+    Creates a new scoring record (set to 'in_progress') for messages without one.
+    Only accessible by validators.
+    """
+    try:
+        lease_ttl_seconds = int(os.getenv("SCORING_LEASE_TTL_SECONDS", "900"))
+
+        async with prisma.tx() as tx:
+            # 1) Reclaim expired leases: in_progress older than TTL → pending (unassigned).
+            await tx.execute_raw(
+                """
+                UPDATE telegram_scoring
+                SET status = 'pending',
+                    start_time = NULL,
+                    validator_hotkey = NULL
+                WHERE status = 'in_progress'
+                  AND start_time IS NOT NULL
+                  AND start_time < (NOW() AT TIME ZONE 'utc') - (MAKE_INTERVAL(secs => $1));
+                """,
+                lease_ttl_seconds,
+            )
+
+            # 2) Pick from two sources:
+            #   A) Existing scoring records with status='pending'
+            #   B) Messages with no scoring record and no analysis record
+
+            # A: Atomically claim up to `limit` pending scorings using row locks.
+            claimed_pending = await tx.query_raw(
+                """
+                WITH picked AS (
+                    SELECT s.id, s.message_id
+                    FROM telegram_scoring s
+                    JOIN telegram_messages m ON m.id = s.message_id
+                    WHERE s.status = 'pending'
+                      AND m.content IS NOT NULL
+                      AND BTRIM(m.content) <> ''
+                    ORDER BY s.created_at ASC, s.id ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT $1
+                )
+                UPDATE telegram_scoring s
+                SET status = 'in_progress',
+                    start_time = (NOW() AT TIME ZONE 'utc'),
+                    validator_hotkey = $2
+                FROM picked
+                WHERE s.id = picked.id
+                RETURNING picked.message_id;
+                """,
+                limit,
+                validator_hotkey,
+            )
+            message_ids_pending = [row["message_id"] for row in (claimed_pending or [])]
+
+            # If need more, get messages that have no scoring and no analysis
+            slots_left = max(0, limit - len(message_ids_pending))
+            message_ids_no_scoring = []
+            if slots_left > 0:
+                inserted_rows = await tx.query_raw(
+                    """
+                    WITH unscored_messages AS (
+                        SELECT m.id AS message_id
+                        FROM telegram_messages m
+                        LEFT JOIN telegram_scoring s ON s.message_id = m.id
+                        LEFT JOIN telegram_message_analysis a ON a.message_id = m.id
+                        WHERE s.id IS NULL AND a.id IS NULL
+                          AND m.content IS NOT NULL
+                          AND BTRIM(m.content) <> ''
+                        ORDER BY m.created_at ASC, m.id ASC
+                        LIMIT $1
+                        FOR UPDATE OF m SKIP LOCKED
+                    ), created_scoring AS (
+                        INSERT INTO telegram_scoring (message_id, status, start_time, validator_hotkey, created_at)
+                        SELECT message_id, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
+                        FROM unscored_messages
+                        RETURNING message_id
+                    )
+                    SELECT message_id FROM created_scoring;
+                    """,
+                    slots_left,
+                    validator_hotkey,
+                )
+                message_ids_no_scoring = [row["message_id"] for row in (inserted_rows or [])]
+
+            # Combine all claimed message ids
+            message_ids = message_ids_pending + message_ids_no_scoring
+            if not message_ids:
+                return TelegramMessagesForScoringResponse(messages=[], count=0)
+
+        # Fetch the claimed messages with group and analysis relations
+        messages = await prisma.telegrammessage.find_many(
+            where={"id": {"in": message_ids}},
+            include={"group": True, "analysis": True},
+        )
+
+        # Preserve claim order
+        messages_by_id = {m.id: m for m in messages}
+        ordered = [messages_by_id.get(mid) for mid in message_ids if mid in messages_by_id]
+
+        messages_for_scoring = []
+        for message in ordered:
+            if message is None or message.content is None or not str(message.content).strip():
+                continue
+
+            # Build the response model
+            group_model = None
+            analysis_model = None
+            context_messages = []
+            inherited_subnet_id = None
+            inherited_subnet_name = None
+
+            if message.group:
+                group_model = TelegramGroup(
+                    id=message.group.id,
+                    telegramId=message.group.telegramId,
+                    title=message.group.title,
+                    isMonitored=message.group.isMonitored,
+                    isMuted=message.group.isMuted,
+                    mutedUntil=message.group.mutedUntil.isoformat() if message.group.mutedUntil else None,
+                    createdAt=message.group.createdAt.isoformat() if message.group.createdAt else None,
+                    updatedAt=message.group.updatedAt.isoformat() if message.group.updatedAt else None,
+                )
+
+            if message.analysis:
+                analysis_model = TelegramMessageAnalysis(
+                    id=message.analysis.id,
+                    messageId=message.analysis.messageId,
+                    sentiment=message.analysis.sentiment,
+                    subnetId=message.analysis.subnetId,
+                    subnetName=message.analysis.subnetName,
+                    contentType=message.analysis.contentType,
+                    technicalQuality=message.analysis.technicalQuality,
+                    marketAnalysis=message.analysis.marketAnalysis,
+                    impactPotential=message.analysis.impactPotential,
+                    relevanceConfidence=message.analysis.relevanceConfidence,
+                    analyzedAt=message.analysis.analyzedAt.isoformat() if message.analysis.analyzedAt else None,
+                )
+
+            # Check for context based on reply status
+            if message.replyToId is not None:
+                # This message is a reply - check if parent message has classification
+                parent_message = await prisma.telegrammessage.find_first(
+                    where={"telegramId": message.replyToId},
+                    include={"group": True, "analysis": True},
+                )
+                if parent_message:
+                    parent_group_model = None
+                    parent_analysis_model = None
+                    
+                    if parent_message.group:
+                        parent_group_model = TelegramGroup(
+                            id=parent_message.group.id,
+                            telegramId=parent_message.group.telegramId,
+                            title=parent_message.group.title,
+                            isMonitored=parent_message.group.isMonitored,
+                            isMuted=parent_message.group.isMuted,
+                            mutedUntil=parent_message.group.mutedUntil.isoformat() if parent_message.group.mutedUntil else None,
+                            createdAt=parent_message.group.createdAt.isoformat() if parent_message.group.createdAt else None,
+                            updatedAt=parent_message.group.updatedAt.isoformat() if parent_message.group.updatedAt else None,
+                        )
+                    
+                    if parent_message.analysis:
+                        parent_analysis_model = TelegramMessageAnalysis(
+                            id=parent_message.analysis.id,
+                            messageId=parent_message.analysis.messageId,
+                            sentiment=parent_message.analysis.sentiment,
+                            subnetId=parent_message.analysis.subnetId,
+                            subnetName=parent_message.analysis.subnetName,
+                            contentType=parent_message.analysis.contentType,
+                            technicalQuality=parent_message.analysis.technicalQuality,
+                            marketAnalysis=parent_message.analysis.marketAnalysis,
+                            impactPotential=parent_message.analysis.impactPotential,
+                            relevanceConfidence=parent_message.analysis.relevanceConfidence,
+                            analyzedAt=parent_message.analysis.analyzedAt.isoformat() if parent_message.analysis.analyzedAt else None,
+                        )
+                        # Inherit subnet classification from parent
+                        if parent_message.analysis.subnetId is not None:
+                            inherited_subnet_id = parent_message.analysis.subnetId
+                            inherited_subnet_name = parent_message.analysis.subnetName
+
+                    context_messages.append(TelegramMessageWithContext(
+                        id=parent_message.id,
+                        telegramId=parent_message.telegramId,
+                        groupId=parent_message.groupId,
+                        senderId=parent_message.senderId,
+                        senderUsername=parent_message.senderUsername,
+                        senderName=parent_message.senderName,
+                        content=parent_message.content,
+                        replyToId=parent_message.replyToId,
+                        createdAt=parent_message.createdAt.isoformat() if parent_message.createdAt else None,
+                        group=parent_group_model,
+                        analysis=parent_analysis_model,
+                    ))
+            else:
+                # Not a reply - grab previous 2 messages in the same group for context
+                previous_messages = await prisma.telegrammessage.find_many(
+                    where={
+                        "groupId": message.groupId,
+                        "createdAt": {"lt": message.createdAt},
+                    },
+                    include={"group": True, "analysis": True},
+                    order={"createdAt": "desc"},
+                    take=2,
+                )
+                
+                for prev_msg in previous_messages:
+                    prev_group_model = None
+                    prev_analysis_model = None
+                    
+                    if prev_msg.group:
+                        prev_group_model = TelegramGroup(
+                            id=prev_msg.group.id,
+                            telegramId=prev_msg.group.telegramId,
+                            title=prev_msg.group.title,
+                            isMonitored=prev_msg.group.isMonitored,
+                            isMuted=prev_msg.group.isMuted,
+                            mutedUntil=prev_msg.group.mutedUntil.isoformat() if prev_msg.group.mutedUntil else None,
+                            createdAt=prev_msg.group.createdAt.isoformat() if prev_msg.group.createdAt else None,
+                            updatedAt=prev_msg.group.updatedAt.isoformat() if prev_msg.group.updatedAt else None,
+                        )
+                    
+                    if prev_msg.analysis:
+                        prev_analysis_model = TelegramMessageAnalysis(
+                            id=prev_msg.analysis.id,
+                            messageId=prev_msg.analysis.messageId,
+                            sentiment=prev_msg.analysis.sentiment,
+                            subnetId=prev_msg.analysis.subnetId,
+                            subnetName=prev_msg.analysis.subnetName,
+                            contentType=prev_msg.analysis.contentType,
+                            technicalQuality=prev_msg.analysis.technicalQuality,
+                            marketAnalysis=prev_msg.analysis.marketAnalysis,
+                            impactPotential=prev_msg.analysis.impactPotential,
+                            relevanceConfidence=prev_msg.analysis.relevanceConfidence,
+                            analyzedAt=prev_msg.analysis.analyzedAt.isoformat() if prev_msg.analysis.analyzedAt else None,
+                        )
+                        # Inherit subnet classification from most recent classified message
+                        if inherited_subnet_id is None and prev_msg.analysis.subnetId is not None:
+                            inherited_subnet_id = prev_msg.analysis.subnetId
+                            inherited_subnet_name = prev_msg.analysis.subnetName
+
+                    context_messages.append(TelegramMessageWithContext(
+                        id=prev_msg.id,
+                        telegramId=prev_msg.telegramId,
+                        groupId=prev_msg.groupId,
+                        senderId=prev_msg.senderId,
+                        senderUsername=prev_msg.senderUsername,
+                        senderName=prev_msg.senderName,
+                        content=prev_msg.content,
+                        replyToId=prev_msg.replyToId,
+                        createdAt=prev_msg.createdAt.isoformat() if prev_msg.createdAt else None,
+                        group=prev_group_model,
+                        analysis=prev_analysis_model,
+                    ))
+
+            message_data = TelegramMessageForScoring(
+                id=message.id,
+                telegramId=message.telegramId,
+                groupId=message.groupId,
+                senderId=message.senderId,
+                senderUsername=message.senderUsername,
+                senderName=message.senderName,
+                content=message.content,
+                replyToId=message.replyToId,
+                createdAt=message.createdAt.isoformat() if message.createdAt else None,
+                group=group_model,
+                analysis=analysis_model,
+                contextMessages=context_messages,
+                inheritedSubnetId=inherited_subnet_id,
+                inheritedSubnetName=inherited_subnet_name,
+            )
+            messages_for_scoring.append(message_data)
+
+        logger.info(f"Leased {len(messages_for_scoring)} telegram message(s) to validator {validator_hotkey}")
+        return TelegramMessagesForScoringResponse(messages=messages_for_scoring, count=len(messages_for_scoring))
+
+    except Exception as e:
+        logger.error(f"Error getting unscored telegram messages: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get unscored telegram messages: {str(e)}",
+        )
+
+
+@app.post(
+    "/telegram/messages/completed",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_completed_telegram_messages(
+    submission: CompletedTelegramMessagesSubmission,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Submit completed scored telegram messages.
+    
+    Updates the scoring status to 'completed' and stores the analysis in TelegramMessageAnalysis.
+    Only messages assigned to the requesting validator can be completed.
+    
+    Only accessible by validators.
+    """
+    try:
+        updated_count = 0
+        
+        for completed in submission.completed_messages:
+            # Create or update TelegramMessageAnalysis with sentiment + optional classification columns.
+            analysis_create = {
+                "messageId": completed.message_id,
+                "sentiment": completed.sentiment,
+                "analyzedAt": datetime.utcnow(),
+            }
+            analysis_update = {
+                "sentiment": completed.sentiment,
+                "updatedAt": datetime.utcnow(),
+                "analyzedAt": datetime.utcnow(),
+            }
+
+            # Optional classification columns (only set if provided by the validator).
+            optional_fields = {
+                "subnetId": completed.subnet_id,
+                "subnetName": completed.subnet_name,
+                "contentType": completed.content_type,
+                "technicalQuality": completed.technical_quality,
+                "marketAnalysis": completed.market_analysis,
+                "impactPotential": completed.impact_potential,
+                "relevanceConfidence": completed.relevance_confidence,
+            }
+            for k, v in optional_fields.items():
+                if v is not None:
+                    analysis_create[k] = v
+                    analysis_update[k] = v
+
+            await prisma.telegrammessageanalysis.upsert(
+                where={"messageId": completed.message_id},
+                data={
+                    "create": analysis_create,
+                    "update": analysis_update,
+                },
+            )
+            
+            # Update scoring status to completed (only if still leased to this validator).
+            result = await prisma.telegramscoring.update_many(
+                where={
+                    "messageId": completed.message_id,
+                    "validatorHotkey": validator_hotkey,
+                    "status": "in_progress",
+                },
+                data={"status": "completed"},
+            )
+            updated_count += result
+        
+        logger.info(f"Validator {validator_hotkey} completed {updated_count} telegram messages")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully completed {updated_count} telegram messages",
+            count=updated_count,
+        )
+    
+    except Exception as e:
+        logger.error(f"Error submitting completed telegram messages: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit completed telegram messages: {str(e)}",
         )
 
 
