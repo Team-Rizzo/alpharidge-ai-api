@@ -1,10 +1,11 @@
 """
 TAO Price History Service.
 
-Fetches TAO/USD price from TaoStats API every 15 minutes and writes it to the database.
+Fetches TAO/USD price from TaoStats API or CoinGecko every 15 minutes and writes it to the database.
 This runs as a separate background task to maintain historical price data.
 
 Supports a separate PRICE_DATABASE_URL for writing price data to a different database.
+Set USE_COINGECKO=true to use CoinGecko instead of TaoStats.
 """
 
 import os
@@ -12,9 +13,23 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+from dataclasses import dataclass
 
 import httpx
 from prisma import Prisma
+
+
+@dataclass
+class TaoPriceData:
+    """Container for TAO price and market data."""
+    price: float
+    market_cap: Optional[float] = None
+    volume_24h: Optional[float] = None
+    price_change_24h: Optional[float] = None
+    market_cap_change_24h: Optional[float] = None
+    price_change_7d: Optional[float] = None
+    price_change_30d: Optional[float] = None
+    source: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +38,12 @@ TAO_PRICE_HISTORY_REFRESH_SECONDS = int(os.getenv("TAO_PRICE_HISTORY_REFRESH_SEC
 TAOSTATS_API_URL = os.getenv("TAOSTATS_API_URL", "https://api.taostats.io/api/price/latest/v1?asset=tao")
 TAOSTATS_API_KEY = os.getenv("TAOSTATS_API_KEY", "")
 TAOSTATS_TIMEOUT = float(os.getenv("TAOSTATS_TIMEOUT", "10.0"))
+
+# CoinGecko configuration
+USE_COINGECKO = os.getenv("USE_COINGECKO", "false").lower() == "true"
+COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
+COINGECKO_API_URL = "https://api.coingecko.com/api/v3/simple/price"
+COINGECKO_TAO_ID = "bittensor"  # CoinGecko's id for TAO
 
 # Optional separate database for price data
 PRICE_DATABASE_URL = os.getenv("PRICE_DATABASE_URL", "")
@@ -77,12 +98,87 @@ def set_prisma_client(prisma: Prisma) -> None:
     logger.info("Prisma client set for TAO price history service")
 
 
-async def fetch_tao_price_from_api() -> float:
+async def fetch_tao_price_from_coingecko() -> TaoPriceData:
+    """
+    Fetch TAO/USD price and market data from CoinGecko API.
+    
+    Returns:
+        TaoPriceData with price and additional market data.
+        
+    Raises:
+        Exception if fetch fails.
+    """
+    params = {
+        "ids": COINGECKO_TAO_ID,
+        "vs_currencies": "usd",
+        "include_market_cap": "true",
+        "include_24hr_vol": "true",
+        "include_24hr_change": "true",
+    }
+    if COINGECKO_API_KEY:
+        params["x_cg_demo_api_key"] = COINGECKO_API_KEY
+    
+    async with httpx.AsyncClient(timeout=TAOSTATS_TIMEOUT) as client:
+        response = await client.get(COINGECKO_API_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        # CoinGecko returns: {"bittensor": {"usd": 123.45, "usd_market_cap": ..., ...}}
+        if COINGECKO_TAO_ID not in data:
+            raise ValueError(f"Could not find {COINGECKO_TAO_ID} in CoinGecko response: {data}")
+        
+        tao_data = data[COINGECKO_TAO_ID]
+        price = tao_data.get("usd")
+        if price is None:
+            raise ValueError(f"Could not find USD price in CoinGecko response: {data}")
+        
+        # Fetch additional data from the detailed endpoint for 7d/30d changes
+        price_change_7d = None
+        price_change_30d = None
+        market_cap_change_24h = None
+        
+        try:
+            detailed_url = f"https://api.coingecko.com/api/v3/coins/{COINGECKO_TAO_ID}"
+            detailed_params = {
+                "localization": "false",
+                "tickers": "false",
+                "community_data": "false",
+                "developer_data": "false",
+                "sparkline": "false",
+            }
+            if COINGECKO_API_KEY:
+                detailed_params["x_cg_demo_api_key"] = COINGECKO_API_KEY
+            
+            detailed_response = await client.get(detailed_url, params=detailed_params)
+            detailed_response.raise_for_status()
+            detailed_data = detailed_response.json()
+            
+            market_data = detailed_data.get("market_data", {})
+            price_change_7d = market_data.get("price_change_percentage_7d")
+            price_change_30d = market_data.get("price_change_percentage_30d")
+            market_cap_change_24h = market_data.get("market_cap_change_percentage_24h")
+        except Exception as e:
+            # Log but don't fail - the basic data is still valuable
+            logger.warning(f"Failed to fetch detailed CoinGecko data: {e}")
+        
+        return TaoPriceData(
+            price=float(price),
+            market_cap=tao_data.get("usd_market_cap"),
+            volume_24h=tao_data.get("usd_24h_vol"),
+            price_change_24h=tao_data.get("usd_24h_change"),
+            market_cap_change_24h=market_cap_change_24h,
+            price_change_7d=price_change_7d,
+            price_change_30d=price_change_30d,
+            source="coingecko",
+        )
+
+
+async def fetch_tao_price_from_taostats() -> TaoPriceData:
     """
     Fetch TAO/USD price from TaoStats API.
     
     Returns:
-        The TAO price in USD.
+        TaoPriceData with price only (TaoStats doesn't provide market data).
         
     Raises:
         Exception if fetch fails.
@@ -121,9 +217,30 @@ async def fetch_tao_price_from_api() -> float:
             price = data["usdPrice"]
         
         if price is None:
-            raise ValueError(f"Could not find price in API response: {data}")
+            raise ValueError(f"Could not find price in TaoStats response: {data}")
         
-        return float(price)
+        return TaoPriceData(
+            price=float(price),
+            source="taostats",
+        )
+
+
+async def fetch_tao_price_from_api() -> TaoPriceData:
+    """
+    Fetch TAO/USD price from configured API source.
+    
+    Uses CoinGecko if USE_COINGECKO=true, otherwise uses TaoStats.
+    
+    Returns:
+        TaoPriceData with price and optional market data.
+        
+    Raises:
+        Exception if fetch fails.
+    """
+    if USE_COINGECKO:
+        return await fetch_tao_price_from_coingecko()
+    else:
+        return await fetch_tao_price_from_taostats()
 
 
 async def fetch_and_write_price() -> None:
@@ -139,18 +256,34 @@ async def fetch_and_write_price() -> None:
     
     for attempt in range(max_retries):
         try:
-            price = await fetch_tao_price_from_api()
+            price_data = await fetch_tao_price_from_api()
             timestamp = datetime.now(timezone.utc)
             
-            # Write to database
-            await _prisma.taousdprice.create(
-                data={
-                    "taoPrice": price,
-                    "date": timestamp,
-                }
-            )
+            # Build the data dict - always include price and date
+            db_data = {
+                "taoPrice": price_data.price,
+                "date": timestamp,
+                "source": price_data.source,
+            }
             
-            logger.info(f"TAO price written to database: ${price:.2f} at {timestamp.isoformat()}")
+            # Add optional fields if available (from CoinGecko)
+            if price_data.market_cap is not None:
+                db_data["marketCap"] = price_data.market_cap
+            if price_data.volume_24h is not None:
+                db_data["volume24h"] = price_data.volume_24h
+            if price_data.price_change_24h is not None:
+                db_data["priceChange24h"] = price_data.price_change_24h
+            if price_data.market_cap_change_24h is not None:
+                db_data["marketCapChange24h"] = price_data.market_cap_change_24h
+            if price_data.price_change_7d is not None:
+                db_data["priceChange7d"] = price_data.price_change_7d
+            if price_data.price_change_30d is not None:
+                db_data["priceChange30d"] = price_data.price_change_30d
+            
+            # Write to database
+            await _prisma.taousdprice.create(data=db_data)
+            
+            logger.info(f"TAO price written to database: ${price_data.price:.2f} at {timestamp.isoformat()} (source: {price_data.source})")
             return
             
         except Exception as e:
@@ -181,7 +314,8 @@ def start_history_task() -> asyncio.Task:
     global _history_task
     if _history_task is None or _history_task.done():
         _history_task = asyncio.create_task(_history_loop())
-        logger.info(f"TAO price history task started (interval: {TAO_PRICE_HISTORY_REFRESH_SECONDS}s)")
+        source = "CoinGecko" if USE_COINGECKO else "TaoStats"
+        logger.info(f"TAO price history task started (interval: {TAO_PRICE_HISTORY_REFRESH_SECONDS}s, source: {source})")
     return _history_task
 
 

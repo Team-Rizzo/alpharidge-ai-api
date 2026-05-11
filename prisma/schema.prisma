@@ -372,9 +372,18 @@ model BlacklistedHotkey {
 
 /// Historical TAO/USD price data
 model TaoUsdPrice {
-  id        Int      @id @default(autoincrement())
-  taoPrice  Float    @map("tao_price")
-  date      DateTime @default(now()) @db.Timestamptz
+  id                    Int      @id @default(autoincrement())
+  taoPrice              Float    @map("tao_price")
+  date                  DateTime @default(now()) @db.Timestamptz
+  
+  // Additional market data (optional - populated when using CoinGecko)
+  marketCap             Float?   @map("market_cap")
+  volume24h             Float?   @map("volume_24h")
+  priceChange24h        Float?   @map("price_change_24h")
+  marketCapChange24h    Float?   @map("market_cap_change_24h")
+  priceChange7d         Float?   @map("price_change_7d")
+  priceChange30d        Float?   @map("price_change_30d")
+  source                String?  // "coingecko" or "taostats"
 
   @@index([date], name: "idx_tao_usd_price_date")
   @@map("tao_usd_price")
