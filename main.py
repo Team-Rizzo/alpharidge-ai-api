@@ -502,6 +502,8 @@ async def get_unscored_tweets(
     """
     try:
         lease_ttl_seconds = int(os.getenv("SCORING_LEASE_TTL_SECONDS", "900"))
+        serve_crypto = os.getenv("SERVE_CRYPTO_TWEETS", "false").lower() == "true"
+        rule_tag_filter = "" if serve_crypto else "AND (t.rule_tag IS NULL OR t.rule_tag NOT LIKE 'search_%')"
 
         async with prisma.tx() as tx:
             # 1) Reclaim expired leases: in_progress older than TTL → pending (unassigned).
@@ -524,7 +526,7 @@ async def get_unscored_tweets(
 
             # A: Atomically claim up to `limit` pending scorings using row locks.
             claimed_pending = await tx.query_raw(
-                """
+                f"""
                 WITH picked AS (
                     SELECT s.id, s.tweet_id
                     FROM scoring s
@@ -532,6 +534,7 @@ async def get_unscored_tweets(
                     WHERE s.status = 'pending'
                       AND t.text IS NOT NULL
                       AND BTRIM(t.text) <> ''
+                      {rule_tag_filter}
                     ORDER BY s.created_at ASC, s.id ASC
                     FOR UPDATE SKIP LOCKED
                     LIMIT $1
@@ -557,7 +560,7 @@ async def get_unscored_tweets(
                 # and insert a new scoring record (status = 'in_progress') for each, returning IDs
                 # We must avoid race condition: Do all in one statement with row locking
                 inserted_rows = await tx.query_raw(
-                    """
+                    f"""
                     WITH unscored_tweets AS (
                         SELECT t.id AS tweet_id
                         FROM tweets t
@@ -566,6 +569,7 @@ async def get_unscored_tweets(
                         WHERE s.id IS NULL AND a.id IS NULL
                           AND t.text IS NOT NULL
                           AND BTRIM(t.text) <> ''
+                          {rule_tag_filter}
                         ORDER BY t.created_at ASC, t.id ASC
                         LIMIT $1
                         FOR UPDATE OF t SKIP LOCKED
@@ -629,8 +633,8 @@ async def get_unscored_tweets(
                     id=tweet.analysis.id,
                     tweetId=tweet.analysis.tweetId,
                     sentiment=tweet.analysis.sentiment,
-                    subnetId=tweet.analysis.subnetId,
-                    subnetName=tweet.analysis.subnetName,
+                    assetId=tweet.analysis.assetId,
+                    assetSymbol=tweet.analysis.assetSymbol,
                     contentType=tweet.analysis.contentType,
                     analyzedAt=tweet.analysis.analyzedAt,
                 )
@@ -704,8 +708,8 @@ async def submit_completed_tweets(
 
             # Optional classification columns (only set if provided by the validator).
             optional_fields = {
-                "subnetId": completed.subnet_id,
-                "subnetName": completed.subnet_name,
+                "assetId": completed.asset_id,
+                "assetSymbol": completed.asset_symbol,
                 "contentType": completed.content_type,
                 "technicalQuality": completed.technical_quality,
                 "marketAnalysis": completed.market_analysis,
@@ -772,10 +776,10 @@ async def get_unscored_telegram_messages(
     - Have no TelegramMessageAnalysis record
 
     For each message, context is provided:
-    - If the message is a reply, check if the parent message has been classified (has subnetId).
-      If so, include that classification as inherited_subnet_id.
+    - If the message is a reply, check if the parent message has been classified (has assetId).
+      If so, include that classification as inherited_asset_id.
     - If not a reply, grab the previous 2 messages in the same group and check their classification.
-      If any have a classification, include that as inherited_subnet_id.
+      If any have a classification, include that as inherited_asset_id.
 
     Creates a new scoring record (set to 'in_progress') for messages without one.
     Only accessible by validators.
@@ -883,8 +887,8 @@ async def get_unscored_telegram_messages(
             group_model = None
             analysis_model = None
             context_messages = []
-            inherited_subnet_id = None
-            inherited_subnet_name = None
+            inherited_asset_id = None
+            inherited_asset_symbol = None
 
             if message.group:
                 group_model = TelegramGroup(
@@ -903,8 +907,8 @@ async def get_unscored_telegram_messages(
                     id=message.analysis.id,
                     messageId=message.analysis.messageId,
                     sentiment=message.analysis.sentiment,
-                    subnetId=message.analysis.subnetId,
-                    subnetName=message.analysis.subnetName,
+                    assetId=message.analysis.assetId,
+                    assetSymbol=message.analysis.assetSymbol,
                     contentType=message.analysis.contentType,
                     technicalQuality=message.analysis.technicalQuality,
                     marketAnalysis=message.analysis.marketAnalysis,
@@ -941,8 +945,8 @@ async def get_unscored_telegram_messages(
                             id=parent_message.analysis.id,
                             messageId=parent_message.analysis.messageId,
                             sentiment=parent_message.analysis.sentiment,
-                            subnetId=parent_message.analysis.subnetId,
-                            subnetName=parent_message.analysis.subnetName,
+                            assetId=parent_message.analysis.assetId,
+                            assetSymbol=parent_message.analysis.assetSymbol,
                             contentType=parent_message.analysis.contentType,
                             technicalQuality=parent_message.analysis.technicalQuality,
                             marketAnalysis=parent_message.analysis.marketAnalysis,
@@ -950,10 +954,9 @@ async def get_unscored_telegram_messages(
                             relevanceConfidence=parent_message.analysis.relevanceConfidence,
                             analyzedAt=parent_message.analysis.analyzedAt.isoformat() if parent_message.analysis.analyzedAt else None,
                         )
-                        # Inherit subnet classification from parent
-                        if parent_message.analysis.subnetId is not None:
-                            inherited_subnet_id = parent_message.analysis.subnetId
-                            inherited_subnet_name = parent_message.analysis.subnetName
+                        if parent_message.analysis.assetId is not None:
+                            inherited_asset_id = parent_message.analysis.assetId
+                            inherited_asset_symbol = parent_message.analysis.assetSymbol
 
                     context_messages.append(TelegramMessageWithContext(
                         id=parent_message.id,
@@ -1001,8 +1004,8 @@ async def get_unscored_telegram_messages(
                             id=prev_msg.analysis.id,
                             messageId=prev_msg.analysis.messageId,
                             sentiment=prev_msg.analysis.sentiment,
-                            subnetId=prev_msg.analysis.subnetId,
-                            subnetName=prev_msg.analysis.subnetName,
+                            assetId=prev_msg.analysis.assetId,
+                            assetSymbol=prev_msg.analysis.assetSymbol,
                             contentType=prev_msg.analysis.contentType,
                             technicalQuality=prev_msg.analysis.technicalQuality,
                             marketAnalysis=prev_msg.analysis.marketAnalysis,
@@ -1010,10 +1013,9 @@ async def get_unscored_telegram_messages(
                             relevanceConfidence=prev_msg.analysis.relevanceConfidence,
                             analyzedAt=prev_msg.analysis.analyzedAt.isoformat() if prev_msg.analysis.analyzedAt else None,
                         )
-                        # Inherit subnet classification from most recent classified message
-                        if inherited_subnet_id is None and prev_msg.analysis.subnetId is not None:
-                            inherited_subnet_id = prev_msg.analysis.subnetId
-                            inherited_subnet_name = prev_msg.analysis.subnetName
+                        if inherited_asset_id is None and prev_msg.analysis.assetId is not None:
+                            inherited_asset_id = prev_msg.analysis.assetId
+                            inherited_asset_symbol = prev_msg.analysis.assetSymbol
 
                     context_messages.append(TelegramMessageWithContext(
                         id=prev_msg.id,
@@ -1042,8 +1044,8 @@ async def get_unscored_telegram_messages(
                 group=group_model,
                 analysis=analysis_model,
                 contextMessages=context_messages,
-                inheritedSubnetId=inherited_subnet_id,
-                inheritedSubnetName=inherited_subnet_name,
+                inheritedAssetId=inherited_asset_id,
+                inheritedAssetSymbol=inherited_asset_symbol,
             )
             messages_for_scoring.append(message_data)
 
@@ -1093,8 +1095,8 @@ async def submit_completed_telegram_messages(
 
             # Optional classification columns (only set if provided by the validator).
             optional_fields = {
-                "subnetId": completed.subnet_id,
-                "subnetName": completed.subnet_name,
+                "assetId": completed.asset_id,
+                "assetSymbol": completed.asset_symbol,
                 "contentType": completed.content_type,
                 "technicalQuality": completed.technical_quality,
                 "marketAnalysis": completed.market_analysis,

@@ -176,9 +176,13 @@ model TweetAnalysis {
   // Sentiment analysis
   sentiment           String?   // very_bullish, bullish, neutral, bearish, very_bearish
   
-  // Subnet classification
+  // Subnet classification (legacy — kept for backward compatibility with existing data)
   subnetId            Int?      @map("subnet_id")
   subnetName          String?   @map("subnet_name")
+
+  // Asset classification (new — replaces subnet classification)
+  assetId             Int?      @map("asset_id")
+  assetSymbol         String?   @map("asset_symbol")
   
   // Content analysis
   contentType         String?   @map("content_type")
@@ -199,6 +203,7 @@ model TweetAnalysis {
 
   @@index([sentiment], name: "idx_tweet_analysis_sentiment")
   @@index([subnetId], name: "idx_tweet_analysis_subnet")
+  @@index([assetId], name: "idx_tweet_analysis_asset")
   @@index([analyzedAt], name: "idx_tweet_analysis_analyzed_at")
   @@map("tweet_analysis")
 }
@@ -444,9 +449,13 @@ model TelegramMessageAnalysis {
   // Sentiment analysis
   sentiment           String?          // very_bullish, bullish, neutral, bearish, very_bearish
   
-  // Subnet classification
+  // Subnet classification (legacy — kept for backward compatibility with existing data)
   subnetId            Int?             @map("subnet_id")
   subnetName          String?          @map("subnet_name")
+
+  // Asset classification (new — replaces subnet classification)
+  assetId             Int?             @map("asset_id")
+  assetSymbol         String?          @map("asset_symbol")
   
   // Content analysis
   contentType         String?          @map("content_type")
@@ -467,6 +476,7 @@ model TelegramMessageAnalysis {
 
   @@index([sentiment], name: "idx_telegram_analysis_sentiment")
   @@index([subnetId], name: "idx_telegram_analysis_subnet")
+  @@index([assetId], name: "idx_telegram_analysis_asset")
   @@index([analyzedAt], name: "idx_telegram_analysis_analyzed_at")
   @@map("telegram_message_analysis")
 }
