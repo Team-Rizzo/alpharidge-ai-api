@@ -78,6 +78,9 @@ from models import (
     TelegramGroup, TelegramMessage, TelegramMessageAnalysis,
     TelegramMessageWithContext, TelegramMessageForScoring,
     TelegramMessagesForScoringResponse, CompletedTelegramMessagesSubmission,
+    # News article models
+    NewsArticleForScoring, NewsArticlesForScoringResponse,
+    CompletedNewsArticlesSubmission,
 )
 from utils.auth import (
     AuthRequest,
@@ -113,6 +116,9 @@ prisma = Prisma()
 # Optional separate database for price data
 PRICE_DATABASE_URL = os.getenv("PRICE_DATABASE_URL", "")
 price_prisma: Optional[Prisma] = None  # Will be set if PRICE_DATABASE_URL is configured
+
+# Feature gate for news article scoring
+SERVE_NEWS_ARTICLES = os.getenv("SERVE_NEWS_ARTICLES", "false").lower() == "true"
 
 
 def _setup_log_filters():
@@ -1139,6 +1145,239 @@ async def submit_completed_telegram_messages(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to submit completed telegram messages: {str(e)}",
+        )
+
+
+# ============================================================================
+# News Article Routes
+# ============================================================================
+
+@app.get(
+    "/articles/unscored",
+    response_model=NewsArticlesForScoringResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_unscored_articles(
+    limit: int = 3,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Get news articles that need scoring.
+
+    Returns up to `limit` articles (default 3) that either:
+    - Have no scoring records at all, or
+    - Have no news_article_analysis record
+
+    Excludes articles that already have an 'in_progress' or 'completed' scoring.
+    Creates a new scoring record (set to 'in_progress') for articles without one.
+
+    Only accessible by validators.
+    """
+    if not SERVE_NEWS_ARTICLES:
+        return NewsArticlesForScoringResponse(articles=[], count=0)
+
+    try:
+        lease_ttl_seconds = int(os.getenv("SCORING_LEASE_TTL_SECONDS", "900"))
+
+        async with prisma.tx() as tx:
+            # 1) Reclaim expired leases: in_progress older than TTL → pending (unassigned).
+            await tx.execute_raw(
+                """
+                UPDATE news_article_scoring
+                SET status = 'pending',
+                    start_time = NULL,
+                    validator_hotkey = NULL
+                WHERE status = 'in_progress'
+                  AND start_time IS NOT NULL
+                  AND start_time < (NOW() AT TIME ZONE 'utc') - (MAKE_INTERVAL(secs => $1));
+                """,
+                lease_ttl_seconds,
+            )
+
+            # 2) Pick from two sources:
+            #   A) Existing scoring records with status='pending'
+            #   B) Articles with no scoring record and no analysis record
+
+            # A: Atomically claim up to `limit` pending scorings using row locks.
+            claimed_pending = await tx.query_raw(
+                """
+                WITH picked AS (
+                    SELECT s.id, s.article_id
+                    FROM news_article_scoring s
+                    JOIN news_articles a ON a.id = s.article_id
+                    WHERE s.status = 'pending'
+                      AND a.title IS NOT NULL
+                      AND BTRIM(a.title) <> ''
+                    ORDER BY s.created_at ASC, s.id ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT $1
+                )
+                UPDATE news_article_scoring s
+                SET status = 'in_progress',
+                    start_time = (NOW() AT TIME ZONE 'utc'),
+                    validator_hotkey = $2
+                FROM picked
+                WHERE s.id = picked.id
+                RETURNING picked.article_id;
+                """,
+                limit,
+                validator_hotkey,
+            )
+            article_ids_pending = [row["article_id"] for row in (claimed_pending or [])]
+
+            # If need more, get up to `slots_left` articles that have no scoring and no analysis
+            slots_left = max(0, limit - len(article_ids_pending))
+            article_ids_no_scoring = []
+            if slots_left > 0:
+                inserted_rows = await tx.query_raw(
+                    """
+                    WITH unscored_articles AS (
+                        SELECT a.id AS article_id
+                        FROM news_articles a
+                        LEFT JOIN news_article_scoring s ON s.article_id = a.id
+                        LEFT JOIN news_article_analysis na ON na.article_id = a.id
+                        WHERE s.id IS NULL AND na.id IS NULL
+                          AND a.title IS NOT NULL
+                          AND BTRIM(a.title) <> ''
+                        ORDER BY a.created_at ASC, a.id ASC
+                        LIMIT $1
+                        FOR UPDATE OF a SKIP LOCKED
+                    ), created_scoring AS (
+                        INSERT INTO news_article_scoring (article_id, status, start_time, validator_hotkey, created_at)
+                        SELECT article_id, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
+                        FROM unscored_articles
+                        RETURNING article_id
+                    )
+                    SELECT article_id FROM created_scoring;
+                    """,
+                    slots_left,
+                    validator_hotkey,
+                )
+                article_ids_no_scoring = [row["article_id"] for row in (inserted_rows or [])]
+
+            # Combine all claimed article ids
+            article_ids = article_ids_pending + article_ids_no_scoring
+            if not article_ids:
+                return NewsArticlesForScoringResponse(articles=[], count=0)
+
+        # Fetch the claimed articles for response.
+        articles = await prisma.newsarticle.find_many(
+            where={"id": {"in": article_ids}},
+        )
+
+        # Preserve claim order
+        articles_by_id = {a.id: a for a in articles}
+        ordered = [articles_by_id.get(aid) for aid in article_ids if aid in articles_by_id]
+
+        articles_for_scoring = []
+        for article in ordered:
+            # Defensive safety check: never send articles with NULL/empty/whitespace-only title.
+            if article is None or article.title is None or not str(article.title).strip():
+                continue
+
+            article_data = NewsArticleForScoring(
+                id=article.id,
+                url=article.url,
+                title=article.title,
+                summary=getattr(article, 'summary', None),
+                content=getattr(article, 'content', None),
+                published=article.published.isoformat() if hasattr(article, 'published') and article.published else None,
+                source=article.source,
+                topic=getattr(article, 'topic', None),
+                extra=getattr(article, 'extra', None),
+            )
+            articles_for_scoring.append(article_data)
+
+        logger.info(f"Leased {len(articles_for_scoring)} article(s) to validator {validator_hotkey}")
+        return NewsArticlesForScoringResponse(articles=articles_for_scoring, count=len(articles_for_scoring))
+
+    except Exception as e:
+        logger.error(f"Error getting unscored articles: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get unscored articles: {str(e)}",
+        )
+
+
+@app.post(
+    "/articles/completed",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_completed_articles(
+    submission: CompletedNewsArticlesSubmission,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Submit completed scored news articles.
+
+    Updates the scoring status to 'completed' and stores the analysis in news_article_analysis.
+    Only articles assigned to the requesting validator can be completed.
+
+    Only accessible by validators.
+    """
+    try:
+        updated_count = 0
+
+        for completed in submission.completed_articles:
+            # Create or update news_article_analysis with sentiment + optional classification columns.
+            analysis_create = {
+                "articleId": completed.article_id,
+                "sentiment": completed.sentiment,
+                "analyzedAt": datetime.utcnow(),
+            }
+            analysis_update = {
+                "sentiment": completed.sentiment,
+                "updatedAt": datetime.utcnow(),
+                "analyzedAt": datetime.utcnow(),
+            }
+
+            # Optional classification columns (only set if provided by the validator).
+            optional_fields = {
+                "sectorId": completed.sector_id,
+                "sectorSymbol": completed.sector_symbol,
+                "contentType": completed.content_type,
+                "technicalQuality": completed.technical_quality,
+                "marketAnalysis": completed.market_analysis,
+                "impactPotential": completed.impact_potential,
+                "relevanceConfidence": completed.relevance_confidence,
+            }
+            for k, v in optional_fields.items():
+                if v is not None:
+                    analysis_create[k] = v
+                    analysis_update[k] = v
+
+            await prisma.newsarticleanalysis.upsert(
+                where={"articleId": completed.article_id},
+                data={
+                    "create": analysis_create,
+                    "update": analysis_update,
+                },
+            )
+
+            # Update scoring status to completed (only if still leased to this validator).
+            result = await prisma.newsarticlescoring.update_many(
+                where={
+                    "articleId": completed.article_id,
+                    "validatorHotkey": validator_hotkey,
+                    "status": "in_progress",
+                },
+                data={"status": "completed"},
+            )
+            updated_count += result
+
+        logger.info(f"Validator {validator_hotkey} completed {updated_count} news articles")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully completed {updated_count} news articles",
+            count=updated_count,
+        )
+
+    except Exception as e:
+        logger.error(f"Error submitting completed news articles: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit completed news articles: {str(e)}",
         )
 
 
