@@ -1316,6 +1316,9 @@ async def submit_completed_articles(
 
     Only accessible by validators.
     """
+    if not SERVE_NEWS_ARTICLES:
+        return SubmissionResponse(success=False, message="News articles are not enabled", count=0)
+
     try:
         updated_count = 0
 
@@ -1332,7 +1335,6 @@ async def submit_completed_articles(
                 "analyzedAt": datetime.utcnow(),
             }
 
-            # Optional classification columns (only set if provided by the validator).
             optional_fields = {
                 "sectorId": completed.sector_id,
                 "sectorSymbol": completed.sector_symbol,
