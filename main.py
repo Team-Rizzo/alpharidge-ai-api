@@ -21,6 +21,13 @@ BLOCKED_HOTKEYS: set[str] = set(
     filter(None, os.getenv("BLOCKED_HOTKEYS", "").split(","))
 )
 
+# Tweet allowlist — when set, only these validators receive tweets.
+# Configure via TWEET_ALLOWLIST env var (comma-separated ss58 addresses).
+# Leave empty to allow all validators.
+TWEET_ALLOWLIST: set[str] = set(
+    filter(None, os.getenv("TWEET_ALLOWLIST", "").split(","))
+)
+
 
 class SuppressV2LogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
@@ -139,6 +146,16 @@ def _setup_log_filters():
                 handler.addFilter(f)
     
     logger.info(f"Log filters applied. Blocking {len(BLOCKED_HOTKEYS)} hotkeys from logs.")
+
+
+def _version_ok(client_version: str) -> bool:
+    """Return True if client_version >= MIN_VALIDATOR_VERSION (semver)."""
+    try:
+        c = tuple(int(x) for x in client_version.split("."))
+        m = tuple(int(x) for x in MIN_VALIDATOR_VERSION.split("."))
+        return c >= m
+    except (ValueError, AttributeError):
+        return False
 
 
 @asynccontextmanager
@@ -375,6 +392,54 @@ async def health_check():
 
 
 # ============================================================================
+# Subnet Config Endpoint (centralized tuning for all validators)
+# ============================================================================
+
+SUBNET_CONFIG = {
+    "USD_PRICE_PER_POINT": float(os.getenv("SUBNET_USD_PRICE_PER_POINT", "0.040")),
+    "MINER_BATCH_SIZE": int(os.getenv("SUBNET_MINER_BATCH_SIZE", "20")),
+    "VALIDATION_FETCH_LIMIT": int(os.getenv("SUBNET_VALIDATION_FETCH_LIMIT", "100")),
+    "MIN_PERCENT_PER_POINT": float(os.getenv("SUBNET_MIN_PERCENT_PER_POINT", "0.003")),
+}
+
+MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "2.0.0")
+
+SUBNET_BLACKLISTED_HOTKEYS: list[str] = [
+    hk.strip() for hk in os.getenv("SUBNET_BLACKLISTED_HOTKEYS", "").split(",") if hk.strip()
+]
+
+RESET_BROADCASTS_BEFORE_EPOCH: int = int(os.getenv("RESET_BROADCASTS_BEFORE_EPOCH", "-1"))
+PURGE_BROADCAST_HOTKEYS: list[str] = [
+    hk.strip() for hk in os.getenv("PURGE_BROADCAST_HOTKEYS", "").split(",") if hk.strip()
+]
+
+
+@app.get("/config/subnet")
+async def get_subnet_config(
+    request: Request,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Returns recommended configuration values for validators.
+
+    Validators poll this once per hour. Local OVERRIDE_<key> env vars
+    take precedence on the validator side.
+    """
+    client_version = request.headers.get("X-Validator-Version", "unknown")
+    logger.info(f"Config request from {validator_hotkey[:12]}.. version={client_version}")
+
+    return {
+        "config": SUBNET_CONFIG,
+        "min_validator_version": MIN_VALIDATOR_VERSION,
+        "blacklisted_hotkeys": SUBNET_BLACKLISTED_HOTKEYS,
+        "reset_broadcasts_before_epoch": RESET_BROADCASTS_BEFORE_EPOCH,
+        "purge_broadcast_hotkeys": PURGE_BROADCAST_HOTKEYS,
+        "version": 2,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+# ============================================================================
 # TAO Price Endpoint
 # ============================================================================
 
@@ -485,9 +550,21 @@ async def check_axon(
     responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
 )
 async def get_unscored_tweets(
+    request: Request,
     limit: int = 3,
     validator_hotkey: str = Depends(get_validator_hotkey),
 ):
+    if TWEET_ALLOWLIST and validator_hotkey not in TWEET_ALLOWLIST:
+        return TweetsForScoringResponse(tweets=[], count=0)
+
+    client_ver = request.headers.get("X-Validator-Version", "0.0.0")
+    if not _version_ok(client_ver):
+        logger.warning(
+            f"Validator {validator_hotkey[:12]}.. version {client_ver} below minimum "
+            f"{MIN_VALIDATOR_VERSION} — returning empty tweets"
+        )
+        return TweetsForScoringResponse(tweets=[], count=0)
+
     """
     Get tweets that need scoring.
 
@@ -765,9 +842,21 @@ async def submit_completed_tweets(
     responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
 ) 
 async def get_unscored_telegram_messages(
+    request: Request,
     limit: int = 3,
     validator_hotkey: str = Depends(get_validator_hotkey),
 ):
+    if TWEET_ALLOWLIST and validator_hotkey not in TWEET_ALLOWLIST:
+        return TelegramMessagesForScoringResponse(messages=[], count=0)
+
+    client_ver = request.headers.get("X-Validator-Version", "0.0.0")
+    if not _version_ok(client_ver):
+        logger.warning(
+            f"Validator {validator_hotkey[:12]}.. version {client_ver} below minimum "
+            f"{MIN_VALIDATOR_VERSION} — returning empty telegram messages"
+        )
+        return TelegramMessagesForScoringResponse(messages=[], count=0)
+
     """
     Get telegram messages that need scoring.
 

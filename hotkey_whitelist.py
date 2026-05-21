@@ -7,7 +7,7 @@ This module provides functions to get whitelisted hotkeys for authentication.
 - Miners: Automatically fetched from metagraph via mg.hotkeys and cached for 2 minutes
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
 import time
 import threading
@@ -89,6 +89,34 @@ else:
 
 # Cache duration for both miners and validators
 _CACHE_DURATION_SECONDS = 2 * 60  # 2 minutes
+
+# Shared Subtensor instance — reused across all refreshes to avoid leaking
+# WebSocket connections and accumulating memory from stale objects.
+_subtensor_instance: Optional[bt.Subtensor] = None
+_subtensor_lock = threading.Lock()
+
+def _get_shared_subtensor() -> bt.Subtensor:
+    """Get or create a single shared Subtensor instance."""
+    global _subtensor_instance
+    with _subtensor_lock:
+        if _subtensor_instance is None:
+            _subtensor_instance = bt.Subtensor(network=NETWORK)
+            logger.info(f"Created shared Subtensor instance (network={NETWORK})")
+        return _subtensor_instance
+
+def _reset_shared_subtensor():
+    """Reset the shared instance on connection errors so the next call reconnects."""
+    global _subtensor_instance
+    with _subtensor_lock:
+        old = _subtensor_instance
+        _subtensor_instance = None
+    if old is not None:
+        try:
+            if hasattr(old, 'substrate') and old.substrate:
+                old.substrate.close()
+        except Exception:
+            pass
+        logger.info("Reset shared Subtensor instance after error")
 
 # Validator hotkeys configuration
 # Fetched from metagraph (validators with permit and stake >= threshold)
@@ -200,14 +228,11 @@ def get_miner_hotkeys() -> List[str]:
             current_time - _MINER_CACHE_TIMESTAMP >= _CACHE_DURATION_SECONDS):
             try:
                 logger.info("Refreshing miner hotkeys cache from metagraph")
-                sub = bt.Subtensor(network=NETWORK)
+                sub = _get_shared_subtensor()
                 mg = sub.metagraph(NETUID)
-                # lite sync is fine; we don't need recency for miners
                 mg.sync(subtensor=sub, lite=True)
                 
-                # Use mg.hotkeys to get the list of miner hotkeys
                 hotkeys = mg.hotkeys
-                # Filter out validators; we only want miners
                 miner_hotkeys = [
                     hotkeys[uid] for uid in range(len(hotkeys))
                     if not bool(int(mg.validator_permit[uid]))
@@ -217,11 +242,10 @@ def get_miner_hotkeys() -> List[str]:
                 _MINER_CACHE_TIMESTAMP = current_time
                 logger.info(f"Cached {len(_MINER_HOTKEYS_CACHE)} miner hotkeys")
                 
-                # Save to file for inspection
                 _save_miner_hotkeys_to_file(_MINER_HOTKEYS_CACHE, current_time)
             except Exception as e:
                 logger.error(f"Failed to fetch miner hotkeys: {e}", exc_info=True)
-                # If we have a stale cache, use it; otherwise return empty list
+                _reset_shared_subtensor()
                 if not _MINER_HOTKEYS_CACHE:
                     logger.warning("No cached miner hotkeys available, returning empty list")
                     return []
@@ -254,18 +278,15 @@ def get_validator_data() -> List[Dict[str, str]]:
             current_time - _VALIDATOR_CACHE_TIMESTAMP >= _CACHE_DURATION_SECONDS):
             try:
                 logger.info("Refreshing validator hotkeys cache from metagraph")
-                sub = bt.Subtensor(network=NETWORK)
+                sub = _get_shared_subtensor()
                 mg = sub.metagraph(NETUID)
-                # lite sync is fine; we don't need recency for validators
                 mg.sync(subtensor=sub, lite=True)
                 
-                # Filter UIDs that have validator permit and stake >= threshold
                 validator_hotkeys = [
                     hk for uid, hk in enumerate(mg.hotkeys)
                     if mg.validator_permit[uid] and mg.S[uid] >= STAKE_THRESHOLD
                 ]
                 
-                # Populate both caches
                 _VALIDATOR_HOTKEYS_CACHE = validator_hotkeys
                 _VALIDATOR_DATA_CACHE = [
                     {"name": f"Validator {i+1}", "hotkey": hk}
@@ -274,11 +295,10 @@ def get_validator_data() -> List[Dict[str, str]]:
                 _VALIDATOR_CACHE_TIMESTAMP = current_time
                 logger.info(f"Cached {len(_VALIDATOR_DATA_CACHE)} validator hotkeys (stake >= {STAKE_THRESHOLD})")
                 
-                # Save to file for inspection
                 _save_validator_hotkeys_to_file(_VALIDATOR_DATA_CACHE, current_time)
             except Exception as e:
                 logger.error(f"Failed to fetch validator hotkeys: {e}", exc_info=True)
-                # If we have a stale cache, use it; otherwise return empty list
+                _reset_shared_subtensor()
                 if not _VALIDATOR_DATA_CACHE:
                     logger.warning("No cached validator hotkeys available, returning empty list")
                     return []
