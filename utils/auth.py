@@ -109,20 +109,20 @@ class AuthConfig:
         """
         Check if a hotkey is in the allowed list.
         
-        This method always consults the cached metagraph whitelist (via
-        hotkey_whitelist.get_all_whitelisted_hotkeys) so that new miners
-        and validators are picked up automatically without restarting the
-        API process. Environment overrides from ALLOWED_HOTKEYS are also
-        applied on every check.
+        Delegates to hotkey_whitelist which maintains its own 2-minute cache.
+        We avoid rebuilding lists on every call to reduce per-request overhead.
         """
-        # Rebuild allowed_hotkeys from env + cached metagraph on each check.
-        # hotkey_whitelist itself maintains a 2‑minute cache, so this does
-        # not hit the chain on every request.
-        current_allowed = self._parse_allowed_hotkeys()
-        self.allowed_hotkeys = current_allowed
-        
+        if not get_all_whitelisted_hotkeys:
+            return False
+
+        try:
+            current_allowed = get_all_whitelisted_hotkeys()
+        except Exception as e:
+            logger.error(f"Failed to get whitelisted hotkeys: {e}")
+            current_allowed = self.allowed_hotkeys
+
         is_allowed = hotkey in current_allowed
-        
+
         if not is_allowed:
             logger.warning(
                 f"Hotkey {hotkey} not found in whitelist. "
