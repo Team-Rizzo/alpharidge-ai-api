@@ -1,0 +1,1011 @@
+#!/usr/bin/env python3
+"""
+Talisman AI API - FastAPI Application
+
+This API provides endpoints for validators to:
+- Get unscored tweets for scoring
+- Submit rewards, penalties, and completed tweets
+- Manage blacklisted hotkeys
+
+Only validators with valid signatures are allowed to access the API.
+"""
+
+import os
+import logging
+from datetime import datetime
+
+
+# Blocked hotkeys - silently reject requests from these addresses
+# Configure via BLOCKED_HOTKEYS env var (comma-separated ss58 addresses)
+BLOCKED_HOTKEYS: set[str] = set(
+    filter(None, os.getenv("BLOCKED_HOTKEYS", "").split(","))
+)
+
+
+class SuppressV2LogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if "/v2/" in message or '"/v2 ' in message:
+            return False
+        return True
+
+
+class SuppressBlockedHotkeyLogFilter(logging.Filter):
+    """Suppress log messages from blocked hotkeys to reduce spam."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not BLOCKED_HOTKEYS:
+            return True
+        message = record.getMessage()
+        # Suppress logs that mention any blocked hotkey
+        for hotkey in BLOCKED_HOTKEYS:
+            if hotkey in message:
+                return False
+        return True
+
+
+class SuppressBlockedRequestsFilter(logging.Filter):
+    """Suppress uvicorn access logs for 403 Forbidden responses (blocked hotkeys)."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not BLOCKED_HOTKEYS:
+            return True
+        message = record.getMessage()
+        # Suppress 403 Forbidden access logs when blocklist is active
+        if '" 403 Forbidden' in message or '" 403 ' in message:
+            return False
+        return True
+
+
+from contextlib import asynccontextmanager
+from typing import List, Optional
+
+from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from prisma import Prisma
+
+import httpx
+
+# Local imports
+from models import (
+    Tweet, TweetWithAuthor, Account, TweetAnalysis,
+    Scoring, ScoringUpdate,
+    Penalty, PenaltyCreate, PenaltyBulkCreate,
+    Reward, RewardCreate, RewardBulkCreate,
+    BlacklistedHotkey, BlacklistedHotkeyCreate, BlacklistedHotkeyBulkCreate,
+    TweetsForScoringResponse, CompletedTweetsSubmission,
+    SubmissionResponse, ErrorResponse, TaoPriceResponse,
+    AxonCheckRequest, AxonCheckResponse,
+)
+from services.tao_price import (
+    start_refresh_task,
+    stop_refresh_task,
+    get_cached_price,
+    is_price_stale,
+)
+from utils.auth import (
+    AuthRequest,
+    auth_config,
+    extract_auth_from_headers,
+    verify_auth_request,
+)
+from hotkey_whitelist import (
+    is_validator_hotkey,
+    initialize_whitelists,
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# Apply log filters to suppress blocked hotkey spam
+logging.getLogger("utils.auth").addFilter(SuppressBlockedHotkeyLogFilter())
+logger.addFilter(SuppressBlockedHotkeyLogFilter())
+
+# Apply filters to uvicorn access logs
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+uvicorn_access_logger.addFilter(SuppressV2LogFilter())
+uvicorn_access_logger.addFilter(SuppressBlockedHotkeyLogFilter())
+uvicorn_access_logger.addFilter(SuppressBlockedRequestsFilter())
+
+# Initialize Prisma client
+prisma = Prisma()
+
+
+def _setup_log_filters():
+    """Set up log filters to suppress blocked hotkey spam."""
+    filters_to_add = [SuppressV2LogFilter(), SuppressBlockedHotkeyLogFilter(), SuppressBlockedRequestsFilter()]
+    
+    # Apply to uvicorn.access logger
+    uvicorn_logger = logging.getLogger("uvicorn.access")
+    for f in filters_to_add:
+        if not any(isinstance(existing, type(f)) for existing in uvicorn_logger.filters):
+            uvicorn_logger.addFilter(f)
+    
+    # Also apply to all handlers on the logger
+    for handler in uvicorn_logger.handlers:
+        for f in filters_to_add:
+            if not any(isinstance(existing, type(f)) for existing in handler.filters):
+                handler.addFilter(f)
+    
+    # Apply to root logger handlers as well (uvicorn often logs to root)
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        for f in filters_to_add:
+            if not any(isinstance(existing, type(f)) for existing in handler.filters):
+                handler.addFilter(f)
+    
+    logger.info(f"Log filters applied. Blocking {len(BLOCKED_HOTKEYS)} hotkeys from logs.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup/shutdown events."""
+    # Startup
+    logger.info("Starting Talisman AI API...")
+    
+    # Re-apply log filters (uvicorn may reconfigure loggers on startup)
+    _setup_log_filters()
+    
+    # Initialize whitelist caches
+    try:
+        initialize_whitelists()
+        logger.info("Whitelists initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize whitelists: {e}")
+    
+    # Connect to database
+    try:
+        await prisma.connect()
+        logger.info("Connected to database")
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        raise
+    
+    # Start TAO price refresh background task
+    start_refresh_task()
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Talisman AI API...")
+    stop_refresh_task()
+    await prisma.disconnect()
+    logger.info("Disconnected from database")
+
+
+# Create FastAPI application
+app = FastAPI(
+    title="Talisman AI API",
+    description="API for Talisman AI subnet validators to score tweets and manage rewards/penalties",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class BlockedHotkeyMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to silently reject requests from blocked hotkeys.
+    
+    Runs before authentication and rejects known bad actors
+    with minimal processing and no logging.
+    """
+    
+    async def dispatch(self, request: Request, call_next):
+        hotkey = request.headers.get("X-Auth-SS58Address", "")
+        
+        if hotkey and hotkey in BLOCKED_HOTKEYS:
+            # Silently reject - no logging to reduce spam
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Access denied."},
+            )
+        
+        return await call_next(request)
+
+
+# Add blocked hotkey middleware (runs before auth)
+if BLOCKED_HOTKEYS:
+    app.add_middleware(BlockedHotkeyMiddleware)
+    logger.info(f"Hotkey blocklist enabled with {len(BLOCKED_HOTKEYS)} hotkeys")
+
+
+# ============================================================================
+# API Version Deprecation Shims
+# ============================================================================
+
+V2_DEPRECATION_MESSAGE = os.getenv(
+    "V2_DEPRECATION_MESSAGE",
+    "The /v2 API is deprecated. Please update your code.",
+)
+
+
+@app.api_route("/v2", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
+@app.api_route("/v2/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
+async def v2_catchall(request: Request, path: str = ""):
+    """
+    Catch-all for legacy clients still calling /v2/*.
+
+    We intentionally do not require authentication here so callers get a clear upgrade message
+    rather than an auth error.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={
+            "error": "deprecated_api_version",
+            "message": V2_DEPRECATION_MESSAGE,
+            "requested_path": request.url.path,
+            "method": request.method,
+        },
+        headers={
+            # Informational headers that some clients/monitors use for deprecations.
+            "Deprecation": "true",
+        },
+    )
+
+
+# ============================================================================
+# Authentication Dependencies
+# ============================================================================
+
+async def get_validator_hotkey(request: Request) -> str:
+    """
+    Dependency to authenticate validator and return their hotkey.
+    
+    Only validators are allowed to access the API. This function:
+    1. Extracts auth data from request headers
+    2. Verifies the signature
+    3. Confirms the hotkey belongs to a validator
+    4. Returns the validator's hotkey
+    
+    Raises HTTPException if authentication fails.
+    """
+    # If auth is disabled (local/testing), allow requests without headers.
+    # We still try to read a hotkey from headers if present for attribution.
+    if not auth_config.enabled:
+        auth_request = extract_auth_from_headers(request)
+        if auth_request and auth_request.ss58_address:
+            return auth_request.ss58_address
+        return "unauthenticated"
+
+    # Extract auth from headers (required when auth is enabled)
+    auth_request = extract_auth_from_headers(request)
+    if auth_request is None:
+        logger.warning("Missing authentication headers")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication headers. Required: X-Auth-SS58Address, X-Auth-Signature, X-Auth-Message, X-Auth-Timestamp",
+        )
+    
+    # Verify auth request
+    if not verify_auth_request(auth_request, auth_config):
+        logger.warning(f"Authentication failed for hotkey: {auth_request.ss58_address}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication. Signature verification failed.",
+        )
+    
+    # Check if hotkey is a validator
+    if not is_validator_hotkey(auth_request.ss58_address):
+        logger.warning(f"Non-validator hotkey attempted access: {auth_request.ss58_address}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Only validators are allowed to access this API.",
+        )
+    
+    logger.info(f"Validator authenticated: {auth_request.ss58_address}")
+    return auth_request.ss58_address
+
+
+# ============================================================================
+# Health Check
+# ============================================================================
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+# ============================================================================
+# TAO Price Endpoint
+# ============================================================================
+
+@app.get(
+    "/price/tao-usd",
+    response_model=TaoPriceResponse,
+    responses={
+        503: {"model": ErrorResponse},
+    },
+)
+async def get_tao_price():
+    """
+    Get the cached TAO/USD price.
+    
+    Returns the TAO price in USD, fetched from TaoStats and cached every 15 minutes.
+    If the cache is empty (e.g., on first startup before fetch completes), returns 503.
+    """
+    cache = get_cached_price()
+    
+    if cache.price_usd is None or cache.last_updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="TAO price not yet available. Please retry shortly.",
+        )
+    
+    return TaoPriceResponse(
+        price_usd=cache.price_usd,
+        last_updated=cache.last_updated,
+        source=cache.source,
+        stale=is_price_stale(),
+    )
+
+
+# ============================================================================
+# Axon Check Endpoint
+# ============================================================================
+
+@app.post(
+    "/axon/check",
+    response_model=AxonCheckResponse,
+)
+async def check_axon(
+    request: AxonCheckRequest,
+):
+    """
+    Verify a validator's axon is reachable from the internet.
+    
+    The API attempts to connect to the validator's axon at the provided IP:port.
+    Used during validator startup to ensure the axon port is properly configured.
+    
+    This endpoint does not require authentication since validators need to verify
+    their axon is reachable before they can fully authenticate with the network.
+    """
+    axon_timeout = float(os.getenv("AXON_CHECK_TIMEOUT", "5.0"))
+    
+    try:
+        async with httpx.AsyncClient(timeout=axon_timeout) as client:
+            # Bittensor axons expose an HTTP server; attempt a simple GET request
+            url = f"http://{request.ip}:{request.port}/"
+            response = await client.get(url)
+            # Any response (even 4xx/5xx) means the port is open and responding
+            logger.info(
+                f"Axon check PASSED: "
+                f"{request.ip}:{request.port} responded with status {response.status_code}"
+            )
+            return AxonCheckResponse(reachable=True)
+    except httpx.ConnectError as e:
+        error_msg = f"Connection refused or host unreachable: {e}"
+        logger.warning(
+            f"Axon check FAILED: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+    except httpx.TimeoutException:
+        error_msg = f"Connection timed out after {axon_timeout}s"
+        logger.warning(
+            f"Axon check FAILED: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+    except Exception as e:
+        error_msg = f"Unexpected error: {type(e).__name__}: {e}"
+        logger.warning(
+            f"Axon check FAILED: "
+            f"{request.ip}:{request.port} - {error_msg}"
+        )
+        return AxonCheckResponse(reachable=False, error=error_msg)
+
+
+# ============================================================================
+# Tweet Routes
+# ============================================================================
+
+@app.get(
+    "/tweets/unscored",
+    response_model=TweetsForScoringResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_unscored_tweets(
+    limit: int = 3,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Get tweets that need scoring.
+
+    Returns up to `limit` tweets (default 3) that either:
+    - Have no scoring records at all, or
+    - Have no TweetAnalysis record
+
+    Excludes tweets that already have an 'in_progress' or 'completed' scoring.
+    Creates a new scoring record (set to 'in_progress') for tweets without one.
+
+    Only accessible by validators.
+    """
+    try:
+        lease_ttl_seconds = int(os.getenv("SCORING_LEASE_TTL_SECONDS", "900"))
+
+        async with prisma.tx() as tx:
+            # 1) Reclaim expired leases: in_progress older than TTL → pending (unassigned).
+            await tx.execute_raw(
+                """
+                UPDATE scoring
+                SET status = 'pending',
+                    start_time = NULL,
+                    validator_hotkey = NULL
+                WHERE status = 'in_progress'
+                  AND start_time IS NOT NULL
+                  AND start_time < (NOW() AT TIME ZONE 'utc') - (MAKE_INTERVAL(secs => $1));
+                """,
+                lease_ttl_seconds,
+            )
+
+            # 2) Pick from two sources:
+            #   A) Existing scoring records with status='pending'
+            #   B) Tweets with no scoring record and no analysis record
+
+            # A: Atomically claim up to `limit` pending scorings using row locks.
+            claimed_pending = await tx.query_raw(
+                """
+                WITH picked AS (
+                    SELECT s.id, s.tweet_id
+                    FROM scoring s
+                    JOIN tweets t ON t.id = s.tweet_id
+                    WHERE s.status = 'pending'
+                      AND t.text IS NOT NULL
+                      AND BTRIM(t.text) <> ''
+                    ORDER BY s.created_at ASC, s.id ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT $1
+                )
+                UPDATE scoring s
+                SET status = 'in_progress',
+                    start_time = (NOW() AT TIME ZONE 'utc'),
+                    validator_hotkey = $2
+                FROM picked
+                WHERE s.id = picked.id
+                RETURNING picked.tweet_id;
+                """,
+                limit,
+                validator_hotkey,
+            )
+            tweet_ids_pending = [row["tweet_id"] for row in (claimed_pending or [])]
+
+            # If need more, get up to `slots_left` tweets that have no scoring and no analysis
+            slots_left = max(0, limit - len(tweet_ids_pending))
+            tweet_ids_no_scoring = []
+            if slots_left > 0:
+                # Find tweets WITHOUT any scoring record AND WITHOUT an analysis record,
+                # and insert a new scoring record (status = 'in_progress') for each, returning IDs
+                # We must avoid race condition: Do all in one statement with row locking
+                inserted_rows = await tx.query_raw(
+                    """
+                    WITH unscored_tweets AS (
+                        SELECT t.id AS tweet_id
+                        FROM tweets t
+                        LEFT JOIN scoring s ON s.tweet_id = t.id
+                        LEFT JOIN tweet_analysis a ON a.tweet_id = t.id
+                        WHERE s.id IS NULL AND a.id IS NULL
+                          AND t.text IS NOT NULL
+                          AND BTRIM(t.text) <> ''
+                        ORDER BY t.created_at ASC, t.id ASC
+                        LIMIT $1
+                        FOR UPDATE OF t SKIP LOCKED
+                    ), created_scoring AS (
+                        INSERT INTO scoring (tweet_id, status, start_time, validator_hotkey, created_at)
+                        SELECT tweet_id, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
+                        FROM unscored_tweets
+                        RETURNING tweet_id
+                    )
+                    SELECT tweet_id FROM created_scoring;
+                    """,
+                    slots_left,
+                    validator_hotkey,
+                )
+                tweet_ids_no_scoring = [row["tweet_id"] for row in (inserted_rows or [])]
+
+            # Combine all claimed tweet ids
+            tweet_ids = tweet_ids_pending + tweet_ids_no_scoring
+            if not tweet_ids:
+                return TweetsForScoringResponse(tweets=[], count=0)
+
+        # Fetch the claimed tweets + nested author/analysis for response.
+        tweets = await prisma.tweet.find_many(
+            where={"id": {"in": tweet_ids}},
+            include={"author": True, "analysis": True},
+        )
+
+        # Preserve claim order
+        tweets_by_id = {t.id: t for t in tweets}
+        ordered = [tweets_by_id.get(tid) for tid in tweet_ids if tid in tweets_by_id]
+
+        tweets_with_authors = []
+        for tweet in ordered:
+            # Defensive safety check: never send tweets with NULL/empty/whitespace-only text.
+            # (We also filter at claim-time in SQL to avoid leasing these in the first place.)
+            if tweet is None or tweet.text is None or not str(tweet.text).strip():
+                continue
+
+            author_model = None
+            analysis_model = None
+
+            if tweet.author:
+                author_model = Account(
+                    id=tweet.author.id,
+                    name=tweet.author.name,
+                    screenName=tweet.author.screenName,
+                    userName=tweet.author.userName,
+                    location=tweet.author.location,
+                    description=tweet.author.description,
+                    verified=tweet.author.verified,
+                    isBlueVerified=tweet.author.isBlueVerified,
+                    followersCount=tweet.author.followersCount,
+                    followingCount=tweet.author.followingCount,
+                    statusesCount=tweet.author.statusesCount,
+                    profileImageUrl=tweet.author.profileImageUrl,
+                    createdAt=tweet.author.createdAt,
+                )
+
+            if tweet.analysis:
+                analysis_model = TweetAnalysis(
+                    id=tweet.analysis.id,
+                    tweetId=tweet.analysis.tweetId,
+                    sentiment=tweet.analysis.sentiment,
+                    subnetId=tweet.analysis.subnetId,
+                    subnetName=tweet.analysis.subnetName,
+                    contentType=tweet.analysis.contentType,
+                    analyzedAt=tweet.analysis.analyzedAt,
+                )
+
+            tweet_data = TweetWithAuthor(
+                id=tweet.id,
+                type=tweet.type,
+                url=tweet.url,
+                text=tweet.text,
+                lang=tweet.lang,
+                retweetCount=tweet.retweetCount,
+                replyCount=tweet.replyCount,
+                likeCount=tweet.likeCount,
+                quoteCount=tweet.quoteCount,
+                viewCount=tweet.viewCount,
+                bookmarkCount=tweet.bookmarkCount,
+                isReply=tweet.isReply,
+                inReplyToId=tweet.inReplyToId,
+                conversationId=tweet.conversationId,
+                authorId=tweet.authorId,
+                createdAt=tweet.createdAt,
+                receivedAt=tweet.receivedAt,
+                author=author_model,
+                analysis=analysis_model,
+            )
+            tweets_with_authors.append(tweet_data)
+
+        logger.info(f"Leased {len(tweets_with_authors)} tweet(s) to validator {validator_hotkey}")
+        return TweetsForScoringResponse(tweets=tweets_with_authors, count=len(tweets_with_authors))
+
+    except Exception as e:
+        logger.error(f"Error getting unscored tweets: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get unscored tweets: {str(e)}",
+        )
+
+
+@app.post(
+    "/tweets/completed",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_completed_tweets(
+    submission: CompletedTweetsSubmission,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Submit completed scored tweets.
+    
+    Updates the scoring status to 'completed' and stores the sentiment in TweetAnalysis.
+    Only tweets assigned to the requesting validator can be completed.
+    
+    Only accessible by validators.
+    """
+    try:
+        updated_count = 0
+        
+        for completed in submission.completed_tweets:
+            # Create or update TweetAnalysis with sentiment + optional richer classification columns.
+            analysis_create = {
+                "tweetId": completed.tweet_id,
+                "sentiment": completed.sentiment,
+                "analyzedAt": datetime.utcnow(),
+            }
+            analysis_update = {
+                "sentiment": completed.sentiment,
+                "updatedAt": datetime.utcnow(),
+                "analyzedAt": datetime.utcnow(),
+            }
+
+            # Optional classification columns (only set if provided by the validator).
+            optional_fields = {
+                "subnetId": completed.subnet_id,
+                "subnetName": completed.subnet_name,
+                "contentType": completed.content_type,
+                "technicalQuality": completed.technical_quality,
+                "marketAnalysis": completed.market_analysis,
+                "impactPotential": completed.impact_potential,
+                "relevanceConfidence": completed.relevance_confidence,
+            }
+            for k, v in optional_fields.items():
+                if v is not None:
+                    analysis_create[k] = v
+                    analysis_update[k] = v
+
+            await prisma.tweetanalysis.upsert(
+                where={"tweetId": completed.tweet_id},
+                data={
+                    "create": analysis_create,
+                    "update": analysis_update,
+                },
+            )
+            
+            # Update scoring status to completed (only if still leased to this validator).
+            result = await prisma.scoring.update_many(
+                where={
+                    "tweetId": completed.tweet_id,
+                    "validatorHotkey": validator_hotkey,
+                    "status": "in_progress",
+                },
+                data={"status": "completed"},
+            )
+            updated_count += result
+        
+        logger.info(f"Validator {validator_hotkey} completed {updated_count} tweets")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully completed {updated_count} tweets",
+            count=updated_count,
+        )
+    
+    except Exception as e:
+        logger.error(f"Error submitting completed tweets: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit completed tweets: {str(e)}",
+        )
+
+
+# ============================================================================
+# Reward Routes
+# ============================================================================
+
+@app.post(
+    "/rewards",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_rewards(
+    submission: RewardBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Submit rewards for miners.
+    
+    Creates reward records for the specified hotkeys with their points.
+    
+    Only accessible by validators.
+    """
+    try:
+        created_count = 0
+        
+        for reward in submission.rewards:
+            await prisma.reward.create(
+                data={
+                    "startBlock": reward.start_block,
+                    "stopBlock": reward.stop_block,
+                    "hotkey": reward.hotkey,
+                    "points": reward.points,
+                }
+            )
+            created_count += 1
+        
+        logger.info(f"Validator {validator_hotkey} submitted {created_count} rewards")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully created {created_count} rewards",
+            count=created_count,
+        )
+    
+    except Exception as e:
+        logger.error(f"Error submitting rewards: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit rewards: {str(e)}",
+        )
+
+
+@app.get(
+    "/rewards",
+    response_model=List[Reward],
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_rewards(
+    hotkey: Optional[str] = None,
+    limit: int = 100,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Get rewards, optionally filtered by hotkey.
+    
+    Only accessible by validators.
+    """
+    try:
+        where = {"hotkey": hotkey} if hotkey else {}
+        rewards = await prisma.reward.find_many(
+            where=where,
+            take=limit,
+            order={"id": "desc"},
+        )
+        
+        return [
+            Reward(
+                id=r.id,
+                startBlock=r.startBlock,
+                stopBlock=r.stopBlock,
+                hotkey=r.hotkey,
+                points=r.points,
+                createdAt=r.createdAt,
+            )
+            for r in rewards
+        ]
+    
+    except Exception as e:
+        logger.error(f"Error getting rewards: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get rewards: {str(e)}",
+        )
+
+
+# ============================================================================
+# Penalty Routes
+# ============================================================================
+
+@app.post(
+    "/penalties",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_penalties(
+    submission: PenaltyBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Submit penalties for miners.
+    
+    Creates penalty records for the specified hotkeys with reasons.
+    
+    Only accessible by validators.
+    """
+    try:
+        created_count = 0
+        
+        for penalty in submission.penalties:
+            await prisma.penalty.create(
+                data={
+                    "hotkey": penalty.hotkey,
+                    "reason": penalty.reason,
+                    "timestamp": datetime.utcnow(),
+                }
+            )
+            created_count += 1
+        
+        logger.info(f"Validator {validator_hotkey} submitted {created_count} penalties")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully created {created_count} penalties",
+            count=created_count,
+        )
+    
+    except Exception as e:
+        logger.error(f"Error submitting penalties: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit penalties: {str(e)}",
+        )
+
+
+@app.get(
+    "/penalties",
+    response_model=List[Penalty],
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_penalties(
+    hotkey: Optional[str] = None,
+    limit: int = 100,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Get penalties, optionally filtered by hotkey.
+    
+    Only accessible by validators.
+    """
+    try:
+        where = {"hotkey": hotkey} if hotkey else {}
+        penalties = await prisma.penalty.find_many(
+            where=where,
+            take=limit,
+            order={"timestamp": "desc"},
+        )
+        
+        return [
+            Penalty(
+                id=p.id,
+                hotkey=p.hotkey,
+                reason=p.reason,
+                timestamp=p.timestamp,
+            )
+            for p in penalties
+        ]
+    
+    except Exception as e:
+        logger.error(f"Error getting penalties: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get penalties: {str(e)}",
+        )
+
+
+# ============================================================================
+# Blacklisted Hotkeys Routes
+# ============================================================================
+
+@app.get(
+    "/blacklist",
+    response_model=List[BlacklistedHotkey],
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_blacklisted_hotkeys(
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Get all blacklisted hotkeys.
+    
+    Only accessible by validators.
+    """
+    try:
+        blacklisted = await prisma.blacklistedhotkey.find_many()
+        return [
+            BlacklistedHotkey(
+                hotkey=b.hotkey,
+                reason=b.reason,
+                createdAt=b.createdAt,
+            )
+            for b in blacklisted
+        ]
+    
+    except Exception as e:
+        logger.error(f"Error getting blacklisted hotkeys: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get blacklisted hotkeys: {str(e)}",
+        )
+
+
+@app.post(
+    "/blacklist",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def add_blacklisted_hotkeys(
+    submission: BlacklistedHotkeyBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Add hotkeys to the blacklist.
+    
+    Only accessible by validators.
+    """
+    try:
+        created_count = 0
+        
+        for hotkey in submission.hotkeys:
+            # Use upsert to avoid duplicates
+            await prisma.blacklistedhotkey.upsert(
+                where={"hotkey": hotkey},
+                data={
+                    "create": {
+                        "hotkey": hotkey,
+                        "reason": submission.reason,
+                    },
+                    "update": {
+                        "reason": submission.reason,
+                    },
+                },
+            )
+            created_count += 1
+        
+        logger.info(f"Validator {validator_hotkey} added {created_count} hotkeys to blacklist")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully added {created_count} hotkeys to blacklist",
+            count=created_count,
+        )
+    
+    except Exception as e:
+        logger.error(f"Error adding blacklisted hotkeys: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add blacklisted hotkeys: {str(e)}",
+        )
+
+
+@app.delete(
+    "/blacklist/{hotkey}",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def remove_blacklisted_hotkey(
+    hotkey: str,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """
+    Remove a hotkey from the blacklist.
+    
+    Only accessible by validators.
+    """
+    try:
+        # Check if hotkey exists
+        existing = await prisma.blacklistedhotkey.find_unique(where={"hotkey": hotkey})
+        
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Hotkey {hotkey} not found in blacklist",
+            )
+        
+        await prisma.blacklistedhotkey.delete(where={"hotkey": hotkey})
+        
+        logger.info(f"Validator {validator_hotkey} removed hotkey {hotkey} from blacklist")
+        return SubmissionResponse(
+            success=True,
+            message=f"Successfully removed hotkey {hotkey} from blacklist",
+            count=1,
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing blacklisted hotkey: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove blacklisted hotkey: {str(e)}",
+        )
+
+
+# ============================================================================
+# Main Entry Point
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "8000"))
+    
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=os.getenv("API_RELOAD", "false").lower() == "true",
+    )

@@ -19,6 +19,9 @@ python-dotenv>=1.0.0
 # HTTP client (for internal calls if needed)
 httpx>=0.25.0
 
+# Numeric operations (embedding cosine similarity)
+numpy>=1
+
 # Async support
 asyncio>=3.4.3
 

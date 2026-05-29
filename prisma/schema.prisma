@@ -193,7 +193,10 @@ model TweetAnalysis {
   
   // Full analysis data (JSON blob)
   analysisData        Json?     @map("analysis_data") @db.JsonB
-  
+
+  // Miner attribution
+  minerHotkey         String?   @map("miner_hotkey")
+
   // Timestamps
   analyzedAt          DateTime  @default(now()) @map("analyzed_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -466,7 +469,10 @@ model TelegramMessageAnalysis {
   
   // Full analysis data (JSON blob)
   analysisData        Json?            @map("analysis_data") @db.JsonB
-  
+
+  // Miner attribution
+  minerHotkey         String?          @map("miner_hotkey")
+
   // Timestamps
   analyzedAt          DateTime         @default(now()) @map("analyzed_at")
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at")
@@ -505,7 +511,7 @@ model TelegramScoring {
 // News Article Models
 // ============================================================================
 
-/// News articles from RSS feeds
+/// News articles from RSS feeds and CC-NEWS WARC archives
 model NewsArticle {
   id          Int       @id @default(autoincrement())
   url         String    @unique
@@ -517,14 +523,18 @@ model NewsArticle {
   topic       String?
   extra       Json?     @db.JsonB
   ruleTag     String?   @map("rule_tag")
+  sourceType  String    @default("rss") @map("source_type")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  scorings    NewsArticleScoring[]
-  analysis    NewsArticleAnalysis?
+  scorings       NewsArticleScoring[]
+  analysis       NewsArticleAnalysis?
+  eventLinks     EventArticle[]
+  narrativeLinks NarrativeArticle[]
 
   @@index([source], name: "idx_news_articles_source")
   @@index([published], name: "idx_news_articles_published")
   @@index([createdAt], name: "idx_news_articles_created")
+  @@index([sourceType], name: "idx_news_articles_source_type")
   @@map("news_articles")
 }
 
@@ -542,14 +552,29 @@ model NewsArticleAnalysis {
   relevanceConfidence String?      @map("relevance_confidence")
   mentionedAssets     Json?        @map("mentioned_assets") @db.JsonB
   analysisData        Json?        @map("analysis_data") @db.JsonB
+  minerHotkey         String?      @map("miner_hotkey")
   analyzedAt          DateTime     @default(now()) @map("analyzed_at") @db.Timestamptz
   updatedAt           DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   article             NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
+  // V2 ArticleIntelligence indexed fields
+  impactLevel         String?      @map("impact_level")
+  factualConfidence   String?      @map("factual_confidence")
+  eventType           String?      @map("event_type")
+  eventDate           DateTime?    @map("event_date") @db.Date
+  contentHash         String?      @map("content_hash")
+  primaryGeo          String?      @map("primary_geo")
+  overallSentimentScore Float?     @map("overall_sentiment_score")
+  narrativeEmbedding    Float[]    @default([]) @map("narrative_embedding")
+
   @@index([sentiment], name: "idx_news_analysis_sentiment")
   @@index([sectorId], name: "idx_news_analysis_sector")
   @@index([analyzedAt], name: "idx_news_analysis_analyzed_at")
+  @@index([eventType], name: "idx_news_analysis_event_type")
+  @@index([eventDate], name: "idx_news_analysis_event_date")
+  @@index([contentHash], name: "idx_news_analysis_content_hash")
+  @@index([impactLevel], name: "idx_news_analysis_impact")
   @@map("news_article_analysis")
 }
 
@@ -570,4 +595,150 @@ model NewsArticleScoring {
   @@index([validatorHotkey], name: "idx_news_scoring_validator")
   @@index([status, startTime], name: "idx_news_scoring_status_start_time")
   @@map("news_article_scoring")
+}
+
+
+// ============================================================================
+// Event & Narrative System (ArticleIntelligence V2)
+// ============================================================================
+
+/// Canonical events — groups of articles about the same real-world event
+model Event {
+  id              Int       @id @default(autoincrement())
+  fingerprint     String    @unique
+  eventType       String    @map("event_type")
+  canonicalTitle  String    @map("canonical_title")
+  eventDate       DateTime? @map("event_date") @db.Date
+  sectorId        Int?      @map("sector_id")
+  sectorSymbol    String?   @map("sector_symbol")
+  articleCount    Int       @default(1) @map("article_count")
+  sentiment       String?
+  impactPotential String?   @map("impact_potential")
+  entities        Json?     @db.JsonB
+  summary         String?
+  titleEmbedding  Float[]   @default([]) @map("title_embedding")
+  firstSeenAt     DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastArticleAt   DateTime  @default(now()) @map("last_article_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  articles        EventArticle[]
+  narrativeLinks  EventNarrative[]
+
+  @@index([eventType], name: "idx_events_type")
+  @@index([eventDate], name: "idx_events_date")
+  @@index([sectorId], name: "idx_events_sector")
+  @@index([lastArticleAt], name: "idx_events_last_article")
+  @@map("events")
+}
+
+/// Join table: articles <-> events (many-to-many)
+model EventArticle {
+  id        Int      @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  articleId Int      @map("article_id")
+  role      String   @default("reporting")
+  addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz
+
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  article   NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, articleId])
+  @@index([eventId], name: "idx_event_articles_event")
+  @@index([articleId], name: "idx_event_articles_article")
+  @@map("event_articles")
+}
+
+/// Market narratives — long-running themes across many articles/events
+model Narrative {
+  id              Int       @id @default(autoincrement())
+  slug            String    @unique
+  name            String
+  description     String?
+  keywords        Json      @db.JsonB
+  sectorIds       Json?     @map("sector_ids") @db.JsonB
+  sentimentBias   String?   @map("sentiment_bias")
+  phase           String    @default("emerging")
+  articleCount    Int       @default(0) @map("article_count")
+  eventCount      Int       @default(0) @map("event_count")
+  sentimentScore  Float?    @map("sentiment_score")
+  momentum        Float?
+  source          String    @default("seed")
+  embedding       Float[]   @default([])
+  embeddingModel  String?   @map("embedding_model")
+  startDate       DateTime? @map("start_date") @db.Date
+  lastArticleAt   DateTime? @map("last_article_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  articleLinks    NarrativeArticle[]
+  eventLinks      EventNarrative[]
+
+  @@index([phase], name: "idx_narratives_phase")
+  @@index([lastArticleAt], name: "idx_narratives_last_article")
+  @@map("narratives")
+}
+
+/// Join table: articles <-> narratives
+model NarrativeArticle {
+  id             Int       @id @default(autoincrement())
+  narrativeId    Int       @map("narrative_id")
+  articleId      Int       @map("article_id")
+  confidence     Float     @default(1.0)
+  matchedKeyword String?   @map("matched_keyword")
+  addedAt        DateTime  @default(now()) @map("added_at") @db.Timestamptz
+
+  narrative      Narrative   @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  article        NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([narrativeId, articleId])
+  @@index([narrativeId], name: "idx_narrative_articles_narrative")
+  @@index([articleId], name: "idx_narrative_articles_article")
+  @@map("narrative_articles")
+}
+
+/// Join table: events <-> narratives
+model EventNarrative {
+  id           Int       @id @default(autoincrement())
+  eventId      Int       @map("event_id")
+  narrativeId  Int       @map("narrative_id")
+  addedAt      DateTime  @default(now()) @map("added_at") @db.Timestamptz
+
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  narrative    Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, narrativeId])
+  @@index([eventId], name: "idx_event_narratives_event")
+  @@index([narrativeId], name: "idx_event_narratives_narrative")
+  @@map("event_narratives")
+}
+
+/// Tracks daily narrative intensity for time-series charting
+model NarrativeIntensity {
+  id            Int      @id @default(autoincrement())
+  narrativeId   Int      @map("narrative_id")
+  date          DateTime @db.Date
+  articleCount  Int      @default(0) @map("article_count")
+  avgSentiment  Float?   @map("avg_sentiment")
+  sourceCount   Int      @default(0) @map("source_count")
+
+  @@unique([narrativeId, date])
+  @@index([narrativeId], name: "idx_narrative_intensity_narrative")
+  @@index([date], name: "idx_narrative_intensity_date")
+  @@map("narrative_intensity")
+}
+
+/// Candidate narratives waiting for auto-discovery threshold
+model NarrativeCandidate {
+  id            Int      @id @default(autoincrement())
+  keyword       String   @unique
+  articleCount  Int      @default(1) @map("article_count")
+  sourceCount   Int      @default(1) @map("source_count")
+  firstSeenAt   DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  promoted      Boolean  @default(false)
+  embedding     Float[]  @default([])
+
+  @@index([keyword], name: "idx_narrative_candidates_keyword")
+  @@index([articleCount], name: "idx_narrative_candidates_count")
+  @@map("narrative_candidates")
 }

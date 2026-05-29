@@ -64,8 +64,8 @@ class Account(AccountBase):
 class TweetAnalysisBase(BaseModel):
     """Base tweet analysis model."""
     sentiment: Optional[str] = None  # very_bullish, bullish, neutral, bearish, very_bearish
-    asset_id: Optional[int] = Field(None, alias="assetId")
-    asset_symbol: Optional[str] = Field(None, alias="assetSymbol")
+    subnet_id: Optional[int] = Field(None, alias="subnetId")
+    subnet_name: Optional[str] = Field(None, alias="subnetName")
     content_type: Optional[str] = Field(None, alias="contentType")
     
     class Config:
@@ -76,8 +76,8 @@ class TweetAnalysisCreate(BaseModel):
     """Model for creating tweet analysis."""
     tweet_id: int
     sentiment: Optional[str] = None
-    asset_id: Optional[int] = None
-    asset_symbol: Optional[str] = None
+    subnet_id: Optional[int] = None
+    subnet_name: Optional[str] = None
     content_type: Optional[str] = None
     analysis_data: Optional[dict] = None
 
@@ -313,14 +313,14 @@ class CompletedTweetSubmission(BaseModel):
     """Model for submitting a completed scored tweet."""
     tweet_id: int
     sentiment: str
-    asset_id: Optional[int] = None
-    asset_symbol: Optional[str] = None
+    # Optional richer classification fields (backward compatible with sentiment-only submissions)
+    subnet_id: Optional[int] = None
+    subnet_name: Optional[str] = None
     content_type: Optional[str] = None
     technical_quality: Optional[str] = None
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
-    miner_hotkey: Optional[str] = None
 
 
 class CompletedTweetsSubmission(BaseModel):
@@ -366,150 +366,3 @@ class AxonCheckResponse(BaseModel):
     """Response model for axon reachability check."""
     reachable: bool
     error: Optional[str] = None
-
-
-# ============================================================================
-# Telegram Models
-# ============================================================================
-
-class TelegramGroup(BaseModel):
-    """Telegram group model."""
-    id: str
-    telegram_id: int = Field(alias="telegramId")
-    title: str
-    is_monitored: bool = Field(False, alias="isMonitored")
-    is_muted: bool = Field(False, alias="isMuted")
-    muted_until: Optional[str] = Field(None, alias="mutedUntil")
-    created_at: str = Field(alias="createdAt")
-    updated_at: str = Field(alias="updatedAt")
-
-    class Config:
-        populate_by_name = True
-
-
-class TelegramMessageAnalysis(BaseModel):
-    """Telegram message analysis model."""
-    id: int
-    message_id: str = Field(alias="messageId")
-    sentiment: Optional[str] = None
-    asset_id: Optional[int] = Field(None, alias="assetId")
-    asset_symbol: Optional[str] = Field(None, alias="assetSymbol")
-    content_type: Optional[str] = Field(None, alias="contentType")
-    technical_quality: Optional[str] = Field(None, alias="technicalQuality")
-    market_analysis: Optional[str] = Field(None, alias="marketAnalysis")
-    impact_potential: Optional[str] = Field(None, alias="impactPotential")
-    relevance_confidence: Optional[str] = Field(None, alias="relevanceConfidence")
-    analyzed_at: str = Field(alias="analyzedAt")
-
-    class Config:
-        populate_by_name = True
-
-
-class TelegramMessage(BaseModel):
-    """Telegram message model."""
-    id: str
-    telegram_id: int = Field(alias="telegramId")
-    group_id: str = Field(alias="groupId")
-    sender_id: int = Field(alias="senderId")
-    sender_username: Optional[str] = Field(None, alias="senderUsername")
-    sender_name: str = Field(alias="senderName")
-    content: str
-    reply_to_id: Optional[int] = Field(None, alias="replyToId")
-    created_at: str = Field(alias="createdAt")
-
-    class Config:
-        populate_by_name = True
-
-
-class TelegramMessageWithContext(TelegramMessage):
-    """Telegram message model with group and analysis context."""
-    group: Optional[TelegramGroup] = None
-    analysis: Optional[TelegramMessageAnalysis] = None
-
-
-class TelegramMessageForScoring(TelegramMessageWithContext):
-    """
-    Telegram message with context messages for scoring.
-    
-    Contains the main message plus context from:
-    - The message being replied to (if any) with its classification
-    - Previous messages in the conversation for context
-    """
-    context_messages: List["TelegramMessageWithContext"] = Field(
-        default_factory=list, alias="contextMessages"
-    )
-    inherited_asset_id: Optional[int] = Field(None, alias="inheritedAssetId")
-    inherited_asset_symbol: Optional[str] = Field(None, alias="inheritedAssetSymbol")
-
-    class Config:
-        populate_by_name = True
-
-
-class TelegramMessagesForScoringResponse(BaseModel):
-    """Response model for getting telegram messages for scoring."""
-    messages: List[TelegramMessageForScoring]
-    count: int
-
-
-class CompletedTelegramMessageSubmission(BaseModel):
-    """Model for submitting a completed scored telegram message."""
-    message_id: str
-    sentiment: str
-    asset_id: Optional[int] = None
-    asset_symbol: Optional[str] = None
-    content_type: Optional[str] = None
-    technical_quality: Optional[str] = None
-    market_analysis: Optional[str] = None
-    impact_potential: Optional[str] = None
-    relevance_confidence: Optional[str] = None
-    miner_hotkey: Optional[str] = None
-
-
-class CompletedTelegramMessagesSubmission(BaseModel):
-    """Model for submitting multiple completed scored telegram messages."""
-    completed_messages: List[CompletedTelegramMessageSubmission]
-
-
-# ============================================================================
-# News Article Models
-# ============================================================================
-
-class NewsArticleForScoring(BaseModel):
-    """News article model for scoring responses."""
-    id: int
-    url: str
-    title: str
-    summary: Optional[str] = None
-    content: Optional[str] = None
-    published: Optional[str] = None
-    source: str
-    topic: Optional[str] = None
-    extra: Optional[Any] = None
-
-    class Config:
-        populate_by_name = True
-
-
-class NewsArticlesForScoringResponse(BaseModel):
-    """Response model for getting news articles for scoring."""
-    articles: List[NewsArticleForScoring]
-    count: int
-
-
-class CompletedNewsArticleSubmission(BaseModel):
-    """Model for submitting a completed scored news article."""
-    article_id: int
-    sentiment: str
-    sector_id: Optional[int] = None
-    sector_symbol: Optional[str] = None
-    content_type: Optional[str] = None
-    technical_quality: Optional[str] = None
-    market_analysis: Optional[str] = None
-    impact_potential: Optional[str] = None
-    relevance_confidence: Optional[str] = None
-    miner_hotkey: Optional[str] = None
-
-
-class CompletedNewsArticlesSubmission(BaseModel):
-    """Model for submitting multiple completed scored news articles."""
-    completed_articles: List[CompletedNewsArticleSubmission]

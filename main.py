@@ -201,10 +201,25 @@ async def lifespan(app: FastAPI):
             logger.error(f"Failed to connect to price database: {e}")
             raise
     
+    # Start background jobs (event cluster merging, narrative lifecycle)
+    background_task = None
+    try:
+        from jobs.background_tasks import run_periodic_jobs
+        background_task = asyncio.create_task(run_periodic_jobs(prisma))
+        logger.info("Background jobs started")
+    except Exception as e:
+        logger.warning(f"Failed to start background jobs: {e}")
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Talisman AI API...")
+    if background_task and not background_task.done():
+        background_task.cancel()
+        try:
+            await background_task
+        except asyncio.CancelledError:
+            pass
     
     if price_prisma is not None:
         await price_prisma.disconnect()
@@ -419,6 +434,8 @@ PURGE_BROADCAST_HOTKEYS: list[str] = [
     hk.strip() for hk in os.getenv("PURGE_BROADCAST_HOTKEYS", "").split(",") if hk.strip()
 ]
 
+RESET_SCORES_ID: str = os.getenv("RESET_SCORES_ID", "")
+
 
 @app.get("/config/subnet")
 async def get_subnet_config(
@@ -440,6 +457,7 @@ async def get_subnet_config(
         "blacklisted_hotkeys": SUBNET_BLACKLISTED_HOTKEYS,
         "reset_broadcasts_before_epoch": RESET_BROADCASTS_BEFORE_EPOCH,
         "purge_broadcast_hotkeys": PURGE_BROADCAST_HOTKEYS,
+        "reset_scores_id": RESET_SCORES_ID,
         "version": 2,
         "timestamp": datetime.utcnow().isoformat(),
     }
@@ -798,6 +816,7 @@ async def submit_completed_tweets(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1197,6 +1216,7 @@ async def submit_completed_telegram_messages(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1297,6 +1317,7 @@ async def get_unscored_articles(
                     WHERE s.status = 'pending'
                       AND a.title IS NOT NULL
                       AND BTRIM(a.title) <> ''
+                      AND a.source_type = 'rss'
                     ORDER BY s.created_at ASC, s.id ASC
                     FOR UPDATE SKIP LOCKED
                     LIMIT $1
@@ -1328,6 +1349,7 @@ async def get_unscored_articles(
                         WHERE s.id IS NULL AND na.id IS NULL
                           AND a.title IS NOT NULL
                           AND BTRIM(a.title) <> ''
+                          AND a.source_type = 'rss'
                         ORDER BY a.created_at ASC, a.id ASC
                         LIMIT $1
                         FOR UPDATE OF a SKIP LOCKED
@@ -1432,11 +1454,43 @@ async def submit_completed_articles(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
                     analysis_create[k] = v
                     analysis_update[k] = v
+
+            # V2: Store full ArticleIntelligence in analysisData JSONB
+            ad = completed.analysis_data
+            if ad and isinstance(ad, dict):
+                analysis_create["analysisData"] = ad
+                analysis_update["analysisData"] = ad
+                # Extract V2 indexed fields
+                v2_fields = {
+                    "impactLevel": ad.get("impact_potential"),
+                    "factualConfidence": ad.get("factual_confidence"),
+                    "eventType": ad.get("event_fingerprint", {}).get("event_type"),
+                    "contentHash": ad.get("event_fingerprint", {}).get("content_hash"),
+                    "primaryGeo": ad.get("primary_geo"),
+                    "overallSentimentScore": ad.get("overall_sentiment_score"),
+                }
+                event_date_str = ad.get("event_fingerprint", {}).get("event_date")
+                if event_date_str:
+                    try:
+                        v2_fields["eventDate"] = datetime.strptime(event_date_str, "%Y-%m-%d")
+                    except (ValueError, TypeError):
+                        pass
+                for k, v in v2_fields.items():
+                    if v is not None:
+                        analysis_create[k] = v
+                        analysis_update[k] = v
+
+                # Store narrative embedding for matching and centroid drift
+                narr_emb_raw = ad.get("narrative_embedding")
+                if narr_emb_raw and isinstance(narr_emb_raw, list) and len(narr_emb_raw) == 384:
+                    analysis_create["narrativeEmbedding"] = narr_emb_raw
+                    analysis_update["narrativeEmbedding"] = narr_emb_raw
 
             await prisma.newsarticleanalysis.upsert(
                 where={"articleId": completed.article_id},
@@ -1456,6 +1510,26 @@ async def submit_completed_articles(
                 data={"status": "completed"},
             )
             updated_count += result
+
+            # V2: Event clustering + narrative matching (non-blocking)
+            if ad and isinstance(ad, dict):
+                try:
+                    from services.event_clustering import cluster_article
+                    from services.narrative_matcher import match_article_narratives
+                    await cluster_article(prisma, completed.article_id, ad)
+                    narrative_kws = ad.get("narrative_keywords", [])
+                    sector = ad.get("topic_signature", {}).get("primary_sector_id")
+                    narr_emb = ad.get("narrative_embedding")
+                    if narr_emb and isinstance(narr_emb, list) and len(narr_emb) == 384:
+                        pass  # valid embedding
+                    else:
+                        narr_emb = None
+                    await match_article_narratives(
+                        prisma, completed.article_id, narrative_kws, sector,
+                        narrative_embedding=narr_emb,
+                    )
+                except Exception as clustering_err:
+                    logger.warning(f"Event/narrative processing failed for article {completed.article_id}: {clustering_err}")
 
         logger.info(f"Validator {validator_hotkey} completed {updated_count} news articles")
         return SubmissionResponse(
@@ -1778,6 +1852,14 @@ async def remove_blacklisted_hotkey(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove blacklisted hotkey: {str(e)}",
         )
+
+
+# ============================================================================
+# Dashboard Endpoints (read-only, restricted to local / box IPs)
+# ============================================================================
+
+from dashboard_routes import router as dashboard_router
+app.include_router(dashboard_router)
 
 
 # ============================================================================
