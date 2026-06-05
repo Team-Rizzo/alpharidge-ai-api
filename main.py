@@ -416,9 +416,23 @@ SUBNET_CONFIG = {
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "2.0.0")
 MAX_POINTS_PER_ITEM = float(os.getenv("MAX_POINTS_PER_ITEM", "1"))
-MAX_OUTSTANDING_LEASES = int(os.getenv("MAX_OUTSTANDING_LEASES", "30"))
+# Prod-safety: these two levers live in the shared */unscored endpoints that EVERY
+# validator hits, so their defaults must be no-ops — enabling them is a deliberate
+# operator action, never inherited from a deploy.
+#   MAX_OUTSTANDING_LEASES <= 0  => unlimited (no lease cap)  [see verification.grant_count]
+#   AUDIT_OVERLAP_RATE     == 0  => no silent audit re-leasing
+MAX_OUTSTANDING_LEASES = int(os.getenv("MAX_OUTSTANDING_LEASES", "0"))
 REPORT_CONSENSUS_THRESHOLD = int(os.getenv("REPORT_CONSENSUS_THRESHOLD", "2"))
-AUDIT_OVERLAP_RATE = float(os.getenv("AUDIT_OVERLAP_RATE", "0.05"))
+AUDIT_OVERLAP_RATE = float(os.getenv("AUDIT_OVERLAP_RATE", "0"))
+# §3 prod-safety: report consensus is ALARM-ONLY by default. Automated blacklisting of an
+# accused validator stays off until the false-positive rate is observed (a deep-verify
+# mismatch can signal benign API-side data drift, and sybil reporters could knock out an
+# honest validator). Flip to "true" only as a deliberate operator action.
+REPORTS_AUTO_BLACKLIST = os.getenv("REPORTS_AUTO_BLACKLIST", "false").lower() == "true"
+# §4 scoped-test allowlist: when non-empty, verdicts are only written / attestations only
+# issued for these validator hotkeys. Empty (default) = no restriction (backward compatible).
+VERDICT_ALLOWLIST_HOTKEYS = set(filter(None, (
+    h.strip() for h in os.getenv("VERDICT_ALLOWLIST_HOTKEYS", "").split(","))))
 
 SUBNET_BLACKLISTED_HOTKEYS: list[str] = [
     hk.strip() for hk in os.getenv("SUBNET_BLACKLISTED_HOTKEYS", "").split(",") if hk.strip()
@@ -817,6 +831,9 @@ async def write_verdict(*, resource_type: str, resource_id: str, validator_hotke
     Returns True if a verdict row was written, False if rejected/skipped/errored.
     Best-effort: never raises, so a verdict failure can't break the completed-submission
     request for legacy validators (Phase-1 grace)."""
+    # §4 scoped-test allowlist: when configured, only write verdicts for listed validators.
+    if VERDICT_ALLOWLIST_HOTKEYS and validator_hotkey not in VERDICT_ALLOWLIST_HOTKEYS:
+        return False
     # Phase-1 grace: incomplete verdict payloads simply produce no verdict row.
     # categorical_key uses truthiness (reject ""); epoch uses `is not None` (0 is valid).
     if not all([miner_hotkey, miner_signature, nonce, miner_analysis_hash,
@@ -1994,7 +2011,10 @@ async def remove_blacklisted_hotkey(
 )
 async def get_attestation(epoch: int, validator_hotkey: str = Depends(get_validator_hotkey)):
     """Recompute this validator's per-miner budget for `epoch` from ScoreVerdict,
-    build a Merkle root, sign it with the API ed25519 key, upsert, and return it."""
+    build a Merkle root, sign it with the API sr25519 key, upsert, and return it."""
+    # §4 scoped-test allowlist: when configured, only issue attestations for listed validators.
+    if VERDICT_ALLOWLIST_HOTKEYS and validator_hotkey not in VERDICT_ALLOWLIST_HOTKEYS:
+        raise HTTPException(status_code=403, detail="validator not in verdict allowlist")
     try:
         rows = await prisma.scoreverdict.find_many(
             where={"validatorHotkey": validator_hotkey, "epoch": int(epoch)},
@@ -2049,8 +2069,11 @@ async def get_attestation(epoch: int, validator_hotkey: str = Depends(get_valida
 )
 async def post_report(report: BroadcastReportCreate,
                       validator_hotkey: str = Depends(get_validator_hotkey)):
-    """Record a receiver-flagged discrepancy. On >= REPORT_CONSENSUS_THRESHOLD distinct
-    reporters for (accused, epoch), blacklist the accused."""
+    """Record a receiver-flagged discrepancy (always written to the broadcast_report
+    paper trail). On >= REPORT_CONSENSUS_THRESHOLD distinct reporters for (accused, epoch),
+    raise an alarm — and auto-blacklist ONLY if REPORTS_AUTO_BLACKLIST is enabled (§3).
+    Default is alarm-only: a deep-verify mismatch can be benign API-side data drift, and
+    sybil reporters must not be able to knock out an honest validator automatically."""
     await prisma.broadcastreport.upsert(
         where={"uq_broadcast_report": {
             "reporterHotkey": validator_hotkey, "accusedHotkey": report.accused_hotkey,
@@ -2067,14 +2090,21 @@ async def post_report(report: BroadcastReportCreate,
     )
     reporter_count = len({r.reporterHotkey for r in distinct})
     if v.has_report_consensus(reporter_count, REPORT_CONSENSUS_THRESHOLD):
-        await prisma.blacklistedhotkey.upsert(
-            where={"hotkey": report.accused_hotkey},
-            data={"create": {"hotkey": report.accused_hotkey,
-                             "reason": f"report_consensus:{report.reason}:epoch{report.epoch}"},
-                  "update": {"reason": f"report_consensus:{report.reason}:epoch{report.epoch}"}},
-        )
-        logger.warning(f"Blacklisted {report.accused_hotkey[:12]}.. on "
-                       f"{reporter_count} reports (reason={report.reason}, epoch={report.epoch})")
+        if REPORTS_AUTO_BLACKLIST:
+            await prisma.blacklistedhotkey.upsert(
+                where={"hotkey": report.accused_hotkey},
+                data={"create": {"hotkey": report.accused_hotkey,
+                                 "reason": f"report_consensus:{report.reason}:epoch{report.epoch}"},
+                      "update": {"reason": f"report_consensus:{report.reason}:epoch{report.epoch}"}},
+            )
+            logger.warning(f"Blacklisted {report.accused_hotkey[:12]}.. on "
+                           f"{reporter_count} reports (reason={report.reason}, epoch={report.epoch})")
+        else:
+            logger.warning(
+                f"[ALARM] Report consensus reached for {report.accused_hotkey[:12]}.. "
+                f"({reporter_count} distinct reporters, reason={report.reason}, epoch={report.epoch}) "
+                f"— NOT auto-blacklisting (alarm-only mode). Review manually before any action."
+            )
     return SubmissionResponse(success=True, message="report recorded", count=reporter_count)
 
 

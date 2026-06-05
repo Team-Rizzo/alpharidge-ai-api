@@ -6,7 +6,13 @@ from typing import Dict, List, Set
 
 
 def grant_count(limit: int, outstanding: int, max_outstanding: int) -> int:
-    """How many new leases to grant given an outstanding-lease cap."""
+    """How many new leases to grant given an outstanding-lease cap.
+
+    A non-positive max_outstanding means 'no cap' (unlimited) — the prod-safe default
+    so the lease throttle is opt-in, not inherited from a deploy.
+    """
+    if int(max_outstanding) <= 0:
+        return max(0, int(limit))
     return max(0, min(int(limit), int(max_outstanding) - int(outstanding)))
 
 

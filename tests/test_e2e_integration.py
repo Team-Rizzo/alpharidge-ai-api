@@ -2,7 +2,7 @@
 Opt-in end-to-end integration test for Verifiable Validator Point Broadcasting.
 
 Drives the REAL FastAPI app (in-process via httpx ASGITransport) against a REAL
-Postgres schema, with REAL sr25519 miner signatures and a REAL ed25519 API
+Postgres schema, with REAL sr25519 miner signatures and a REAL sr25519 API
 attestation key, then exercises the REAL validator-side modules (offline attestation
 ingest, deep-verify, reports). No mocks for the trust spine.
 
@@ -13,7 +13,7 @@ Run:
 
 Config (env overrides):
     E2E_DATABASE_URL   default postgresql://talisman:talisman_dev@127.0.0.1:5433/talisman?schema=talisman_e2e
-    API_ATTESTATION_PRIVKEY   default: a fresh random ed25519 seed
+    API_ATTESTATION_PRIVKEY   default: a fresh random sr25519 seed
 """
 import os
 import sys
@@ -48,10 +48,7 @@ sys.path.insert(0, API_DIR)
 import pytest_asyncio  # noqa: E402
 from httpx import AsyncClient, ASGITransport  # noqa: E402
 
-try:
-    from bittensor_wallet import Keypair, KeypairType
-except ImportError:  # pragma: no cover
-    from substrateinterface import Keypair, KeypairType
+from bittensor_wallet import Keypair  # sr25519 (default)
 
 import main                                    # noqa: E402
 import hotkey_whitelist                         # noqa: E402
@@ -67,14 +64,14 @@ from talisman_ai.validator.reward_broadcast_store import (          # noqa: E402
 # Synthetic actors / fixtures
 # ----------------------------------------------------------------------------
 ATT_KP = Keypair.create_from_seed(
-    "0x" + os.environ["API_ATTESTATION_PRIVKEY"], crypto_type=KeypairType.ED25519)
+    "0x" + os.environ["API_ATTESTATION_PRIVKEY"])
 PINNED_PUBKEY = ATT_KP.ss58_address
 
-MINER1 = Keypair.create_from_seed("0x" + "a1" * 32, crypto_type=KeypairType.SR25519)
-MINER2 = Keypair.create_from_seed("0x" + "b2" * 32, crypto_type=KeypairType.SR25519)
-VALI1 = Keypair.create_from_seed("0x" + "c3" * 32, crypto_type=KeypairType.SR25519)
-VALI2 = Keypair.create_from_seed("0x" + "d4" * 32, crypto_type=KeypairType.SR25519)
-VALI3 = Keypair.create_from_seed("0x" + "e5" * 32, crypto_type=KeypairType.SR25519)
+MINER1 = Keypair.create_from_seed("0x" + "a1" * 32)
+MINER2 = Keypair.create_from_seed("0x" + "b2" * 32)
+VALI1 = Keypair.create_from_seed("0x" + "c3" * 32)
+VALI2 = Keypair.create_from_seed("0x" + "d4" * 32)
+VALI3 = Keypair.create_from_seed("0x" + "e5" * 32)
 MINERS = {MINER1.ss58_address: MINER1, MINER2.ss58_address: MINER2}
 EPOCH = 4242
 
@@ -272,20 +269,31 @@ async def test_full_integration_flow(client):
     divergent = await main.audit_divergence_for_group(f"tweet:{shared_id}:{EPOCH}")
     assert divergent == [VALI3.ss58_address], divergent
 
-    # --- 6. Report consensus -> blacklist ---
+    # --- 6. Report consensus: alarm-only by default (§3), auto-blacklist only when enabled ---
     accused = VALI3.ss58_address
+    main.REPORTS_AUTO_BLACKLIST = False  # explicit: default prod-safe posture
     r1 = await client.post("/reports", headers=vheaders(VALI1), json={
         "accused_hotkey": accused, "epoch": EPOCH, "reason": "content_divergence",
         "evidence": {"expected_root": "deadbeef"}})
     assert r1.json()["count"] == 1
-    bl = await client.get("/blacklist", headers=vheaders(VALI1))
-    assert accused not in [b["hotkey"] for b in bl.json()]
     r2 = await client.post("/reports", headers=vheaders(VALI2), json={
         "accused_hotkey": accused, "epoch": EPOCH, "reason": "content_divergence",
         "evidence": {"expected_root": "deadbeef"}})
-    assert r2.json()["count"] == 2
+    assert r2.json()["count"] == 2  # consensus reached...
     bl = await client.get("/blacklist", headers=vheaders(VALI1))
-    assert accused in [b["hotkey"] for b in bl.json()], bl.json()
+    assert accused not in [b["hotkey"] for b in bl.json()], "alarm-only must NOT blacklist"
+
+    # Flip the operator switch ON: the same consensus now auto-blacklists.
+    main.REPORTS_AUTO_BLACKLIST = True
+    try:
+        r3 = await client.post("/reports", headers=vheaders(VALI2), json={
+            "accused_hotkey": accused, "epoch": EPOCH, "reason": "content_divergence",
+            "evidence": {"expected_root": "deadbeef"}})
+        assert r3.json()["count"] == 2
+        bl = await client.get("/blacklist", headers=vheaders(VALI1))
+        assert accused in [b["hotkey"] for b in bl.json()], bl.json()
+    finally:
+        main.REPORTS_AUTO_BLACKLIST = False
 
 
 def test_offline_ingest_adversarial():

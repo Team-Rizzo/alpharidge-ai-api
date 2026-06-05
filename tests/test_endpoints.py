@@ -11,10 +11,7 @@ import pytest
 import verification as v
 from utils import attestation_crypto as ac
 
-try:
-    from bittensor_wallet import Keypair, KeypairType
-except ImportError:  # pragma: no cover
-    from substrateinterface import Keypair, KeypairType
+from bittensor_wallet import Keypair  # sr25519 (default)
 
 
 class _FakeVerdictTable:
@@ -53,7 +50,7 @@ async def test_write_verdict_writes_valid_signed_row(monkeypatch):
     fake = _FakePrisma()
     monkeypatch.setattr(main, "prisma", fake, raising=False)
 
-    kp = Keypair.create_from_seed("0x" + "33" * 32, crypto_type=KeypairType.SR25519)
+    kp = Keypair.create_from_seed("0x" + "33" * 32)
     monkeypatch.setattr(main.hotkey_whitelist, "is_miner_hotkey", lambda hk: hk == kp.ss58_address)
     ah = "abc123"
     sig = kp.sign(ac.miner_sign_message("123", ah, "n1").encode("utf-8")).hex()
@@ -74,9 +71,38 @@ async def test_write_verdict_writes_valid_signed_row(monkeypatch):
     assert row["auditGroupId"] == "tweet:123:7"
 
 
-def test_max_outstanding_default():
+def test_prod_safe_lever_defaults():
+    # §2/§3/§4: every new lever must default to a no-op / non-restrictive value so a
+    # plain deploy never changes subnet-wide behavior.
     import main
-    assert main.MAX_OUTSTANDING_LEASES >= 1
+    assert main.MAX_OUTSTANDING_LEASES == 0      # unlimited (no lease throttle)
+    assert main.AUDIT_OVERLAP_RATE == 0          # no silent audit re-leasing
+    assert main.REPORTS_AUTO_BLACKLIST is False  # alarm-only
+    assert main.VERDICT_ALLOWLIST_HOTKEYS == set()  # no allowlist restriction
+
+
+@pytest.mark.asyncio
+async def test_write_verdict_allowlist_gates_non_listed_validator(monkeypatch):
+    import main
+    fake = _FakePrisma()
+    monkeypatch.setattr(main, "prisma", fake, raising=False)
+    monkeypatch.setattr(main.hotkey_whitelist, "is_miner_hotkey", lambda hk: True)
+    monkeypatch.setattr(main, "VERDICT_ALLOWLIST_HOTKEYS", {"valiX"}, raising=False)
+
+    kp = Keypair.create_from_seed("0x" + "55" * 32)
+    ah = "abc"
+    sig = kp.sign(ac.miner_sign_message("9", ah, "n1").encode("utf-8")).hex()
+    common = dict(resource_type="tweet", resource_id="9", miner_hotkey=kp.ss58_address,
+                  miner_signature=sig, nonce="n1", miner_analysis_hash=ah,
+                  validator_verdict="valid", categorical_key="BTC|bull",
+                  points_awarded=1.0, epoch=7)
+
+    # Not in the allowlist -> skipped, nothing written.
+    assert await main.write_verdict(validator_hotkey="vali1", **common) is False
+    assert fake.scoreverdict.rows == []
+    # In the allowlist -> written.
+    assert await main.write_verdict(validator_hotkey="valiX", **common) is True
+    assert len(fake.scoreverdict.rows) == 1
 
 
 @pytest.mark.asyncio
@@ -151,7 +177,7 @@ async def test_get_verdicts_returns_leaves_matching_attestation_root(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_post_reports_blacklists_on_second_distinct_reporter(monkeypatch):
+async def test_post_reports_alarm_only_by_default_and_blacklists_when_enabled(monkeypatch):
     import main
 
     state = {"reports": [], "blacklisted": []}
@@ -181,11 +207,21 @@ async def test_post_reports_blacklists_on_second_distinct_reporter(monkeypatch):
     monkeypatch.setattr(main, "prisma", _P(), raising=False)
     from models import BroadcastReportCreate
 
-    await main.post_report(BroadcastReportCreate(accused_hotkey="bad", epoch=7,
-                           reason="budget_exceeded", evidence={}), validator_hotkey="repA")
+    def report(reporter):
+        return main.post_report(BroadcastReportCreate(
+            accused_hotkey="bad", epoch=7, reason="budget_exceeded", evidence={}),
+            validator_hotkey=reporter)
+
+    # §3 default = alarm-only: even at consensus (2 distinct reporters), NO blacklist.
+    monkeypatch.setattr(main, "REPORTS_AUTO_BLACKLIST", False, raising=False)
+    await report("repA")
     assert state["blacklisted"] == []
-    await main.post_report(BroadcastReportCreate(accused_hotkey="bad", epoch=7,
-                           reason="budget_exceeded", evidence={}), validator_hotkey="repB")
+    await report("repB")
+    assert state["blacklisted"] == [], "alarm-only mode must not blacklist on consensus"
+
+    # Operator enables enforcement: the same consensus now blacklists.
+    monkeypatch.setattr(main, "REPORTS_AUTO_BLACKLIST", True, raising=False)
+    await report("repB")  # consensus still 2 distinct reporters
     assert "bad" in state["blacklisted"]
 
 

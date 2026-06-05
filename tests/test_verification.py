@@ -8,6 +8,13 @@ def test_grant_count_respects_outstanding_cap():
     assert v.grant_count(limit=10, outstanding=0, max_outstanding=30) == 10
 
 
+def test_grant_count_unlimited_when_cap_non_positive():
+    # §2 prod-safe default: max_outstanding <= 0 means no cap (full limit granted).
+    assert v.grant_count(limit=10, outstanding=999, max_outstanding=0) == 10
+    assert v.grant_count(limit=10, outstanding=999, max_outstanding=-1) == 10
+    assert v.grant_count(limit=0, outstanding=5, max_outstanding=0) == 0
+
+
 def test_budget_sums_only_valid_verified_verdicts():
     rows = [
         {"miner_hotkey": "m1", "validator_verdict": "valid", "points_awarded": 1.0},

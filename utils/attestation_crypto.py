@@ -12,10 +12,10 @@ import json
 import os
 from typing import Dict, List
 
-try:
-    from bittensor_wallet import Keypair, KeypairType
-except ImportError:  # pragma: no cover
-    from substrateinterface import Keypair, KeypairType
+# sr25519 is the only signature scheme used here (API attestation key + miner hotkeys).
+# bittensor_wallet's Keypair defaults to sr25519 and is the one library guaranteed present
+# on the runtime stack (bittensor-wallet 4.0.1, no substrate-interface, no ed25519/KeypairType).
+from bittensor_wallet import Keypair
 
 
 def canonical_json(payload: dict) -> str:
@@ -79,7 +79,7 @@ def merkle_root(verdicts: List[dict]) -> str:
     return layer[0]
 
 
-# ---- Attestation signature (API ed25519 key) --------------------------------
+# ---- Attestation signature (API sr25519 key) --------------------------------
 def attestation_message(validator_hotkey: str, epoch: int, per_miner_points: Dict[str, float],
                         total_points: float, merkle_root_hex: str) -> str:
     return canonical_json({
@@ -92,7 +92,7 @@ def attestation_message(validator_hotkey: str, epoch: int, per_miner_points: Dic
 
 
 def load_signing_key() -> "Keypair":
-    """Load the API attestation ed25519 key from API_ATTESTATION_PRIVKEY (hex seed)."""
+    """Load the API attestation sr25519 key from API_ATTESTATION_PRIVKEY (hex seed)."""
     seed_hex = os.getenv("API_ATTESTATION_PRIVKEY")
     if not seed_hex:
         raise RuntimeError("API_ATTESTATION_PRIVKEY not set")
@@ -101,7 +101,7 @@ def load_signing_key() -> "Keypair":
         raise RuntimeError(
             f"API_ATTESTATION_PRIVKEY must be 64 hex chars (32 bytes), got {len(seed_hex)}"
         )
-    return Keypair.create_from_seed("0x" + seed_hex, crypto_type=KeypairType.ED25519)
+    return Keypair.create_from_seed("0x" + seed_hex)  # sr25519 (default)
 
 
 def sign_attestation(keypair: "Keypair", message: str) -> str:
@@ -110,7 +110,7 @@ def sign_attestation(keypair: "Keypair", message: str) -> str:
 
 def verify_attestation(pubkey_ss58: str, message: str, signature_hex: str) -> bool:
     try:
-        kp = Keypair(ss58_address=pubkey_ss58, crypto_type=KeypairType.ED25519)
+        kp = Keypair(ss58_address=pubkey_ss58)  # sr25519 (default)
         return bool(kp.verify(message.encode("utf-8"), bytes.fromhex(signature_hex)))
     except Exception:
         return False
