@@ -328,6 +328,8 @@ model Scoring {
   startTime       DateTime? @map("start_time") @db.Timestamptz
   validatorHotkey String?   @map("validator_hotkey")
   score           Float?
+  epoch           Int?      @map("epoch")
+  minerHotkey     String?   @map("miner_hotkey")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
@@ -489,6 +491,8 @@ model TelegramScoring {
   startTime       DateTime?        @map("start_time")
   validatorHotkey String?          @map("validator_hotkey")
   score           Float?
+  epoch           Int?             @map("epoch")
+  minerHotkey     String?          @map("miner_hotkey")
   createdAt       DateTime         @default(now()) @map("created_at")
 
   // Relations
@@ -561,6 +565,8 @@ model NewsArticleScoring {
   startTime       DateTime?    @map("start_time") @db.Timestamptz
   validatorHotkey String?      @map("validator_hotkey")
   score           Float?
+  epoch           Int?         @map("epoch")
+  minerHotkey     String?      @map("miner_hotkey")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   article         NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -570,4 +576,57 @@ model NewsArticleScoring {
   @@index([validatorHotkey], name: "idx_news_scoring_validator")
   @@index([status, startTime], name: "idx_news_scoring_status_start_time")
   @@map("news_article_scoring")
+}
+
+/// Canonical per-item scoring paper trail. One row per (resource, validator, epoch).
+model ScoreVerdict {
+  id                Int      @id @default(autoincrement())
+  resourceType      String   @map("resource_type")
+  resourceId        String   @map("resource_id")
+  epoch             Int
+  validatorHotkey   String   @map("validator_hotkey")
+  minerHotkey       String   @map("miner_hotkey")
+  minerSignature    String   @map("miner_signature")
+  minerAnalysisHash String   @map("miner_analysis_hash")
+  validatorVerdict  String   @map("validator_verdict")
+  categoricalKey    String   @map("categorical_key")
+  pointsAwarded     Float    @map("points_awarded")
+  isAudit           Boolean  @default(false) @map("is_audit")
+  auditGroupId      String?  @map("audit_group_id")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([resourceType, resourceId, validatorHotkey, epoch], name: "uq_score_verdict_item")
+  @@index([epoch, validatorHotkey], name: "idx_score_verdict_epoch_validator")
+  @@index([auditGroupId], name: "idx_score_verdict_audit_group")
+  @@map("score_verdict")
+}
+
+/// Signed per-(validator, epoch) snapshot — the broadcast payload.
+model Attestation {
+  id              Int      @id @default(autoincrement())
+  validatorHotkey String   @map("validator_hotkey")
+  epoch           Int
+  perMinerPoints  Json     @map("per_miner_points")
+  totalPoints     Float    @map("total_points")
+  merkleRoot      String   @map("merkle_root")
+  signature       String
+  issuedAt        DateTime @default(now()) @map("issued_at") @db.Timestamptz
+
+  @@unique([validatorHotkey, epoch], name: "uq_attestation_validator_epoch")
+  @@map("attestation")
+}
+
+/// Receiver-flagged discrepancy; drives 2+ report consensus → blacklist.
+model BroadcastReport {
+  id             Int      @id @default(autoincrement())
+  reporterHotkey String   @map("reporter_hotkey")
+  accusedHotkey  String   @map("accused_hotkey")
+  epoch          Int
+  reason         String
+  evidence       Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([reporterHotkey, accusedHotkey, epoch, reason], name: "uq_broadcast_report")
+  @@index([accusedHotkey, epoch], name: "idx_broadcast_report_accused")
+  @@map("broadcast_report")
 }
