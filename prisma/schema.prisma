@@ -198,6 +198,8 @@ model TweetAnalysis {
   analyzedAt          DateTime  @default(now()) @map("analyzed_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  minerHotkey         String?   @map("miner_hotkey")
+
   // Relations
   tweet               Tweet     @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
@@ -471,6 +473,8 @@ model TelegramMessageAnalysis {
   analyzedAt          DateTime         @default(now()) @map("analyzed_at")
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at")
 
+  minerHotkey         String?          @map("miner_hotkey")
+
   // Relations
   message             TelegramMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
@@ -544,6 +548,8 @@ model NewsArticleAnalysis {
   analysisData        Json?        @map("analysis_data") @db.JsonB
   analyzedAt          DateTime     @default(now()) @map("analyzed_at") @db.Timestamptz
   updatedAt           DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  minerHotkey         String?      @map("miner_hotkey")
 
   article             NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
