@@ -320,6 +320,7 @@ class CompletedTweetSubmission(BaseModel):
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
+    miner_hotkey: Optional[str] = None
 
 
 class CompletedTweetsSubmission(BaseModel):
@@ -461,6 +462,7 @@ class CompletedTelegramMessageSubmission(BaseModel):
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
+    miner_hotkey: Optional[str] = None
 
 
 class CompletedTelegramMessagesSubmission(BaseModel):
@@ -505,6 +507,7 @@ class CompletedNewsArticleSubmission(BaseModel):
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
+    miner_hotkey: Optional[str] = None
 
 
 class CompletedNewsArticlesSubmission(BaseModel):

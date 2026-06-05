@@ -798,6 +798,7 @@ async def submit_completed_tweets(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1197,6 +1198,7 @@ async def submit_completed_telegram_messages(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1432,6 +1434,7 @@ async def submit_completed_articles(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1778,6 +1781,14 @@ async def remove_blacklisted_hotkey(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove blacklisted hotkey: {str(e)}",
         )
+
+
+# ============================================================================
+# Dashboard Endpoints (read-only, restricted to local / box IPs)
+# ============================================================================
+
+from dashboard_routes import router as dashboard_router
+app.include_router(dashboard_router)
 
 
 # ============================================================================
