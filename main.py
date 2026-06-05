@@ -932,6 +932,7 @@ async def submit_completed_tweets(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1364,6 +1365,7 @@ async def submit_completed_telegram_messages(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -1632,6 +1634,7 @@ async def submit_completed_articles(
                 "marketAnalysis": completed.market_analysis,
                 "impactPotential": completed.impact_potential,
                 "relevanceConfidence": completed.relevance_confidence,
+                "minerHotkey": completed.miner_hotkey,
             }
             for k, v in optional_fields.items():
                 if v is not None:
@@ -2132,6 +2135,14 @@ async def get_verdicts(validator: str, epoch: int,
     ) for r in rows]
     return VerdictsResponse(validator_hotkey=validator, epoch=int(epoch),
                             verdicts=leaves, count=len(leaves))
+
+
+# ============================================================================
+# Dashboard Endpoints (read-only, restricted to local / box IPs)
+# ============================================================================
+
+from dashboard_routes import router as dashboard_router
+app.include_router(dashboard_router)
 
 
 # ============================================================================
