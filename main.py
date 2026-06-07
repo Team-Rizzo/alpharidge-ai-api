@@ -11,6 +11,7 @@ Only validators with valid signatures are allowed to access the API.
 """
 
 import os
+import math
 import logging
 from datetime import datetime, timezone
 
@@ -67,7 +68,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from prisma import Prisma
+from prisma import Prisma, Json
 
 import httpx
 
@@ -88,6 +89,8 @@ from models import (
     # News article models
     NewsArticleForScoring, NewsArticlesForScoringResponse,
     CompletedNewsArticlesSubmission,
+    # Attestation / verdict models
+    AttestationResponse, VerdictsResponse, VerdictLeaf, BroadcastReportCreate,
 )
 from utils.auth import (
     AuthRequest,
@@ -95,10 +98,13 @@ from utils.auth import (
     extract_auth_from_headers,
     verify_auth_request,
 )
+import hotkey_whitelist
 from hotkey_whitelist import (
     is_validator_hotkey,
     initialize_whitelists,
 )
+import verification as v
+from utils import attestation_crypto as ac
 
 # Configure logging
 logging.basicConfig(
@@ -409,6 +415,24 @@ SUBNET_CONFIG = {
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "2.0.0")
+MAX_POINTS_PER_ITEM = float(os.getenv("MAX_POINTS_PER_ITEM", "1"))
+# Prod-safety: these two levers live in the shared */unscored endpoints that EVERY
+# validator hits, so their defaults must be no-ops — enabling them is a deliberate
+# operator action, never inherited from a deploy.
+#   MAX_OUTSTANDING_LEASES <= 0  => unlimited (no lease cap)  [see verification.grant_count]
+#   AUDIT_OVERLAP_RATE     == 0  => no silent audit re-leasing
+MAX_OUTSTANDING_LEASES = int(os.getenv("MAX_OUTSTANDING_LEASES", "0"))
+REPORT_CONSENSUS_THRESHOLD = int(os.getenv("REPORT_CONSENSUS_THRESHOLD", "2"))
+AUDIT_OVERLAP_RATE = float(os.getenv("AUDIT_OVERLAP_RATE", "0"))
+# §3 prod-safety: report consensus is ALARM-ONLY by default. Automated blacklisting of an
+# accused validator stays off until the false-positive rate is observed (a deep-verify
+# mismatch can signal benign API-side data drift, and sybil reporters could knock out an
+# honest validator). Flip to "true" only as a deliberate operator action.
+REPORTS_AUTO_BLACKLIST = os.getenv("REPORTS_AUTO_BLACKLIST", "false").lower() == "true"
+# §4 scoped-test allowlist: when non-empty, verdicts are only written / attestations only
+# issued for these validator hotkeys. Empty (default) = no restriction (backward compatible).
+VERDICT_ALLOWLIST_HOTKEYS = set(filter(None, (
+    h.strip() for h in os.getenv("VERDICT_ALLOWLIST_HOTKEYS", "").split(","))))
 
 SUBNET_BLACKLISTED_HOTKEYS: list[str] = [
     hk.strip() for hk in os.getenv("SUBNET_BLACKLISTED_HOTKEYS", "").split(",") if hk.strip()
@@ -603,6 +627,20 @@ async def get_unscored_tweets(
                 lease_ttl_seconds,
             )
 
+            # Outstanding-lease cap: count this validator's in-progress leases and
+            # reduce the grant so it never exceeds MAX_OUTSTANDING_LEASES.
+            # Note: audit-overlap injection below may add up to ceil(limit*AUDIT_OVERLAP_RATE) extra in_progress rows beyond this cap (bounded, intentional extra verification work).
+            outstanding_rows = await tx.query_raw(
+                "SELECT COUNT(*)::int AS c FROM scoring "
+                "WHERE validator_hotkey = $1 AND status = 'in_progress';",
+                validator_hotkey,
+            )
+            outstanding = int((outstanding_rows or [{"c": 0}])[0]["c"])
+            limit = v.grant_count(limit=limit, outstanding=outstanding,
+                                  max_outstanding=MAX_OUTSTANDING_LEASES)
+            if limit <= 0:
+                return TweetsForScoringResponse(tweets=[], count=0)
+
             # 2) Pick from two sources:
             #   A) Existing scoring records with status='pending'
             #   B) Tweets with no scoring record and no analysis record
@@ -671,6 +709,34 @@ async def get_unscored_tweets(
 
             # Combine all claimed tweet ids
             tweet_ids = tweet_ids_pending + tweet_ids_no_scoring
+
+            # Audit overlaps: silently re-issue a small fraction of items another
+            # validator already completed, so we can later compare categorical keys.
+            audit_n = math.ceil(limit * AUDIT_OVERLAP_RATE) if limit > 0 else 0
+            if audit_n > 0:
+                audit_rows = await tx.query_raw(
+                    """
+                    SELECT s.tweet_id
+                    FROM scoring s
+                    JOIN tweets t ON t.id = s.tweet_id
+                    WHERE s.status = 'completed'
+                      AND (s.validator_hotkey IS NULL OR s.validator_hotkey <> $1)
+                      AND t.text IS NOT NULL AND BTRIM(t.text) <> ''
+                    ORDER BY s.created_at DESC
+                    LIMIT $2;
+                    """,
+                    validator_hotkey, audit_n,
+                )
+                for row in (audit_rows or []):
+                    tid = row["tweet_id"]
+                    if tid in tweet_ids:
+                        continue
+                    await tx.scoring.create(data={
+                        "tweetId": tid, "status": "in_progress",
+                        "startTime": datetime.utcnow(), "validatorHotkey": validator_hotkey,
+                    })
+                    tweet_ids.append(tid)
+
             if not tweet_ids:
                 return TweetsForScoringResponse(tweets=[], count=0)
 
@@ -756,6 +822,74 @@ async def get_unscored_tweets(
         )
 
 
+async def write_verdict(*, resource_type: str, resource_id: str, validator_hotkey: str,
+                        miner_hotkey: str, miner_signature: str, nonce: str,
+                        miner_analysis_hash: str, validator_verdict: str,
+                        categorical_key: str, points_awarded: float,
+                        epoch: int, is_audit: bool = False) -> bool:
+    """Verify the miner signature against the metagraph and upsert a ScoreVerdict.
+    Returns True if a verdict row was written, False if rejected/skipped/errored.
+    Best-effort: never raises, so a verdict failure can't break the completed-submission
+    request for legacy validators (Phase-1 grace)."""
+    # §4 scoped-test allowlist: when configured, only write verdicts for listed validators.
+    if VERDICT_ALLOWLIST_HOTKEYS and validator_hotkey not in VERDICT_ALLOWLIST_HOTKEYS:
+        return False
+    # Phase-1 grace: incomplete verdict payloads simply produce no verdict row.
+    # categorical_key uses truthiness (reject ""); epoch uses `is not None` (0 is valid).
+    if not all([miner_hotkey, miner_signature, nonce, miner_analysis_hash,
+                validator_verdict, categorical_key, epoch is not None]):
+        return False
+    if not hotkey_whitelist.is_miner_hotkey(miner_hotkey):
+        logger.warning(f"Verdict rejected: {miner_hotkey[:12]}.. is not a current miner")
+        return False
+    if not ac.verify_miner_signature(miner_hotkey, str(resource_id), miner_analysis_hash,
+                                     nonce, miner_signature):
+        logger.warning(f"Verdict rejected: bad miner signature from {miner_hotkey[:12]}..")
+        return False
+
+    clamped = v.clamp_points(points_awarded if points_awarded is not None else 0.0,
+                             MAX_POINTS_PER_ITEM)
+    # Deterministic group id: all validators scoring the same item+epoch share it,
+    # enabling audit/divergence comparison regardless of whether this was an audit lease.
+    audit_group_id = f"{resource_type}:{resource_id}:{int(epoch)}"
+    data = {
+        "resourceType": resource_type,
+        "resourceId": str(resource_id),
+        "epoch": int(epoch),
+        "validatorHotkey": validator_hotkey,
+        "minerHotkey": miner_hotkey,
+        "minerSignature": miner_signature,
+        "minerAnalysisHash": miner_analysis_hash,
+        "validatorVerdict": validator_verdict,
+        "categoricalKey": categorical_key,
+        "pointsAwarded": clamped,
+        # isAudit is reserved: always False in Phase 1 (audit-lease provenance is not yet
+        # propagated from the scoring row). Divergence detection keys off auditGroupId, not this.
+        "isAudit": is_audit,
+        "auditGroupId": audit_group_id,
+    }
+    try:
+        await prisma.scoreverdict.upsert(
+            where={"uq_score_verdict_item": {
+                "resourceType": resource_type, "resourceId": str(resource_id),
+                "validatorHotkey": validator_hotkey, "epoch": int(epoch)}},
+            data={"create": data, "update": data},
+        )
+    except Exception as e:
+        logger.error(f"write_verdict upsert failed (non-fatal): {e}")
+        return False
+    return True
+
+
+async def audit_divergence_for_group(audit_group_id: str) -> list:
+    """Return the sorted list of validators whose categorical_key diverges from the
+    majority within an audit group (empty if no strict majority / <2 verdicts)."""
+    rows = await prisma.scoreverdict.find_many(where={"auditGroupId": audit_group_id})
+    group = [{"validator_hotkey": r.validatorHotkey, "categorical_key": r.categoricalKey}
+             for r in rows]
+    return sorted(v.audit_divergent_validators(group))
+
+
 @app.post(
     "/tweets/completed",
     response_model=SubmissionResponse,
@@ -823,7 +957,27 @@ async def submit_completed_tweets(
                 data={"status": "completed"},
             )
             updated_count += result
-        
+
+            # Record a signed verdict (Phase 1+: optional; skipped if fields/sig missing).
+            # Only record a verdict if this validator actually held the lease for this
+            # item (the update_many above matches only in_progress rows owned by us).
+            # This enforces per-miner attribution: a validator cannot earn points for
+            # items it was never leased.
+            if result:
+                await write_verdict(
+                    resource_type="tweet",
+                    resource_id=str(completed.tweet_id),
+                    validator_hotkey=validator_hotkey,
+                    miner_hotkey=completed.miner_hotkey,
+                    miner_signature=completed.miner_signature,
+                    nonce=completed.nonce,
+                    miner_analysis_hash=completed.miner_analysis_hash,
+                    validator_verdict=completed.validator_verdict,
+                    categorical_key=completed.categorical_key,
+                    points_awarded=completed.points_awarded,
+                    epoch=completed.epoch,
+                )
+
         logger.info(f"Validator {validator_hotkey} completed {updated_count} tweets")
         return SubmissionResponse(
             success=True,
@@ -897,6 +1051,19 @@ async def get_unscored_telegram_messages(
                 """,
                 lease_ttl_seconds,
             )
+
+            # Outstanding-lease cap: count this validator's in-progress leases and
+            # reduce the grant so it never exceeds MAX_OUTSTANDING_LEASES.
+            outstanding_rows = await tx.query_raw(
+                "SELECT COUNT(*)::int AS c FROM telegram_scoring "
+                "WHERE validator_hotkey = $1 AND status = 'in_progress';",
+                validator_hotkey,
+            )
+            outstanding = int((outstanding_rows or [{"c": 0}])[0]["c"])
+            limit = v.grant_count(limit=limit, outstanding=outstanding,
+                                  max_outstanding=MAX_OUTSTANDING_LEASES)
+            if limit <= 0:
+                return TelegramMessagesForScoringResponse(messages=[], count=0)
 
             # 2) Pick from two sources:
             #   A) Existing scoring records with status='pending'
@@ -1223,7 +1390,27 @@ async def submit_completed_telegram_messages(
                 data={"status": "completed"},
             )
             updated_count += result
-        
+
+            # Record a signed verdict (Phase 1+: optional; skipped if fields/sig missing).
+            # Only record a verdict if this validator actually held the lease for this
+            # item (the update_many above matches only in_progress rows owned by us).
+            # This enforces per-miner attribution: a validator cannot earn points for
+            # items it was never leased.
+            if result:
+                await write_verdict(
+                    resource_type="telegram",
+                    resource_id=str(completed.message_id),
+                    validator_hotkey=validator_hotkey,
+                    miner_hotkey=completed.miner_hotkey,
+                    miner_signature=completed.miner_signature,
+                    nonce=completed.nonce,
+                    miner_analysis_hash=completed.miner_analysis_hash,
+                    validator_verdict=completed.validator_verdict,
+                    categorical_key=completed.categorical_key,
+                    points_awarded=completed.points_awarded,
+                    epoch=completed.epoch,
+                )
+
         logger.info(f"Validator {validator_hotkey} completed {updated_count} telegram messages")
         return SubmissionResponse(
             success=True,
@@ -1284,6 +1471,19 @@ async def get_unscored_articles(
                 """,
                 lease_ttl_seconds,
             )
+
+            # Outstanding-lease cap: count this validator's in-progress leases and
+            # reduce the grant so it never exceeds MAX_OUTSTANDING_LEASES.
+            outstanding_rows = await tx.query_raw(
+                "SELECT COUNT(*)::int AS c FROM news_article_scoring "
+                "WHERE validator_hotkey = $1 AND status = 'in_progress';",
+                validator_hotkey,
+            )
+            outstanding = int((outstanding_rows or [{"c": 0}])[0]["c"])
+            limit = v.grant_count(limit=limit, outstanding=outstanding,
+                                  max_outstanding=MAX_OUTSTANDING_LEASES)
+            if limit <= 0:
+                return NewsArticlesForScoringResponse(articles=[], count=0)
 
             # 2) Pick from two sources:
             #   A) Existing scoring records with status='pending'
@@ -1459,6 +1659,26 @@ async def submit_completed_articles(
                 data={"status": "completed"},
             )
             updated_count += result
+
+            # Record a signed verdict (Phase 1+: optional; skipped if fields/sig missing).
+            # Only record a verdict if this validator actually held the lease for this
+            # item (the update_many above matches only in_progress rows owned by us).
+            # This enforces per-miner attribution: a validator cannot earn points for
+            # items it was never leased.
+            if result:
+                await write_verdict(
+                    resource_type="news",
+                    resource_id=str(completed.article_id),
+                    validator_hotkey=validator_hotkey,
+                    miner_hotkey=completed.miner_hotkey,
+                    miner_signature=completed.miner_signature,
+                    nonce=completed.nonce,
+                    miner_analysis_hash=completed.miner_analysis_hash,
+                    validator_verdict=completed.validator_verdict,
+                    categorical_key=completed.categorical_key,
+                    points_awarded=completed.points_awarded,
+                    epoch=completed.epoch,
+                )
 
         logger.info(f"Validator {validator_hotkey} completed {updated_count} news articles")
         return SubmissionResponse(
@@ -1781,6 +2001,140 @@ async def remove_blacklisted_hotkey(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove blacklisted hotkey: {str(e)}",
         )
+
+
+# ============================================================================
+# Attestation Endpoint
+# ============================================================================
+
+@app.get(
+    "/attestation",
+    response_model=AttestationResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_attestation(epoch: int, validator_hotkey: str = Depends(get_validator_hotkey)):
+    """Recompute this validator's per-miner budget for `epoch` from ScoreVerdict,
+    build a Merkle root, sign it with the API sr25519 key, upsert, and return it."""
+    # §4 scoped-test allowlist: when configured, only issue attestations for listed validators.
+    if VERDICT_ALLOWLIST_HOTKEYS and validator_hotkey not in VERDICT_ALLOWLIST_HOTKEYS:
+        raise HTTPException(status_code=403, detail="validator not in verdict allowlist")
+    try:
+        rows = await prisma.scoreverdict.find_many(
+            where={"validatorHotkey": validator_hotkey, "epoch": int(epoch)},
+        )
+        leaf_dicts = [{
+            "resource_type": r.resourceType,
+            "resource_id": r.resourceId,
+            "miner_hotkey": r.minerHotkey,
+            "validator_verdict": r.validatorVerdict,
+            "categorical_key": r.categoricalKey,
+            "points_awarded": r.pointsAwarded,
+        } for r in rows]
+
+        per_miner = v.compute_budget(leaf_dicts)
+        total = float(sum(per_miner.values()))
+        root = ac.merkle_root(leaf_dicts)
+        msg = ac.attestation_message(validator_hotkey, int(epoch), per_miner, total, root)
+        keypair = ac.load_signing_key()
+        signature = ac.sign_attestation(keypair, msg)
+
+        await prisma.attestation.upsert(
+            where={"uq_attestation_validator_epoch": {
+                "validatorHotkey": validator_hotkey, "epoch": int(epoch)}},
+            data={
+                "create": {"validatorHotkey": validator_hotkey, "epoch": int(epoch),
+                           "perMinerPoints": Json(per_miner), "totalPoints": total,
+                           "merkleRoot": root, "signature": signature},
+                "update": {"perMinerPoints": Json(per_miner), "totalPoints": total,
+                           "merkleRoot": root, "signature": signature},
+            },
+        )
+        return AttestationResponse(
+            validator_hotkey=validator_hotkey, epoch=int(epoch),
+            per_miner_points=per_miner, total_points=total,
+            merkle_root=root, signature=signature,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"get_attestation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Attestation failed: {e}")
+
+
+# ============================================================================
+# Reports Endpoint
+# ============================================================================
+
+@app.post(
+    "/reports",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def post_report(report: BroadcastReportCreate,
+                      validator_hotkey: str = Depends(get_validator_hotkey)):
+    """Record a receiver-flagged discrepancy (always written to the broadcast_report
+    paper trail). On >= REPORT_CONSENSUS_THRESHOLD distinct reporters for (accused, epoch),
+    raise an alarm — and auto-blacklist ONLY if REPORTS_AUTO_BLACKLIST is enabled (§3).
+    Default is alarm-only: a deep-verify mismatch can be benign API-side data drift, and
+    sybil reporters must not be able to knock out an honest validator automatically."""
+    await prisma.broadcastreport.upsert(
+        where={"uq_broadcast_report": {
+            "reporterHotkey": validator_hotkey, "accusedHotkey": report.accused_hotkey,
+            "epoch": int(report.epoch), "reason": report.reason}},
+        data={"create": {
+            "reporterHotkey": validator_hotkey, "accusedHotkey": report.accused_hotkey,
+            "epoch": int(report.epoch), "reason": report.reason, "evidence": Json(report.evidence)},
+            "update": {"evidence": Json(report.evidence)}},
+    )
+
+    distinct = await prisma.broadcastreport.find_many(
+        where={"accusedHotkey": report.accused_hotkey, "epoch": int(report.epoch)},
+        distinct=["reporterHotkey"],
+    )
+    reporter_count = len({r.reporterHotkey for r in distinct})
+    if v.has_report_consensus(reporter_count, REPORT_CONSENSUS_THRESHOLD):
+        if REPORTS_AUTO_BLACKLIST:
+            await prisma.blacklistedhotkey.upsert(
+                where={"hotkey": report.accused_hotkey},
+                data={"create": {"hotkey": report.accused_hotkey,
+                                 "reason": f"report_consensus:{report.reason}:epoch{report.epoch}"},
+                      "update": {"reason": f"report_consensus:{report.reason}:epoch{report.epoch}"}},
+            )
+            logger.warning(f"Blacklisted {report.accused_hotkey[:12]}.. on "
+                           f"{reporter_count} reports (reason={report.reason}, epoch={report.epoch})")
+        else:
+            logger.warning(
+                f"[ALARM] Report consensus reached for {report.accused_hotkey[:12]}.. "
+                f"({reporter_count} distinct reporters, reason={report.reason}, epoch={report.epoch}) "
+                f"— NOT auto-blacklisting (alarm-only mode). Review manually before any action."
+            )
+    return SubmissionResponse(success=True, message="report recorded", count=reporter_count)
+
+
+# ============================================================================
+# Verdicts Endpoint
+# ============================================================================
+
+@app.get(
+    "/verdicts",
+    response_model=VerdictsResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def get_verdicts(validator: str, epoch: int,
+                       validator_hotkey: str = Depends(get_validator_hotkey)):
+    """Return the raw verdict leaves for (validator, epoch) so a receiver can rebuild
+    the Merkle root and confirm it matches the signed attestation. Any validator may
+    fetch any other validator's leaves (this is the trust-but-verify backstop)."""
+    rows = await prisma.scoreverdict.find_many(
+        where={"validatorHotkey": validator, "epoch": int(epoch)},
+    )
+    leaves = [VerdictLeaf(
+        resource_type=r.resourceType, resource_id=r.resourceId,
+        miner_hotkey=r.minerHotkey, validator_verdict=r.validatorVerdict,
+        categorical_key=r.categoricalKey, points_awarded=r.pointsAwarded,
+    ) for r in rows]
+    return VerdictsResponse(validator_hotkey=validator, epoch=int(epoch),
+                            verdicts=leaves, count=len(leaves))
 
 
 # ============================================================================

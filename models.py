@@ -6,7 +6,7 @@ request/response validation and serialization.
 """
 
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
 
 
@@ -320,7 +320,15 @@ class CompletedTweetSubmission(BaseModel):
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
+    # --- verifiable-points verdict fields (optional during migration) ---
+    epoch: Optional[int] = None
     miner_hotkey: Optional[str] = None
+    miner_signature: Optional[str] = None
+    nonce: Optional[str] = None
+    miner_analysis_hash: Optional[str] = None
+    validator_verdict: Optional[str] = None        # "valid" | "invalid"
+    categorical_key: Optional[str] = None
+    points_awarded: Optional[float] = None
 
 
 class CompletedTweetsSubmission(BaseModel):
@@ -338,6 +346,40 @@ class SubmissionResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Error response model."""
     detail: str
+
+
+class AttestationResponse(BaseModel):
+    """Signed per-(validator, epoch) attestation returned by GET /attestation."""
+    validator_hotkey: str
+    epoch: int
+    per_miner_points: Dict[str, float]
+    total_points: float
+    merkle_root: str
+    signature: str
+
+
+class VerdictLeaf(BaseModel):
+    """A single verdict leaf for recompute via GET /verdicts."""
+    resource_type: str
+    resource_id: str
+    miner_hotkey: str
+    validator_verdict: str
+    categorical_key: str
+    points_awarded: float
+
+
+class VerdictsResponse(BaseModel):
+    validator_hotkey: str
+    epoch: int
+    verdicts: List[VerdictLeaf]
+    count: int
+
+
+class BroadcastReportCreate(BaseModel):
+    accused_hotkey: str
+    epoch: int
+    reason: str                 # bad_signature | budget_exceeded | attribution_mismatch | content_divergence
+    evidence: Dict[str, Any] = {}
 
 
 # ============================================================================
@@ -462,7 +504,15 @@ class CompletedTelegramMessageSubmission(BaseModel):
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
+    # --- verifiable-points verdict fields (optional during migration) ---
+    epoch: Optional[int] = None
     miner_hotkey: Optional[str] = None
+    miner_signature: Optional[str] = None
+    nonce: Optional[str] = None
+    miner_analysis_hash: Optional[str] = None
+    validator_verdict: Optional[str] = None        # "valid" | "invalid"
+    categorical_key: Optional[str] = None
+    points_awarded: Optional[float] = None
 
 
 class CompletedTelegramMessagesSubmission(BaseModel):
@@ -507,7 +557,15 @@ class CompletedNewsArticleSubmission(BaseModel):
     market_analysis: Optional[str] = None
     impact_potential: Optional[str] = None
     relevance_confidence: Optional[str] = None
+    # --- verifiable-points verdict fields (optional during migration) ---
+    epoch: Optional[int] = None
     miner_hotkey: Optional[str] = None
+    miner_signature: Optional[str] = None
+    nonce: Optional[str] = None
+    miner_analysis_hash: Optional[str] = None
+    validator_verdict: Optional[str] = None        # "valid" | "invalid"
+    categorical_key: Optional[str] = None
+    points_awarded: Optional[float] = None
 
 
 class CompletedNewsArticlesSubmission(BaseModel):

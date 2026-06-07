@@ -22,3 +22,6 @@ httpx>=0.25.0
 # Async support
 asyncio>=3.4.3
 
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+

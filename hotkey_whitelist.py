@@ -346,8 +346,11 @@ def get_all_whitelisted_hotkeys() -> List[str]:
 
 
 def is_miner_hotkey(hotkey: str) -> bool:
-    """Check if a hotkey is a miner hotkey"""
-    return hotkey in get_miner_hotkeys()
+    """Check if a hotkey is a current miner hotkey (from cached metagraph)."""
+    try:
+        return hotkey in get_miner_hotkeys()
+    except Exception:
+        return False
 
 
 def is_validator_hotkey(hotkey: str) -> bool:
