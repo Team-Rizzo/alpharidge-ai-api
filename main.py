@@ -91,6 +91,8 @@ from models import (
     CompletedNewsArticlesSubmission,
     # Attestation / verdict models
     AttestationResponse, VerdictsResponse, VerdictLeaf, BroadcastReportCreate,
+    # Penalty detail (display-only dashboard attribution)
+    PenaltyDetailBulkCreate,
 )
 from utils.auth import (
     AuthRequest,
@@ -2135,6 +2137,59 @@ async def get_verdicts(validator: str, epoch: int,
     ) for r in rows]
     return VerdictsResponse(validator_hotkey=validator, epoch=int(epoch),
                             verdicts=leaves, count=len(leaves))
+
+
+# ============================================================================
+# Diagnostics Endpoint (display-only penalty attribution for the dashboard)
+# ============================================================================
+
+@app.post(
+    "/diagnostics/penalty-detail",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_penalty_detail(
+    submission: PenaltyDetailBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """Persist display-only penalty attribution for the miner dashboard.
+
+    DECOUPLED from consensus by design: writes ONLY to `penalty_detail` and never
+    touches score_verdict, attestation, get_verdicts, or merkle_root. Carries no
+    signatures, hashes, or points — it is explanatory data; the authoritative number
+    already reached the miner (signed) via the Score synapse. Best-effort: a bad row
+    is skipped rather than failing the batch, and the flagging validator hotkey is
+    taken from auth (not the payload) so it can't be spoofed per-row.
+    """
+    if not submission.items:
+        return SubmissionResponse(success=True, message="no penalty detail rows", count=0)
+
+    created = 0
+    for it in submission.items:
+        try:
+            await prisma.penaltydetail.create(
+                data={
+                    "minerHotkey": it.miner_hotkey,
+                    # From the authenticated caller, not the row — un-spoofable attribution.
+                    "validatorHotkey": validator_hotkey,
+                    "epoch": int(it.epoch),
+                    "resourceType": it.resource_type,
+                    "resourceId": str(it.resource_id),
+                    "cause": it.cause,
+                    "failedFields": Json(it.failed_fields) if it.failed_fields is not None else None,
+                    "minerValues": Json(it.miner_values) if it.miner_values is not None else None,
+                    "validatorVals": Json(it.validator_values) if it.validator_values is not None else None,
+                    "postPreview": it.post_preview,
+                }
+            )
+            created += 1
+        except Exception as e:
+            # Never let one malformed row drop the rest; this is explanatory data only.
+            logger.warning(f"penalty-detail row skipped (non-fatal): {e}")
+            continue
+
+    logger.info(f"Validator {validator_hotkey} submitted {created}/{len(submission.items)} penalty-detail rows")
+    return SubmissionResponse(success=True, message="penalty detail recorded", count=created)
 
 
 # ============================================================================

@@ -5,6 +5,7 @@ Mounted on the main FastAPI app via `app.include_router(router)`.
 """
 
 import os
+import json
 import logging
 from typing import Optional
 
@@ -34,6 +35,12 @@ from dashboard_models import (
     MinerRewardEntry,
     MinerPenaltyEntry,
     MinerProfileResponse,
+    Diagnosis,
+    MinerBatch,
+    MinerBatchesResponse,
+    MinerBatchItem,
+    MinerBatchItemsResponse,
+    EarnedItem,
     AssetEntry,
     AssetCoverageResponse,
     ValidatorEntry,
@@ -62,6 +69,87 @@ router = APIRouter(prefix="/dashboard", dependencies=[Depends(_require_local)])
 def _get_prisma():
     from main import prisma
     return prisma
+
+
+# Epoch <-> block-window mapping (A5). Must match the validator's formula
+# (validation_client.py: start = epoch*BLOCK_LENGTH, stop = (epoch+1)*BLOCK_LENGTH-1).
+# Env-overridable; default 100 mirrors the validator's config default. Do not hardcode.
+BLOCK_LENGTH = int(os.getenv("BLOCK_LENGTH", "100"))
+
+
+def _block_window(epoch: int) -> tuple[int, int]:
+    return epoch * BLOCK_LENGTH, (epoch + 1) * BLOCK_LENGTH - 1
+
+
+def _as_json(val):
+    """Normalize a JSONB column from query_raw: it may arrive already-parsed (dict/list)
+    or as a JSON string depending on the driver. Returns None on anything unparseable."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except Exception:
+            return None
+    return val
+
+
+def _diagnose_batch(earned_items: int, penalty_items: int, breakdown: dict,
+                    was_zeroed: bool) -> Diagnosis:
+    """A6 diagnosis engine -- turn a batch's numbers into one human sentence.
+    Server-side so the chip text is identical across all surfaces.
+
+    The "zeroed your reward" headline gates on was_zeroed (derived from the authoritative
+    post-zeroing rewards table), NOT on penalty_detail's validator count -- penalty_detail
+    only captures new-build emitters and undercounts the true consensus flag count, so a
+    miner zeroed by other validators may have few or zero detail rows here."""
+    timeouts = breakdown.get("timeout", 0)
+    mismatches = breakdown.get("classification_mismatch", 0)
+    outdated = breakdown.get("missing_classification", 0) + breakdown.get("needs_update", 0)
+
+    # On-chain zeroing is the consequence the miner cares about most -- lead with it,
+    # even when this validator recorded no per-item detail for the epoch.
+    if was_zeroed:
+        if outdated > 0:
+            action = "Pull the latest talisman-ai and restart."
+        elif penalty_items > 0:
+            action = "Fix the items in this batch."
+        else:
+            action = "Multiple validators disagreed with your work this epoch."
+        return Diagnosis(severity="error", headline="This zeroed your on-chain reward.",
+                         detail="You did valid work, but consensus zeroed your reward this epoch.",
+                         action=action)
+
+    if penalty_items == 0:
+        if earned_items > 0:
+            return Diagnosis(severity="ok", headline="Scoring cleanly.",
+                             detail=f"{earned_items} item(s) matched the validator.", action=None)
+        return Diagnosis(severity="ok", headline="No issues this batch.",
+                         detail="Nothing was penalized.", action=None)
+
+    # Outdated code is the most actionable of the non-zeroing cases -- surface it first.
+    if outdated > 0:
+        return Diagnosis(severity="error", headline="Your miner is on outdated code.",
+                         detail="The validator couldn't read your classification.",
+                         action="Pull the latest talisman-ai and restart.")
+
+    if mismatches > 0 and timeouts == 0:
+        return Diagnosis(severity="warn",
+                         headline="Disagreeing with the validator's classification.",
+                         detail=f"{mismatches} item(s) didn't match on at least one field.",
+                         action="Review the field diffs below.")
+
+    if timeouts > 0 and mismatches == 0:
+        return Diagnosis(severity="warn", headline="Items timed out before scoring.",
+                         detail=f"{timeouts} item(s) weren't returned in time.",
+                         action="Check your response time / uptime.")
+
+    # Mixed causes.
+    return Diagnosis(severity="warn", headline="Some items were penalized.",
+                     detail=f"{timeouts} timeout(s), {mismatches} mismatch(es).",
+                     action="See the breakdown below.")
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
@@ -496,9 +584,12 @@ async def dashboard_articles(
 
         where_clause = (" AND " + " AND ".join(conditions)) if conditions else ""
 
+        # INNER JOIN: only surface analyzed articles (matches the /feed behavior).
+        # Unanalyzed rows are the newest (analysis lags scraping) and would otherwise
+        # top the date-sorted list with empty sentiment/impact/type.
         base_query = f"""
             FROM news_articles na
-            LEFT JOIN news_article_analysis naa ON naa.article_id = na.id
+            JOIN news_article_analysis naa ON naa.article_id = na.id
             WHERE 1=1 {where_clause}
         """
 
@@ -1121,6 +1212,261 @@ async def dashboard_miner_profile(hotkey: str):
         raise
     except Exception as e:
         logger.error(f"Error in dashboard_miner_profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Miner Batches (scoring transparency) — read-only, decoupled from consensus
+# ============================================================================
+
+@router.get("/miners/{hotkey}/batches", response_model=MinerBatchesResponse)
+async def dashboard_miner_batches(hotkey: str):
+    """Per-epoch statement line items for a miner: raw earned (pre-zeroing), penalty
+    breakdown by cause, and a server-side diagnosis. Sources: score_verdict valid rows
+    + the standalone penalty_detail table. Never reads attestation/Merkle."""
+    prisma = _get_prisma()
+    try:
+        # Distinct items earned (valid) per epoch. COUNT(DISTINCT (type,id)) dedups the
+        # same item scored by multiple validators (see §13.2 reconciliation). Equals raw
+        # points while verdicts are uniformly 1.0 (true today).
+        earned_rows = await prisma.query_raw(
+            """
+            SELECT epoch, COUNT(DISTINCT (resource_type, resource_id)) AS earned_items
+            FROM score_verdict
+            WHERE miner_hotkey = $1 AND validator_verdict = 'valid'
+            GROUP BY epoch
+            """,
+            hotkey,
+        )
+        # Penalty items + how many distinct validators flagged the miner, per epoch.
+        pen_rows = await prisma.query_raw(
+            """
+            SELECT epoch,
+                   COUNT(DISTINCT (resource_type, resource_id)) AS penalty_items,
+                   COUNT(DISTINCT validator_hotkey) AS flagged_by
+            FROM penalty_detail
+            WHERE miner_hotkey = $1
+            GROUP BY epoch
+            """,
+            hotkey,
+        )
+        # Cause breakdown (distinct items per cause), per epoch.
+        cause_rows = await prisma.query_raw(
+            """
+            SELECT epoch, cause, COUNT(DISTINCT (resource_type, resource_id)) AS cnt
+            FROM penalty_detail
+            WHERE miner_hotkey = $1
+            GROUP BY epoch, cause
+            """,
+            hotkey,
+        )
+        # Authoritative on-chain outcome: the post-zeroing rewards table. No validator
+        # column, so multiple rows per (hotkey, block); MAX is the conservative "most
+        # generous" view. Keyed by start_block, mapped to epoch = start_block / BLOCK_LENGTH.
+        reward_rows = await prisma.query_raw(
+            """
+            SELECT start_block, COUNT(*) AS n, MAX(points) AS max_points
+            FROM rewards
+            WHERE hotkey = $1
+            GROUP BY start_block
+            """,
+            hotkey,
+        )
+        # Last activity time per epoch (for the "2h ago" column).
+        activity_rows = await prisma.query_raw(
+            """
+            SELECT epoch, MAX(created_at) AS last_at FROM (
+                SELECT epoch, created_at FROM score_verdict WHERE miner_hotkey = $1
+                UNION ALL
+                SELECT epoch, created_at FROM penalty_detail WHERE miner_hotkey = $1
+            ) u
+            GROUP BY epoch
+            """,
+            hotkey,
+        )
+
+        earned_by_epoch = {r["epoch"]: int(r["earned_items"]) for r in earned_rows}
+        pen_by_epoch = {r["epoch"]: r for r in pen_rows}
+        breakdown_by_epoch: dict = {}
+        for r in cause_rows:
+            breakdown_by_epoch.setdefault(r["epoch"], {})[r["cause"]] = int(r["cnt"])
+        # reward_by_epoch[epoch] = {"n": rows_written, "max": max_points}
+        reward_by_epoch: dict = {}
+        if BLOCK_LENGTH > 0:
+            for r in reward_rows:
+                ep_r = int(r["start_block"]) // BLOCK_LENGTH
+                reward_by_epoch[ep_r] = {"n": int(r["n"]),
+                                         "max": float(r["max_points"]) if r["max_points"] is not None else 0.0}
+        activity_by_epoch = {r["epoch"]: r.get("last_at") for r in activity_rows}
+
+        all_epochs = sorted(
+            set(earned_by_epoch) | set(pen_by_epoch) | set(breakdown_by_epoch),
+            reverse=True,
+        )[:50]
+
+        batches = []
+        for ep in all_epochs:
+            start, stop = _block_window(int(ep))
+            earned = earned_by_epoch.get(ep, 0)
+            pen = pen_by_epoch.get(ep)
+            penalty_items = int(pen["penalty_items"]) if pen else 0
+            flagged_by = int(pen["flagged_by"]) if pen else 0
+            breakdown = breakdown_by_epoch.get(ep, {})
+            detail_coverage = ep in pen_by_epoch
+
+            # On-chain outcome (3-way gate, per section 16.1). reward_points_max is None
+            # until a reward row lands (rewards lag ~2 epochs) -> "pending", never "zeroed".
+            rwd = reward_by_epoch.get(ep)
+            reward_points_max = rwd["max"] if rwd else None
+            was_zeroed = bool(rwd and rwd["n"] > 0 and rwd["max"] <= 0.0 and earned > 0)
+
+            batches.append(MinerBatch(
+                epoch=int(ep),
+                block_window_start=start,
+                block_window_stop=stop,
+                last_activity_at=activity_by_epoch.get(ep),
+                earned_items=earned,
+                penalty_items=penalty_items,
+                penalty_breakdown=breakdown,
+                reward_points_max=reward_points_max,
+                was_zeroed=was_zeroed,
+                flagged_by_validators=flagged_by,
+                detail_coverage=detail_coverage,
+                diagnosis=_diagnose_batch(earned, penalty_items, breakdown, was_zeroed),
+            ))
+
+        return MinerBatchesResponse(hotkey=hotkey, block_length=BLOCK_LENGTH, batches=batches)
+    except Exception as e:
+        logger.error(f"Error in dashboard_miner_batches: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/miners/{hotkey}/batches/{epoch}/items", response_model=MinerBatchItemsResponse)
+async def dashboard_miner_batch_items(hotkey: str, epoch: int):
+    """Per-item penalty detail for one batch — the miner-vs-validator diff, joined to
+    the item's content preview. Read-only from penalty_detail (+ content tables)."""
+    prisma = _get_prisma()
+    try:
+        # Dedup by (resource_type, resource_id): at fleet scale the same item is flagged by
+        # many validators (and the append-only table can hold repeats from one validator
+        # reprocessing an item). One card per item, keeping the most recent row, so the
+        # drawer matches the deduped penalty_items count on /batches. flagged_by_validators
+        # already conveys "N validators agreed".
+        rows = await prisma.query_raw(
+            """
+            SELECT resource_type, resource_id, cause, failed_fields,
+                   miner_values, validator_values, post_preview, validator_hotkey
+            FROM (
+                SELECT DISTINCT ON (resource_type, resource_id)
+                       resource_type, resource_id, cause, failed_fields,
+                       miner_values, validator_values, post_preview, validator_hotkey, created_at
+                FROM penalty_detail
+                WHERE miner_hotkey = $1 AND epoch = $2
+                ORDER BY resource_type, resource_id, created_at DESC
+            ) d
+            ORDER BY created_at DESC
+            LIMIT 200
+            """,
+            hotkey,
+            epoch,
+        )
+        # Earned (valid) items for this batch (section 18). DISTINCT ON (type,id) dedups the
+        # same item scored by multiple validators and keeps the highest-points row — matches
+        # how earned_items is counted on /batches. Read-only from score_verdict.
+        EARNED_LIMIT = 200
+        earned_rows = await prisma.query_raw(
+            """
+            SELECT DISTINCT ON (resource_type, resource_id)
+                   resource_type, resource_id, points_awarded, categorical_key, validator_hotkey
+            FROM score_verdict
+            WHERE miner_hotkey = $1 AND epoch = $2 AND validator_verdict = 'valid'
+            ORDER BY resource_type, resource_id, points_awarded DESC
+            LIMIT $3
+            """,
+            hotkey,
+            epoch,
+            EARNED_LIMIT,
+        )
+        # score_verdict uses resource_type "news" for articles; penalty_detail uses "article".
+        # Normalize the earned rows to the penalty_detail/frontend vocabulary so the whole
+        # response is self-consistent (tweet | telegram | article) and the preview resolver matches.
+        _RTYPE_NORM = {"news": "article"}
+        earned_norm = [{**r, "resource_type": _RTYPE_NORM.get(r["resource_type"], r["resource_type"])}
+                       for r in earned_rows]
+
+        # Resolve a content preview per item from the type-specific content table, for BOTH
+        # penalized and earned items in one pass. Small N per batch, so a per-type fetch
+        # keyed by id is cheap and clear.
+        by_type: dict = {}
+        for r in rows:
+            by_type.setdefault(r["resource_type"], set()).add(str(r["resource_id"]))
+        for r in earned_norm:
+            by_type.setdefault(r["resource_type"], set()).add(str(r["resource_id"]))
+
+        # Best-effort content previews. A failure here (e.g. driver array binding) must
+        # not 500 the endpoint — items still return with their stored post_preview.
+        previews: dict = {}  # (resource_type, resource_id) -> preview text
+        try:
+            if by_type.get("tweet"):
+                ids = list(by_type["tweet"])
+                trows = await prisma.query_raw(
+                    "SELECT id::text AS id, text FROM tweets WHERE id::text = ANY($1)", ids,
+                )
+                for t in trows:
+                    previews[("tweet", t["id"])] = t.get("text")
+            if by_type.get("telegram"):
+                ids = list(by_type["telegram"])
+                mrows = await prisma.query_raw(
+                    "SELECT id, content FROM telegram_messages WHERE id = ANY($1)", ids,
+                )
+                for m in mrows:
+                    previews[("telegram", str(m["id"]))] = m.get("content")
+            if by_type.get("article"):
+                ids = list(by_type["article"])
+                arows = await prisma.query_raw(
+                    "SELECT id::text AS id, title FROM news_articles WHERE id::text = ANY($1)", ids,
+                )
+                for a in arows:
+                    previews[("article", a["id"])] = a.get("title")
+        except Exception as e:
+            logger.warning(f"batch_items preview resolution failed (non-fatal): {e}")
+
+        items = []
+        for r in rows:
+            key = (r["resource_type"], str(r["resource_id"]))
+            items.append(MinerBatchItem(
+                resource_type=r["resource_type"],
+                resource_id=str(r["resource_id"]),
+                content_preview=previews.get(key) or r.get("post_preview"),
+                cause=r["cause"],
+                failed_fields=_as_json(r.get("failed_fields")),
+                miner_values=_as_json(r.get("miner_values")),
+                validator_values=_as_json(r.get("validator_values")),
+                post_preview=r.get("post_preview"),
+                validator_hotkey=r.get("validator_hotkey"),
+            ))
+
+        earned = []
+        for r in earned_norm:
+            key = (r["resource_type"], str(r["resource_id"]))
+            earned.append(EarnedItem(
+                resource_type=r["resource_type"],
+                resource_id=str(r["resource_id"]),
+                content_preview=previews.get(key),
+                points_awarded=float(r.get("points_awarded") or 0.0),
+                categorical_key=r.get("categorical_key"),
+                validator_hotkey=r.get("validator_hotkey"),
+            ))
+
+        start, stop = _block_window(int(epoch))
+        return MinerBatchItemsResponse(
+            hotkey=hotkey, epoch=int(epoch),
+            block_window_start=start, block_window_stop=stop,
+            items=items, earned=earned,
+            earned_truncated=(len(earned_rows) >= EARNED_LIMIT),
+        )
+    except Exception as e:
+        logger.error(f"Error in dashboard_miner_batch_items: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
