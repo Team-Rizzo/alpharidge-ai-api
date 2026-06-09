@@ -241,7 +241,7 @@ async def dashboard_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/feed", response_model=FeedResponse)
+# @router.get("/feed", response_model=FeedResponse)
 async def dashboard_feed(
     page: int = 1,
     limit: int = 50,
@@ -467,6 +467,126 @@ async def dashboard_feed(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+PREVIEW_LIMIT = 5
+PREVIEW_DELAY = "3 hours"  # constant, not user input
+
+
+@router.get("/preview", response_model=FeedResponse)
+async def dashboard_preview(
+    source_type: Optional[str] = None,
+    asset: Optional[str] = None,
+):
+    """Recent items preview."""
+    prisma = _get_prisma()
+    try:
+        source_types = {s.strip() for s in source_type.split(",") if s.strip()} if source_type else None
+        asset_list = [a.strip() for a in asset.split(",") if a.strip()] if asset else []
+
+        params: list = []
+        param_idx = 1
+
+        def _next_param(value):
+            nonlocal param_idx
+            params.append(value)
+            idx = param_idx
+            param_idx += 1
+            return f"${idx}"
+
+        def _asset_filter(asset_col: str) -> str:
+            if not asset_list:
+                return ""
+            placeholders = ", ".join(_next_param(a) for a in asset_list)
+            return f" AND {asset_col} IN ({placeholders})"
+
+        parts: list[str] = []
+        if source_types is None or "tweet" in source_types:
+            parts.append(f"""
+                SELECT 'tweet' AS source_type, t.id::text AS item_id, t.text AS content,
+                    ta.sentiment, ta.asset_symbol, ta.content_type, ta.impact_potential,
+                    ta.technical_quality, ta.market_analysis, t.created_at AS timestamp,
+                    a.screen_name AS author_screen_name, a.profile_image_url AS author_profile_image_url,
+                    NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
+                    NULL::text AS article_title, NULL::text AS article_source, NULL::text AS article_url, NULL::text AS sector_symbol
+                FROM tweets t JOIN tweet_analysis ta ON ta.tweet_id = t.id
+                LEFT JOIN accounts a ON a.id = t.author_id
+                WHERE ta.id IS NOT NULL{_asset_filter("ta.asset_symbol")}
+            """)
+        if source_types is None or "telegram" in source_types:
+            parts.append(f"""
+                SELECT 'telegram' AS source_type, tm.id AS item_id, tm.content,
+                    tma.sentiment, tma.asset_symbol, tma.content_type, tma.impact_potential,
+                    tma.technical_quality, tma.market_analysis, tm.created_at AS timestamp,
+                    NULL::text AS author_screen_name, NULL::text AS author_profile_image_url,
+                    tm.sender_username, tm.sender_name, tg.title AS group_title,
+                    NULL::text AS article_title, NULL::text AS article_source, NULL::text AS article_url, NULL::text AS sector_symbol
+                FROM telegram_messages tm JOIN telegram_message_analysis tma ON tma.message_id = tm.id
+                LEFT JOIN telegram_groups tg ON tg.id = tm.group_id
+                WHERE tma.id IS NOT NULL{_asset_filter("tma.asset_symbol")}
+            """)
+        if source_types is None or "article" in source_types:
+            parts.append(f"""
+                SELECT 'article' AS source_type, na.id::text AS item_id, COALESCE(na.summary, na.title) AS content,
+                    naa.sentiment, naa.sector_symbol AS asset_symbol, naa.content_type, naa.impact_potential,
+                    naa.technical_quality, naa.market_analysis, COALESCE(na.published, na.created_at) AS timestamp,
+                    NULL::text AS author_screen_name, NULL::text AS author_profile_image_url,
+                    NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
+                    na.title AS article_title, na.source AS article_source, na.url AS article_url, naa.sector_symbol
+                FROM news_articles na JOIN news_article_analysis naa ON naa.article_id = na.id
+                WHERE naa.id IS NOT NULL{_asset_filter("naa.sector_symbol")}
+            """)
+
+        if not parts:
+            return FeedResponse(items=[], total=0, page=1, limit=PREVIEW_LIMIT, has_more=False)
+
+        union_query = " UNION ALL ".join(parts)
+        data_sql = f"""
+            SELECT * FROM ({union_query}) AS feed
+            WHERE timestamp <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+            ORDER BY timestamp DESC NULLS LAST
+            LIMIT {PREVIEW_LIMIT}
+        """
+        rows = await prisma.query_raw(data_sql, *params)
+
+        items: list[FeedItem] = []
+        for row in (rows or []):
+            item = FeedItem(
+                source_type=row["source_type"],
+                id=row.get("item_id"),
+                content=row.get("content"),
+                sentiment=row.get("sentiment"),
+                asset_symbol=row.get("asset_symbol"),
+                content_type=row.get("content_type"),
+                impact_potential=row.get("impact_potential"),
+                technical_quality=row.get("technical_quality"),
+                market_analysis=row.get("market_analysis"),
+                timestamp=row.get("timestamp"),
+            )
+            if row["source_type"] == "tweet":
+                item.author = FeedItemAuthor(
+                    screen_name=row.get("author_screen_name"),
+                    profile_image_url=row.get("author_profile_image_url"),
+                )
+            elif row["source_type"] == "telegram":
+                item.telegram = FeedItemTelegramMeta(
+                    sender_username=row.get("sender_username"),
+                    sender_name=row.get("sender_name"),
+                    group_title=row.get("group_title"),
+                )
+            elif row["source_type"] == "article":
+                item.article = FeedItemArticleMeta(
+                    title=row.get("article_title"),
+                    source=row.get("article_source"),
+                    url=row.get("article_url"),
+                    sector_symbol=row.get("sector_symbol"),
+                )
+            items.append(item)
+
+        return FeedResponse(items=items, total=len(items), page=1, limit=PREVIEW_LIMIT, has_more=False)
+    except Exception as e:
+        logger.error(f"Error in dashboard_preview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/articles/sources", response_model=ArticleSourcesResponse)
 async def dashboard_article_sources():
     """
@@ -512,7 +632,7 @@ async def dashboard_article_sources():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/articles", response_model=ArticlesResponse)
+# @router.get("/articles", response_model=ArticlesResponse)
 async def dashboard_articles(
     page: int = 1,
     limit: int = 50,
@@ -660,7 +780,7 @@ async def dashboard_articles(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/articles/{article_id}", response_model=ArticleDetailResponse)
+# @router.get("/articles/{article_id}", response_model=ArticleDetailResponse)
 async def dashboard_article_detail(article_id: int):
     """
     Single article detail with full analysis.
@@ -727,7 +847,7 @@ async def dashboard_article_detail(article_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tweets/{tweet_id}", response_model=TweetDetailResponse)
+# @router.get("/tweets/{tweet_id}", response_model=TweetDetailResponse)
 async def dashboard_tweet_detail(tweet_id: int):
     """Single tweet detail with author and analysis."""
     prisma = _get_prisma()
@@ -793,7 +913,7 @@ async def dashboard_tweet_detail(tweet_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/telegram/{message_id}", response_model=TelegramDetailResponse)
+# @router.get("/telegram/{message_id}", response_model=TelegramDetailResponse)
 async def dashboard_telegram_detail(message_id: str):
     """Single telegram message detail with group and analysis."""
     prisma = _get_prisma()
