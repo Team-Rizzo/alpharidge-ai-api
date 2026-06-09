@@ -614,7 +614,38 @@ async def dashboard_article_sources():
             ORDER BY total_articles DESC
         """)
 
+        # Twitter + Telegram as aggregate "sources" (sentiment over analyzed items).
+        channel_rows = await prisma.query_raw("""
+            SELECT 'Twitter/X' AS source, COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bullish')::int AS very_bullish,
+                COUNT(*) FILTER (WHERE sentiment = 'bullish')::int AS bullish,
+                COUNT(*) FILTER (WHERE sentiment = 'neutral')::int AS neutral,
+                COUNT(*) FILTER (WHERE sentiment = 'bearish')::int AS bearish,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bearish')::int AS very_bearish
+            FROM tweet_analysis
+            UNION ALL
+            SELECT 'Telegram', COUNT(*)::int,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bullish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'bullish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'neutral')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'bearish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bearish')::int
+            FROM telegram_message_analysis
+        """)
+
         sources = [
+            SourceStats(
+                source=row["source"],
+                total_articles=row["total"],
+                analyzed_articles=row["total"],
+                very_bullish=row["very_bullish"],
+                bullish=row["bullish"],
+                neutral=row["neutral"],
+                bearish=row["bearish"],
+                very_bearish=row["very_bearish"],
+            )
+            for row in (channel_rows or [])
+        ] + [
             SourceStats(
                 source=row["source"],
                 total_articles=row["total_articles"],
