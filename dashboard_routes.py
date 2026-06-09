@@ -241,7 +241,7 @@ async def dashboard_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/feed", response_model=FeedResponse)
+# @router.get("/feed", response_model=FeedResponse)
 async def dashboard_feed(
     page: int = 1,
     limit: int = 50,
@@ -467,6 +467,127 @@ async def dashboard_feed(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+PREVIEW_LIMIT = 5
+PREVIEW_DELAY = "3 hours"  # constant, not user input
+RECENT_ITEMS_LIMIT = 10  # miner-profile recent items (same delay as PREVIEW_DELAY)
+
+
+@router.get("/preview", response_model=FeedResponse)
+async def dashboard_preview(
+    source_type: Optional[str] = None,
+    asset: Optional[str] = None,
+):
+    """Recent items preview."""
+    prisma = _get_prisma()
+    try:
+        source_types = {s.strip() for s in source_type.split(",") if s.strip()} if source_type else None
+        asset_list = [a.strip() for a in asset.split(",") if a.strip()] if asset else []
+
+        params: list = []
+        param_idx = 1
+
+        def _next_param(value):
+            nonlocal param_idx
+            params.append(value)
+            idx = param_idx
+            param_idx += 1
+            return f"${idx}"
+
+        def _asset_filter(asset_col: str) -> str:
+            if not asset_list:
+                return ""
+            placeholders = ", ".join(_next_param(a) for a in asset_list)
+            return f" AND {asset_col} IN ({placeholders})"
+
+        parts: list[str] = []
+        if source_types is None or "tweet" in source_types:
+            parts.append(f"""
+                SELECT 'tweet' AS source_type, t.id::text AS item_id, t.text AS content,
+                    ta.sentiment, ta.asset_symbol, ta.content_type, ta.impact_potential,
+                    ta.technical_quality, ta.market_analysis, t.created_at AS timestamp,
+                    a.screen_name AS author_screen_name, a.profile_image_url AS author_profile_image_url,
+                    NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
+                    NULL::text AS article_title, NULL::text AS article_source, NULL::text AS article_url, NULL::text AS sector_symbol
+                FROM tweets t JOIN tweet_analysis ta ON ta.tweet_id = t.id
+                LEFT JOIN accounts a ON a.id = t.author_id
+                WHERE ta.id IS NOT NULL{_asset_filter("ta.asset_symbol")}
+            """)
+        if source_types is None or "telegram" in source_types:
+            parts.append(f"""
+                SELECT 'telegram' AS source_type, tm.id AS item_id, tm.content,
+                    tma.sentiment, tma.asset_symbol, tma.content_type, tma.impact_potential,
+                    tma.technical_quality, tma.market_analysis, tm.created_at AS timestamp,
+                    NULL::text AS author_screen_name, NULL::text AS author_profile_image_url,
+                    tm.sender_username, tm.sender_name, tg.title AS group_title,
+                    NULL::text AS article_title, NULL::text AS article_source, NULL::text AS article_url, NULL::text AS sector_symbol
+                FROM telegram_messages tm JOIN telegram_message_analysis tma ON tma.message_id = tm.id
+                LEFT JOIN telegram_groups tg ON tg.id = tm.group_id
+                WHERE tma.id IS NOT NULL{_asset_filter("tma.asset_symbol")}
+            """)
+        if source_types is None or "article" in source_types:
+            parts.append(f"""
+                SELECT 'article' AS source_type, na.id::text AS item_id, COALESCE(na.summary, na.title) AS content,
+                    naa.sentiment, naa.sector_symbol AS asset_symbol, naa.content_type, naa.impact_potential,
+                    naa.technical_quality, naa.market_analysis, COALESCE(na.published, na.created_at) AS timestamp,
+                    NULL::text AS author_screen_name, NULL::text AS author_profile_image_url,
+                    NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
+                    na.title AS article_title, na.source AS article_source, na.url AS article_url, naa.sector_symbol
+                FROM news_articles na JOIN news_article_analysis naa ON naa.article_id = na.id
+                WHERE naa.id IS NOT NULL{_asset_filter("naa.sector_symbol")}
+            """)
+
+        if not parts:
+            return FeedResponse(items=[], total=0, page=1, limit=PREVIEW_LIMIT, has_more=False)
+
+        union_query = " UNION ALL ".join(parts)
+        data_sql = f"""
+            SELECT * FROM ({union_query}) AS feed
+            WHERE timestamp <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+            ORDER BY timestamp DESC NULLS LAST
+            LIMIT {PREVIEW_LIMIT}
+        """
+        rows = await prisma.query_raw(data_sql, *params)
+
+        items: list[FeedItem] = []
+        for row in (rows or []):
+            item = FeedItem(
+                source_type=row["source_type"],
+                id=row.get("item_id"),
+                content=row.get("content"),
+                sentiment=row.get("sentiment"),
+                asset_symbol=row.get("asset_symbol"),
+                content_type=row.get("content_type"),
+                impact_potential=row.get("impact_potential"),
+                technical_quality=row.get("technical_quality"),
+                market_analysis=row.get("market_analysis"),
+                timestamp=row.get("timestamp"),
+            )
+            if row["source_type"] == "tweet":
+                item.author = FeedItemAuthor(
+                    screen_name=row.get("author_screen_name"),
+                    profile_image_url=row.get("author_profile_image_url"),
+                )
+            elif row["source_type"] == "telegram":
+                item.telegram = FeedItemTelegramMeta(
+                    sender_username=row.get("sender_username"),
+                    sender_name=row.get("sender_name"),
+                    group_title=row.get("group_title"),
+                )
+            elif row["source_type"] == "article":
+                item.article = FeedItemArticleMeta(
+                    title=row.get("article_title"),
+                    source=row.get("article_source"),
+                    url=row.get("article_url"),
+                    sector_symbol=row.get("sector_symbol"),
+                )
+            items.append(item)
+
+        return FeedResponse(items=items, total=len(items), page=1, limit=PREVIEW_LIMIT, has_more=False)
+    except Exception as e:
+        logger.error(f"Error in dashboard_preview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/articles/sources", response_model=ArticleSourcesResponse)
 async def dashboard_article_sources():
     """
@@ -493,7 +614,38 @@ async def dashboard_article_sources():
             ORDER BY total_articles DESC
         """)
 
+        # Twitter + Telegram as aggregate "sources" (sentiment over analyzed items).
+        channel_rows = await prisma.query_raw("""
+            SELECT 'Twitter/X' AS source, COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bullish')::int AS very_bullish,
+                COUNT(*) FILTER (WHERE sentiment = 'bullish')::int AS bullish,
+                COUNT(*) FILTER (WHERE sentiment = 'neutral')::int AS neutral,
+                COUNT(*) FILTER (WHERE sentiment = 'bearish')::int AS bearish,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bearish')::int AS very_bearish
+            FROM tweet_analysis
+            UNION ALL
+            SELECT 'Telegram', COUNT(*)::int,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bullish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'bullish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'neutral')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'bearish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bearish')::int
+            FROM telegram_message_analysis
+        """)
+
         sources = [
+            SourceStats(
+                source=row["source"],
+                total_articles=row["total"],
+                analyzed_articles=row["total"],
+                very_bullish=row["very_bullish"],
+                bullish=row["bullish"],
+                neutral=row["neutral"],
+                bearish=row["bearish"],
+                very_bearish=row["very_bearish"],
+            )
+            for row in (channel_rows or [])
+        ] + [
             SourceStats(
                 source=row["source"],
                 total_articles=row["total_articles"],
@@ -512,7 +664,7 @@ async def dashboard_article_sources():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/articles", response_model=ArticlesResponse)
+# @router.get("/articles", response_model=ArticlesResponse)
 async def dashboard_articles(
     page: int = 1,
     limit: int = 50,
@@ -660,7 +812,7 @@ async def dashboard_articles(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/articles/{article_id}", response_model=ArticleDetailResponse)
+# @router.get("/articles/{article_id}", response_model=ArticleDetailResponse)
 async def dashboard_article_detail(article_id: int):
     """
     Single article detail with full analysis.
@@ -727,7 +879,7 @@ async def dashboard_article_detail(article_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tweets/{tweet_id}", response_model=TweetDetailResponse)
+# @router.get("/tweets/{tweet_id}", response_model=TweetDetailResponse)
 async def dashboard_tweet_detail(tweet_id: int):
     """Single tweet detail with author and analysis."""
     prisma = _get_prisma()
@@ -793,7 +945,7 @@ async def dashboard_tweet_detail(tweet_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/telegram/{message_id}", response_model=TelegramDetailResponse)
+# @router.get("/telegram/{message_id}", response_model=TelegramDetailResponse)
 async def dashboard_telegram_detail(message_id: str):
     """Single telegram message detail with group and analysis."""
     prisma = _get_prisma()
@@ -1020,10 +1172,15 @@ async def dashboard_miners(
             )
             SELECT
                 ms.*,
-                COALESCE(r.total_points, 0) AS total_rewards
+                COALESCE(r.total_points, 0) AS total_rewards,
+                COALESCE(r.points_24h, 0) AS points_24h,
+                COALESCE(r.avg_points_day, 0) AS avg_points_day
             FROM miner_stats ms
             LEFT JOIN (
-                SELECT hotkey, SUM(points) AS total_points
+                SELECT hotkey,
+                       SUM(points) AS total_points,
+                       SUM(points) FILTER (WHERE created_at >= now() - interval '24 hours') AS points_24h,
+                       SUM(points) FILTER (WHERE created_at >= now() - interval '7 days') / 7.0 AS avg_points_day
                 FROM rewards
                 GROUP BY hotkey
             ) r ON r.hotkey = ms.miner_hotkey
@@ -1055,6 +1212,8 @@ async def dashboard_miners(
                 first_seen=row.get("first_seen"),
                 last_seen=row.get("last_seen"),
                 total_rewards=row.get("total_rewards", 0) or 0,
+                points_24h=row.get("points_24h", 0) or 0,
+                avg_points_day=row.get("avg_points_day", 0) or 0,
             ))
 
         return MinerLeaderboardResponse(miners=miners, total=len(miners))
@@ -1125,15 +1284,15 @@ async def dashboard_miner_profile(hotkey: str):
         )
 
         recent_rows = await prisma.query_raw(
-            """
+            f"""
             (
                 SELECT 'tweet' AS source_type, ta.tweet_id::text AS id,
                     t.text AS content, ta.sentiment, ta.asset_symbol,
                     ta.impact_potential, ta.technical_quality, ta.analyzed_at
                 FROM tweet_analysis ta
                 JOIN tweets t ON t.id = ta.tweet_id
-                WHERE ta.miner_hotkey = $1
-                ORDER BY ta.analyzed_at DESC LIMIT 20
+                WHERE ta.miner_hotkey = $1 AND ta.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY ta.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             UNION ALL
             (
@@ -1142,8 +1301,8 @@ async def dashboard_miner_profile(hotkey: str):
                     tma.impact_potential, tma.technical_quality, tma.analyzed_at
                 FROM telegram_message_analysis tma
                 JOIN telegram_messages tm ON tm.id = tma.message_id
-                WHERE tma.miner_hotkey = $1
-                ORDER BY tma.analyzed_at DESC LIMIT 20
+                WHERE tma.miner_hotkey = $1 AND tma.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY tma.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             UNION ALL
             (
@@ -1152,11 +1311,11 @@ async def dashboard_miner_profile(hotkey: str):
                     naa.impact_potential, naa.technical_quality, naa.analyzed_at
                 FROM news_article_analysis naa
                 JOIN news_articles na ON na.id = naa.article_id
-                WHERE naa.miner_hotkey = $1
-                ORDER BY naa.analyzed_at DESC LIMIT 20
+                WHERE naa.miner_hotkey = $1 AND naa.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY naa.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             ORDER BY analyzed_at DESC
-            LIMIT 50
+            LIMIT {RECENT_ITEMS_LIMIT}
             """,
             hotkey,
         )
@@ -1365,7 +1524,7 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
                 ORDER BY resource_type, resource_id, created_at DESC
             ) d
             ORDER BY created_at DESC
-            LIMIT 200
+            LIMIT 20
             """,
             hotkey,
             epoch,
@@ -1373,13 +1532,14 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
         # Earned (valid) items for this batch (section 18). DISTINCT ON (type,id) dedups the
         # same item scored by multiple validators and keeps the highest-points row — matches
         # how earned_items is counted on /batches. Read-only from score_verdict.
-        EARNED_LIMIT = 200
+        EARNED_LIMIT = 10
         earned_rows = await prisma.query_raw(
-            """
+            f"""
             SELECT DISTINCT ON (resource_type, resource_id)
                    resource_type, resource_id, points_awarded, categorical_key, validator_hotkey
             FROM score_verdict
             WHERE miner_hotkey = $1 AND epoch = $2 AND validator_verdict = 'valid'
+                  AND created_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
             ORDER BY resource_type, resource_id, points_awarded DESC
             LIMIT $3
             """,
