@@ -1140,10 +1140,15 @@ async def dashboard_miners(
             )
             SELECT
                 ms.*,
-                COALESCE(r.total_points, 0) AS total_rewards
+                COALESCE(r.total_points, 0) AS total_rewards,
+                COALESCE(r.points_24h, 0) AS points_24h,
+                COALESCE(r.avg_points_day, 0) AS avg_points_day
             FROM miner_stats ms
             LEFT JOIN (
-                SELECT hotkey, SUM(points) AS total_points
+                SELECT hotkey,
+                       SUM(points) AS total_points,
+                       SUM(points) FILTER (WHERE created_at >= now() - interval '24 hours') AS points_24h,
+                       SUM(points) FILTER (WHERE created_at >= now() - interval '7 days') / 7.0 AS avg_points_day
                 FROM rewards
                 GROUP BY hotkey
             ) r ON r.hotkey = ms.miner_hotkey
@@ -1175,6 +1180,8 @@ async def dashboard_miners(
                 first_seen=row.get("first_seen"),
                 last_seen=row.get("last_seen"),
                 total_rewards=row.get("total_rewards", 0) or 0,
+                points_24h=row.get("points_24h", 0) or 0,
+                avg_points_day=row.get("avg_points_day", 0) or 0,
             ))
 
         return MinerLeaderboardResponse(miners=miners, total=len(miners))

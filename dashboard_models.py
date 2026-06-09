@@ -253,6 +253,8 @@ class MinerLeaderboardEntry(BaseModel):
     first_seen: Optional[datetime] = None
     last_seen: Optional[datetime] = None
     total_rewards: float = 0.0
+    points_24h: float = 0.0
+    avg_points_day: float = 0.0  # 7-day rolling average
 
 
 class MinerLeaderboardResponse(BaseModel):
