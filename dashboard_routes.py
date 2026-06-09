@@ -1493,7 +1493,7 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
                 ORDER BY resource_type, resource_id, created_at DESC
             ) d
             ORDER BY created_at DESC
-            LIMIT 200
+            LIMIT 20
             """,
             hotkey,
             epoch,
@@ -1501,13 +1501,14 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
         # Earned (valid) items for this batch (section 18). DISTINCT ON (type,id) dedups the
         # same item scored by multiple validators and keeps the highest-points row — matches
         # how earned_items is counted on /batches. Read-only from score_verdict.
-        EARNED_LIMIT = 200
+        EARNED_LIMIT = 10
         earned_rows = await prisma.query_raw(
-            """
+            f"""
             SELECT DISTINCT ON (resource_type, resource_id)
                    resource_type, resource_id, points_awarded, categorical_key, validator_hotkey
             FROM score_verdict
             WHERE miner_hotkey = $1 AND epoch = $2 AND validator_verdict = 'valid'
+                  AND created_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
             ORDER BY resource_type, resource_id, points_awarded DESC
             LIMIT $3
             """,
