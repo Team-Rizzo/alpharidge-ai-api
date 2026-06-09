@@ -469,6 +469,7 @@ async def dashboard_feed(
 
 PREVIEW_LIMIT = 5
 PREVIEW_DELAY = "3 hours"  # constant, not user input
+RECENT_ITEMS_LIMIT = 10  # miner-profile recent items (same delay as PREVIEW_DELAY)
 
 
 @router.get("/preview", response_model=FeedResponse)
@@ -1252,15 +1253,15 @@ async def dashboard_miner_profile(hotkey: str):
         )
 
         recent_rows = await prisma.query_raw(
-            """
+            f"""
             (
                 SELECT 'tweet' AS source_type, ta.tweet_id::text AS id,
                     t.text AS content, ta.sentiment, ta.asset_symbol,
                     ta.impact_potential, ta.technical_quality, ta.analyzed_at
                 FROM tweet_analysis ta
                 JOIN tweets t ON t.id = ta.tweet_id
-                WHERE ta.miner_hotkey = $1
-                ORDER BY ta.analyzed_at DESC LIMIT 20
+                WHERE ta.miner_hotkey = $1 AND ta.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY ta.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             UNION ALL
             (
@@ -1269,8 +1270,8 @@ async def dashboard_miner_profile(hotkey: str):
                     tma.impact_potential, tma.technical_quality, tma.analyzed_at
                 FROM telegram_message_analysis tma
                 JOIN telegram_messages tm ON tm.id = tma.message_id
-                WHERE tma.miner_hotkey = $1
-                ORDER BY tma.analyzed_at DESC LIMIT 20
+                WHERE tma.miner_hotkey = $1 AND tma.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY tma.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             UNION ALL
             (
@@ -1279,11 +1280,11 @@ async def dashboard_miner_profile(hotkey: str):
                     naa.impact_potential, naa.technical_quality, naa.analyzed_at
                 FROM news_article_analysis naa
                 JOIN news_articles na ON na.id = naa.article_id
-                WHERE naa.miner_hotkey = $1
-                ORDER BY naa.analyzed_at DESC LIMIT 20
+                WHERE naa.miner_hotkey = $1 AND naa.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY naa.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             ORDER BY analyzed_at DESC
-            LIMIT 50
+            LIMIT {RECENT_ITEMS_LIMIT}
             """,
             hotkey,
         )
