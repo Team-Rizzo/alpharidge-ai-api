@@ -2167,21 +2167,26 @@ async def submit_penalty_detail(
     created = 0
     for it in submission.items:
         try:
-            await prisma.penaltydetail.create(
-                data={
-                    "minerHotkey": it.miner_hotkey,
-                    # From the authenticated caller, not the row — un-spoofable attribution.
-                    "validatorHotkey": validator_hotkey,
-                    "epoch": int(it.epoch),
-                    "resourceType": it.resource_type,
-                    "resourceId": str(it.resource_id),
-                    "cause": it.cause,
-                    "failedFields": Json(it.failed_fields) if it.failed_fields is not None else None,
-                    "minerValues": Json(it.miner_values) if it.miner_values is not None else None,
-                    "validatorVals": Json(it.validator_values) if it.validator_values is not None else None,
-                    "postPreview": it.post_preview,
-                }
-            )
+            data = {
+                "minerHotkey": it.miner_hotkey,
+                # From the authenticated caller, not the row — un-spoofable attribution.
+                "validatorHotkey": validator_hotkey,
+                "epoch": int(it.epoch),
+                "resourceType": it.resource_type,
+                "resourceId": str(it.resource_id),
+                "cause": it.cause,
+                "postPreview": it.post_preview,
+            }
+            # Optional Json? fields must be OMITTED when null — prisma-client-py
+            # rejects an explicit None for a Json field ("value required but not
+            # set"), which was silently dropping timeout-type rows.
+            if it.failed_fields is not None:
+                data["failedFields"] = Json(it.failed_fields)
+            if it.miner_values is not None:
+                data["minerValues"] = Json(it.miner_values)
+            if it.validator_values is not None:
+                data["validatorVals"] = Json(it.validator_values)
+            await prisma.penaltydetail.create(data=data)
             created += 1
         except Exception as e:
             # Never let one malformed row drop the rest; this is explanatory data only.
