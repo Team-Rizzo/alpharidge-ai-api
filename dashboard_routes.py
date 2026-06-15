@@ -187,6 +187,9 @@ async def dashboard_feed(
         # For impact sorting we fall back to timestamp as secondary
         order_clause = "timestamp" if sort_by != "impact" else "impact_potential"
 
+        # Parse source_type into a set for multi-value support
+        source_types = {s.strip() for s in source_type.split(",") if s.strip()} if source_type else None
+
         # Build shared WHERE filters for each sub-query
         sentiment_list = [s.strip() for s in sentiment.split(",") if s.strip()] if sentiment else []
         asset_list = [a.strip() for a in asset.split(",") if a.strip()] if asset else []
@@ -223,7 +226,7 @@ async def dashboard_feed(
             return conditions
 
         # ---- Tweets sub-query ----
-        if source_type is None or source_type == "tweet":
+        if source_types is None or "tweet" in source_types:
             conds = _build_filters("ta.sentiment", "ta.asset_symbol", "ta.impact_potential", "t.text")
             where = " AND ".join(["ta.id IS NOT NULL"] + conds) if conds else "ta.id IS NOT NULL"
             parts.append(f"""
@@ -254,7 +257,7 @@ async def dashboard_feed(
             """)
 
         # ---- Telegram sub-query ----
-        if source_type is None or source_type == "telegram":
+        if source_types is None or "telegram" in source_types:
             conds = _build_filters("tma.sentiment", "tma.asset_symbol", "tma.impact_potential", "tm.content")
             where = " AND ".join(["tma.id IS NOT NULL"] + conds) if conds else "tma.id IS NOT NULL"
             parts.append(f"""
@@ -285,7 +288,7 @@ async def dashboard_feed(
             """)
 
         # ---- Articles sub-query ----
-        if source_type is None or source_type == "article":
+        if source_types is None or "article" in source_types:
             # For articles, asset_symbol filter maps to sector_symbol
             conds = _build_filters("naa.sentiment", "naa.sector_symbol", "naa.impact_potential", "na.title")
             where = " AND ".join(["naa.id IS NOT NULL"] + conds) if conds else "naa.id IS NOT NULL"
@@ -772,6 +775,8 @@ async def dashboard_sentiment(
     prisma = _get_prisma()
     try:
         days = max(1, min(days, 365))
+        # None => include all source types; otherwise restrict to the one requested.
+        source_types = None if source_type is None else {source_type}
         parts: list[str] = []
         params: list = []
         param_idx = 1
@@ -786,7 +791,7 @@ async def dashboard_sentiment(
         p_days = _next_param(days)
 
         # Build sub-queries per source type
-        if source_type is None or source_type == "tweet":
+        if source_types is None or "tweet" in source_types:
             cond = f"ta.analyzed_at >= CURRENT_DATE - ({p_days} || ' days')::interval AND ta.sentiment IS NOT NULL"
             if asset:
                 p = _next_param(asset)
@@ -797,7 +802,7 @@ async def dashboard_sentiment(
                 WHERE {cond}
             """)
 
-        if source_type is None or source_type == "telegram":
+        if source_types is None or "telegram" in source_types:
             cond = f"tma.analyzed_at >= CURRENT_DATE - ({p_days} || ' days')::interval AND tma.sentiment IS NOT NULL"
             if asset:
                 p = _next_param(asset)
@@ -808,7 +813,7 @@ async def dashboard_sentiment(
                 WHERE {cond}
             """)
 
-        if source_type is None or source_type == "article":
+        if source_types is None or "article" in source_types:
             cond = f"naa.analyzed_at >= CURRENT_DATE - ({p_days} || ' days')::interval AND naa.sentiment IS NOT NULL"
             if asset:
                 p = _next_param(asset)

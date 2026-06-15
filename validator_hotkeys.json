@@ -1,8 +1,8 @@
 {
-  "last_updated": 1780075902.2336957,
-  "last_updated_iso": "2026-05-29T17:31:42.233696+00:00",
-  "total_count": 12,
-  "network": "ws://subtensor-datacenter01.rizzo.network:9944",
+  "last_updated": 1781205321.373613,
+  "last_updated_iso": "2026-06-11T19:15:21.373613+00:00",
+  "total_count": 10,
+  "network": "finney",
   "netuid": 45,
   "stake_threshold": 20000,
   "validators": [
@@ -40,23 +40,14 @@
     },
     {
       "name": "Validator 9",
-      "hotkey": "5GvW4gtNUDcy3VrGqtUhqyYu6iscDuKJ5iMGhZ27TDcGr3BB"
-    },
-    {
-      "name": "Validator 10",
       "hotkey": "5HBDQWbmCs2MJ9BizVxmAh8c9Cc3c25zABVRn48Sj8zoX8V3"
     },
     {
-      "name": "Validator 11",
-      "hotkey": "5C4z2FJzsxh9uWxGTThdK7EBKuMNpWbCEFnrKrQene6Rsn45"
-    },
-    {
-      "name": "Validator 12",
+      "name": "Validator 10",
       "hotkey": "5FeKsRjZ6zYiX1VNwoDqHJKTToMbks1bstr9ah9VGaPX9DGg"
     }
   ],
   "hotkeys": [
-    "5C4z2FJzsxh9uWxGTThdK7EBKuMNpWbCEFnrKrQene6Rsn45",
     "5Cve8gU7QDq4QS4QxQ6cfqC5eYj85WusRam51TNJUyMdXbKf",
     "5DnNzmms8Pg7YekmHsDjJXKUMYeBG8ziM9nMj19pfiH5vs45",
     "5E2LP6EnZ54m3wS8s1yPvD5c3xo71kQroBw7aUVK32TKeZ5u",
@@ -66,7 +57,6 @@
     "5FeKsRjZ6zYiX1VNwoDqHJKTToMbks1bstr9ah9VGaPX9DGg",
     "5G9hfkx9wGB1CLMT9WXkpHSAiYzjZb5o1Boyq4KAdDhjwrc5",
     "5GP7c3fFazW9GXK8Up3qgu2DJBk8inu4aK9TZy3RuoSWVCMi",
-    "5GvW4gtNUDcy3VrGqtUhqyYu6iscDuKJ5iMGhZ27TDcGr3BB",
     "5HBDQWbmCs2MJ9BizVxmAh8c9Cc3c25zABVRn48Sj8zoX8V3"
   ]
 }
