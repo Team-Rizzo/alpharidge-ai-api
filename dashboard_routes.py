@@ -770,6 +770,8 @@ async def dashboard_sentiment(
     prisma = _get_prisma()
     try:
         days = max(1, min(days, 365))
+        # None => include all source types; otherwise restrict to the one requested.
+        source_types = None if source_type is None else {source_type}
         parts: list[str] = []
         params: list = []
         param_idx = 1
