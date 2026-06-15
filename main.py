@@ -1460,6 +1460,11 @@ async def get_unscored_articles(
     """
     Get news articles that need scoring.
 
+    Serves both RSS and CC-NEWS articles (source_type IN ('rss', 'ccnews')),
+    ordered newest-published first (published DESC, NULLs last). CC-NEWS rows
+    are ingested without a scoring record, so they enter via the "no scoring +
+    no analysis" branch, which creates an 'in_progress' record on lease.
+
     Returns up to `limit` articles (default 3) that either:
     - Have no scoring records at all, or
     - Have no news_article_analysis record
@@ -1517,8 +1522,8 @@ async def get_unscored_articles(
                     WHERE s.status = 'pending'
                       AND a.title IS NOT NULL
                       AND BTRIM(a.title) <> ''
-                      AND a.source_type = 'rss'
-                    ORDER BY s.created_at ASC, s.id ASC
+                      AND a.source_type IN ('rss', 'ccnews')
+                    ORDER BY a.published DESC NULLS LAST, a.id DESC
                     FOR UPDATE SKIP LOCKED
                     LIMIT $1
                 )
@@ -1549,8 +1554,8 @@ async def get_unscored_articles(
                         WHERE s.id IS NULL AND na.id IS NULL
                           AND a.title IS NOT NULL
                           AND BTRIM(a.title) <> ''
-                          AND a.source_type = 'rss'
-                        ORDER BY a.created_at ASC, a.id ASC
+                          AND a.source_type IN ('rss', 'ccnews')
+                        ORDER BY a.published DESC NULLS LAST, a.id DESC
                         LIMIT $1
                         FOR UPDATE OF a SKIP LOCKED
                     ), created_scoring AS (

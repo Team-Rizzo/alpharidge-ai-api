@@ -116,7 +116,9 @@ def sign_completed(miner_kp, tweet_id, analysis, verdict="valid"):
 
 async def _reset_db():
     for tbl in ("score_verdict", "attestation", "broadcast_report",
-                "tweet_analysis", "scoring", "tweets", "blacklisted_hotkeys"):
+                "tweet_analysis", "scoring", "tweets", "blacklisted_hotkeys",
+                # News tables: delete children first, then articles.
+                "news_article_scoring", "news_article_analysis", "news_articles"):
         await main.prisma.execute_raw(f'DELETE FROM "{SCHEMA}"."{tbl}";')
 
 
@@ -376,3 +378,56 @@ def test_offline_ingest_adversarial():
         epoch=EPOCH, seq=EPOCH, uid_points={10: 5}, attestation=None, attestation_sig=None,
         hotkey_to_uid=hotkey_to_uid, pinned_pubkey=PINNED_PUBKEY, enforce_signed=False)
     assert ok, why
+
+
+# ----------------------------------------------------------------------------
+# News article leasing: /articles/unscored must serve BOTH rss and ccnews,
+# newest-published first (branch B), with branch A (pending) served first.
+# ----------------------------------------------------------------------------
+async def _seed_article(url, title, source_type, published):
+    """Create a news_articles row. published may be a datetime or None."""
+    return await main.prisma.newsarticle.create(data={
+        "url": url, "title": title, "source": "synthetic",
+        "sourceType": source_type, "published": published,
+    })
+
+
+async def test_articles_unscored_serves_rss_and_ccnews(client):
+    from datetime import datetime, timezone
+    prev_gate = main.SERVE_NEWS_ARTICLES
+    main.SERVE_NEWS_ARTICLES = True
+    try:
+        d_older = datetime(2026, 6, 10, tzinfo=timezone.utc)
+        d_newer = datetime(2026, 6, 12, tzinfo=timezone.utc)
+        d_rss   = datetime(2026, 6, 11, tzinfo=timezone.utc)
+
+        # CC-NEWS rows have NO scoring record (mirrors ccnews_ingest bulk insert).
+        cc_older = await _seed_article("http://x/cc-older", "CC older", "ccnews", d_older)
+        cc_newer = await _seed_article("http://x/cc-newer", "CC newer", "ccnews", d_newer)
+        cc_null  = await _seed_article("http://x/cc-null",  "CC null",  "ccnews", None)
+        # RSS row WITH a pending scoring record (mirrors run.py _write_to_db).
+        rss = await _seed_article("http://x/rss", "RSS one", "rss", d_rss)
+        await main.prisma.newsarticlescoring.create(
+            data={"articleId": rss.id, "status": "pending"})
+
+        r = await client.get("/articles/unscored", params={"limit": 10},
+                             headers=vheaders(VALI1))
+        assert r.status_code == 200, r.text
+        returned = [a["id"] for a in r.json()["articles"]]
+
+        # Core fix: CC-NEWS articles are now served (previously rss-only).
+        assert set(returned) == {rss.id, cc_newer.id, cc_older.id, cc_null.id}, returned
+
+        # Approach 1 semantics: branch A (pending rss) first, then branch B
+        # (ccnews) ordered newest-published first, NULL published last.
+        assert returned == [rss.id, cc_newer.id, cc_older.id, cc_null.id], returned
+
+        # Every leased article is now in_progress for this validator. The 3 CC-NEWS
+        # rows had their scoring records created on-the-fly by branch B.
+        for aid in (rss.id, cc_newer.id, cc_older.id, cc_null.id):
+            rows = await main.prisma.newsarticlescoring.find_many(where={"articleId": aid})
+            assert len(rows) == 1, (aid, rows)
+            assert rows[0].status == "in_progress"
+            assert rows[0].validatorHotkey == VALI1.ss58_address
+    finally:
+        main.SERVE_NEWS_ARTICLES = prev_gate
