@@ -163,3 +163,7 @@ testing/
 
 # Editors
 .vscode/settings.json
+
+# Local SN45 hotkey snapshots (network-specific runtime state, not code)
+miner_hotkeys.json
+validator_hotkeys.json

@@ -522,6 +522,7 @@ model NewsArticle {
   title       String
   summary     String?
   content     String?
+  rawHtml     String?   @map("raw_html")
   published   DateTime? @db.Timestamptz
   source      String
   topic       String?

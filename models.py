@@ -531,6 +531,10 @@ class NewsArticleForScoring(BaseModel):
     title: str
     summary: Optional[str] = None
     content: Optional[str] = None
+    # Raw HTML, served only when SERVE_RAW_HTML is enabled (off by default to
+    # avoid synapse/bandwidth bloat). When present, miners/validators may run
+    # trafilatura on the real DOM for analyzer-side re-extraction.
+    raw_html: Optional[str] = None
     published: Optional[str] = None
     source: str
     topic: Optional[str] = None
@@ -566,6 +570,8 @@ class CompletedNewsArticleSubmission(BaseModel):
     validator_verdict: Optional[str] = None        # "valid" | "invalid"
     categorical_key: Optional[str] = None
     points_awarded: Optional[float] = None
+    # V2: full ArticleIntelligence as JSONB (stored in news_article_analysis.analysisData)
+    analysis_data: Optional[dict] = None
 
 
 class CompletedNewsArticlesSubmission(BaseModel):

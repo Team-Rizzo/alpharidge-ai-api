@@ -132,6 +132,18 @@ price_prisma: Optional[Prisma] = None  # Will be set if PRICE_DATABASE_URL is co
 
 # Feature gate for news article scoring
 SERVE_NEWS_ARTICLES = os.getenv("SERVE_NEWS_ARTICLES", "false").lower() == "true"
+# Include each article's raw HTML in the /articles/unscored response so miners
+# and validators can run trafilatura on the real DOM. OFF by default: raw HTML
+# is large and rides in the miner synapse. Both sides analyze the same article
+# object, so enabling this stays deterministic.
+SERVE_RAW_HTML = os.getenv("SERVE_RAW_HTML", "false").lower() == "true"
+
+# Hard guard against title/summary-only analysis: an article must carry a real
+# body of at least this many characters before it is eligible to be leased for
+# scoring. This guarantees the miner never runs its full analysis (NER + 2 LLM
+# calls + embeddings) on a headline/summary alone (e.g. RSS rows whose body fetch
+# failed). Mirrors MIN_BODY_CHARS in news-scraper/run.py.
+MIN_ARTICLE_CONTENT_CHARS = int(os.getenv("MIN_ARTICLE_CONTENT_CHARS", "200"))
 
 
 def _setup_log_filters():
@@ -1522,6 +1534,8 @@ async def get_unscored_articles(
                     WHERE s.status = 'pending'
                       AND a.title IS NOT NULL
                       AND BTRIM(a.title) <> ''
+                      AND a.content IS NOT NULL
+                      AND LENGTH(BTRIM(a.content)) >= $3
                       AND a.source_type IN ('rss', 'ccnews')
                     ORDER BY a.published DESC NULLS LAST, a.id DESC
                     FOR UPDATE SKIP LOCKED
@@ -1537,6 +1551,7 @@ async def get_unscored_articles(
                 """,
                 limit,
                 validator_hotkey,
+                MIN_ARTICLE_CONTENT_CHARS,
             )
             article_ids_pending = [row["article_id"] for row in (claimed_pending or [])]
 
@@ -1554,6 +1569,8 @@ async def get_unscored_articles(
                         WHERE s.id IS NULL AND na.id IS NULL
                           AND a.title IS NOT NULL
                           AND BTRIM(a.title) <> ''
+                          AND a.content IS NOT NULL
+                          AND LENGTH(BTRIM(a.content)) >= $3
                           AND a.source_type IN ('rss', 'ccnews')
                         ORDER BY a.published DESC NULLS LAST, a.id DESC
                         LIMIT $1
@@ -1568,6 +1585,7 @@ async def get_unscored_articles(
                     """,
                     slots_left,
                     validator_hotkey,
+                    MIN_ARTICLE_CONTENT_CHARS,
                 )
                 article_ids_no_scoring = [row["article_id"] for row in (inserted_rows or [])]
 
@@ -1591,12 +1609,25 @@ async def get_unscored_articles(
             if article is None or article.title is None or not str(article.title).strip():
                 continue
 
+            # Hard guard: never send a title/summary-only article. The miner must
+            # never run full analysis on a record that lacks a real body.
+            content = getattr(article, "content", None)
+            if content is None or len(str(content).strip()) < MIN_ARTICLE_CONTENT_CHARS:
+                logger.warning(
+                    f"Skipping body-less article {article.id} (content too short) for {validator_hotkey}"
+                )
+                continue
+
             article_data = NewsArticleForScoring(
                 id=article.id,
                 url=article.url,
                 title=article.title,
                 summary=getattr(article, 'summary', None),
                 content=getattr(article, 'content', None),
+                # Only ship raw HTML when explicitly enabled (off by default —
+                # it is large and rides in the miner synapse). When omitted the
+                # analyzer falls back to the already-clean `content`.
+                raw_html=getattr(article, 'rawHtml', None) if SERVE_RAW_HTML else None,
                 published=article.published.isoformat() if hasattr(article, 'published') and article.published else None,
                 source=article.source,
                 topic=getattr(article, 'topic', None),
@@ -1669,8 +1700,8 @@ async def submit_completed_articles(
             # V2: Store full ArticleIntelligence in analysisData JSONB
             ad = completed.analysis_data
             if ad and isinstance(ad, dict):
-                analysis_create["analysisData"] = ad
-                analysis_update["analysisData"] = ad
+                analysis_create["analysisData"] = Json(ad)
+                analysis_update["analysisData"] = Json(ad)
                 # Extract V2 indexed fields
                 v2_fields = {
                     "impactLevel": ad.get("impact_potential"),
