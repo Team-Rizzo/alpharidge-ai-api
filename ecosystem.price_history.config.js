@@ -2,8 +2,8 @@ module.exports = {
   apps: [{
     name: 'tao-price-history',
     script: 'run_price_history.py',
-    interpreter: '/home/rizzo/miniconda3/envs/talisman_ai/bin/python',
-    cwd: '/home/rizzo/talisman-ai-api',
+    interpreter: '/home/rizzo/miniconda3/envs/alpharidge_ai/bin/python',
+    cwd: '/home/rizzo/alpharidge-ai-api',
     instances: 1,
     autorestart: true,
     watch: false,

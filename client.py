@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Talisman AI API Client for Validators.
+Alpharidge AI API Client for Validators.
 
 This client provides a simple interface for validators to interact with
-the Talisman AI API. It handles authentication automatically using the
+the Alpharidge AI API. It handles authentication automatically using the
 validator's Bittensor wallet.
 
 Usage:
     import bittensor as bt
-    from client import TalismanAPIClient
+    from client import AlpharidgeAPIClient
     
     # Initialize with your validator wallet
     wallet = bt.wallet(name="validator", hotkey="default")
-    client = TalismanAPIClient(
+    client = AlpharidgeAPIClient(
         base_url="http://localhost:8000",
         wallet=wallet,
     )
@@ -68,8 +68,8 @@ from models import (
 logger = logging.getLogger(__name__)
 
 
-class TalismanAPIError(Exception):
-    """Base exception for Talisman API errors."""
+class AlpharidgeAPIError(Exception):
+    """Base exception for Alpharidge API errors."""
     
     def __init__(self, message: str, status_code: Optional[int] = None, detail: Optional[str] = None):
         self.message = message
@@ -78,33 +78,33 @@ class TalismanAPIError(Exception):
         super().__init__(self.message)
 
 
-class AuthenticationError(TalismanAPIError):
+class AuthenticationError(AlpharidgeAPIError):
     """Raised when authentication fails."""
     pass
 
 
-class AuthorizationError(TalismanAPIError):
+class AuthorizationError(AlpharidgeAPIError):
     """Raised when the user is not authorized (not a validator)."""
     pass
 
 
-class NotFoundError(TalismanAPIError):
+class NotFoundError(AlpharidgeAPIError):
     """Raised when a resource is not found."""
     pass
 
 
 @dataclass
 class ClientConfig:
-    """Configuration for the Talisman API Client."""
+    """Configuration for the Alpharidge API Client."""
     base_url: str
     timeout: float = 30.0
     max_retries: int = 3
     retry_delay: float = 1.0
 
 
-class TalismanAPIClient:
+class AlpharidgeAPIClient:
     """
-    Async client for the Talisman AI API.
+    Async client for the Alpharidge AI API.
     
     This client handles authentication automatically and provides
     typed methods for all API endpoints.
@@ -119,7 +119,7 @@ class TalismanAPIClient:
         retry_delay: float = 1.0,
     ):
         """
-        Initialize the Talisman API client.
+        Initialize the Alpharidge API client.
         
         Args:
             base_url: The base URL of the API (e.g., "http://localhost:8000")
@@ -139,11 +139,11 @@ class TalismanAPIClient:
         )
         self._client: Optional[httpx.AsyncClient] = None
         
-        logger.info(f"Initialized TalismanAPIClient for validator {self.ss58_address}")
+        logger.info(f"Initialized AlpharidgeAPIClient for validator {self.ss58_address}")
     
     def _create_auth_message(self, timestamp: float) -> str:
         """Create a standardized authentication message."""
-        return f"talisman-ai-auth:{int(timestamp)}"
+        return f"alpharidge-ai-auth:{int(timestamp)}"
     
     def _sign_message(self, message: str) -> str:
         """Sign a message with the wallet's hotkey."""
@@ -215,7 +215,7 @@ class TalismanAPIClient:
                 detail=detail,
             )
         else:
-            raise TalismanAPIError(
+            raise AlpharidgeAPIError(
                 f"API request failed with status {status_code}",
                 status_code=status_code,
                 detail=detail,
@@ -269,7 +269,7 @@ class TalismanAPIClient:
                     # Refresh auth headers for retry
                     headers = self._get_auth_headers()
         
-        raise TalismanAPIError(
+        raise AlpharidgeAPIError(
             f"Request failed after {self.config.max_retries} attempts: {last_error}"
         )
     
@@ -665,16 +665,16 @@ class TalismanAPIClient:
 # Synchronous Wrapper (for convenience)
 # =============================================================================
 
-class TalismanAPIClientSync:
+class AlpharidgeAPIClientSync:
     """
-    Synchronous wrapper for TalismanAPIClient.
+    Synchronous wrapper for AlpharidgeAPIClient.
     
     This is a convenience class for validators who prefer synchronous code.
     It wraps the async client and runs operations in an event loop.
     
     Usage:
         wallet = bt.wallet(name="validator", hotkey="default")
-        client = TalismanAPIClientSync("http://localhost:8000", wallet)
+        client = AlpharidgeAPIClientSync("http://localhost:8000", wallet)
         
         tweets = client.get_unscored_tweets(limit=3)
         client.submit_completed_tweets([{"tweet_id": 123, "sentiment": "bullish"}])
@@ -689,7 +689,7 @@ class TalismanAPIClientSync:
         retry_delay: float = 1.0,
     ):
         """Initialize the synchronous client wrapper."""
-        self._async_client = TalismanAPIClient(
+        self._async_client = AlpharidgeAPIClient(
             base_url=base_url,
             wallet=wallet,
             timeout=timeout,
@@ -800,12 +800,12 @@ if __name__ == "__main__":
     import asyncio
     
     async def main():
-        """Example usage of the Talisman API Client."""
+        """Example usage of the Alpharidge API Client."""
         # Initialize wallet (update with your validator wallet details)
         wallet = bt.wallet(name="validator", hotkey="default")
         
         # Create client
-        async with TalismanAPIClient(
+        async with AlpharidgeAPIClient(
             base_url="http://localhost:8000",
             wallet=wallet,
         ) as client:

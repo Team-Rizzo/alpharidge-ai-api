@@ -1,5 +1,5 @@
 """
-Background task scheduler for the Talisman AI API.
+Background task scheduler for the Alpharidge AI API.
 
 Runs periodic jobs:
 - Narrative cache refresh (every 15 min)

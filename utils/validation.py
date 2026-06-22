@@ -3,7 +3,7 @@ Shared validation utilities for normalization and metric tolerance logic.
 
 This module provides shared implementations of normalization and metric validation
 functions used across the API layer. These implementations must match the behavior
-in talisman_ai_subnet/talisman_ai/utils/normalization.py to ensure consistent
+in alpharidge_ai_subnet/alpharidge_ai/utils/normalization.py to ensure consistent
 normalization across miner, validator, and API layers.
 """
 

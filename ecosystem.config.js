@@ -1,9 +1,9 @@
 module.exports = {
   apps: [{
-    name: 'talisman-ai-api',
+    name: 'alpharidge-ai-api',
     script: 'main.py',
-    interpreter: '/home/rizzo/miniconda3/envs/talisman_ai/bin/python',
-    cwd: '/home/rizzo/talisman-ai-api',
+    interpreter: '/home/rizzo/miniconda3/envs/alpharidge_ai/bin/python',
+    cwd: '/home/rizzo/alpharidge-ai-api',
     instances: 1,
     autorestart: true,
     watch: false,

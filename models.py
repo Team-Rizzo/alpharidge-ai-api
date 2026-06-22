@@ -1,5 +1,5 @@
 """
-Pydantic models for Talisman AI API.
+Pydantic models for Alpharidge AI API.
 
 These models correspond to the Prisma schema and are used for
 request/response validation and serialization.

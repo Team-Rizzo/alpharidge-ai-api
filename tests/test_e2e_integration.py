@@ -41,7 +41,7 @@ os.environ.setdefault("SCORING_LEASE_TTL_SECONDS", "900")
 os.environ.setdefault("API_ATTESTATION_PRIVKEY", secrets.token_hex(32))
 
 API_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VAL_DIR = os.path.abspath(os.path.join(API_DIR, "..", "talisman-ai"))
+VAL_DIR = os.path.abspath(os.path.join(API_DIR, "..", "alpharidge-ai"))
 sys.path.insert(0, VAL_DIR)
 sys.path.insert(0, API_DIR)
 
@@ -54,9 +54,9 @@ import main                                    # noqa: E402
 import hotkey_whitelist                         # noqa: E402
 from utils import attestation_crypto as api_ac  # noqa: E402
 
-from talisman_ai.utils import attestation_crypto as val_ac          # noqa: E402
-from talisman_ai.validator import deep_verify                       # noqa: E402
-from talisman_ai.validator.reward_broadcast_store import (          # noqa: E402
+from alpharidge_ai.utils import attestation_crypto as val_ac          # noqa: E402
+from alpharidge_ai.validator import deep_verify                       # noqa: E402
+from alpharidge_ai.validator.reward_broadcast_store import (          # noqa: E402
     RewardBroadcastStore, route_reward_broadcast, MAX_POINTS_PER_UID,
 )
 

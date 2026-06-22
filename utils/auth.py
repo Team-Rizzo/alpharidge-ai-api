@@ -141,7 +141,7 @@ def create_auth_message(timestamp: Optional[float] = None) -> str:
     """Create a standardized authentication message"""
     if timestamp is None:
         timestamp = time.time()
-    return f"talisman-ai-auth:{int(timestamp)}"
+    return f"alpharidge-ai-auth:{int(timestamp)}"
 
 def sign_message(wallet: "bt.Wallet", message: str) -> str:
     """Sign a message with the wallet's hotkey"""

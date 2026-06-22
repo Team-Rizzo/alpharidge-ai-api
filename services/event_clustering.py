@@ -1,5 +1,5 @@
 """
-Event clustering service for the Talisman AI API.
+Event clustering service for the Alpharidge AI API.
 
 Multi-phase clustering:
 1. Fingerprint match (exact)

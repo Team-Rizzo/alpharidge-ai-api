@@ -2,7 +2,7 @@
 Shared crypto primitives for verifiable validator points.
 
 CRITICAL: the canonical-JSON, Merkle, miner-signature, and attestation-message
-formats here MUST match the validator-side mirror talisman_ai/utils/attestation_crypto.py
+formats here MUST match the validator-side mirror alpharidge_ai/utils/attestation_crypto.py
 byte-for-byte, or offline signature/Merkle verification will fail across repos.
 """
 from __future__ import annotations

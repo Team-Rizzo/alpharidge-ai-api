@@ -1,5 +1,5 @@
 """
-Narrative matching service for the Talisman AI API.
+Narrative matching service for the Alpharidge AI API.
 
 Three-signal hybrid matching:
   Signal 1: Slug exact match (confidence 0.95)
@@ -28,7 +28,7 @@ logger = logging.getLogger("narrative_matcher")
 
 NARRATIVES_FILE = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
-    "..", "talisman-ai", "talisman_ai", "analyzer", "data", "narratives.json",
+    "..", "alpharidge-ai", "alpharidge_ai", "analyzer", "data", "narratives.json",
 )
 
 EMBEDDING_DIM = 384

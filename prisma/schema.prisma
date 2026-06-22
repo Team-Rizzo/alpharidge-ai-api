@@ -1,4 +1,4 @@
-// Unified X Archive + Talisman AI Database Schema
+// Unified X Archive + Alpharidge AI Database Schema
 
 generator client {
   provider             = "prisma-client-py"

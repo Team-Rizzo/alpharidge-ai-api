@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Talisman AI API - FastAPI Application
+Alpharidge AI API - FastAPI Application
 
 This API provides endpoints for validators to:
 - Get unscored tweets for scoring
@@ -188,7 +188,7 @@ async def lifespan(app: FastAPI):
     global price_prisma
     
     # Startup
-    logger.info("Starting Talisman AI API...")
+    logger.info("Starting Alpharidge AI API...")
     
     # Re-apply log filters (uvicorn may reconfigure loggers on startup)
     _setup_log_filters()
@@ -231,7 +231,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Shutting down Talisman AI API...")
+    logger.info("Shutting down Alpharidge AI API...")
     if background_task and not background_task.done():
         background_task.cancel()
         try:
@@ -249,8 +249,8 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="Talisman AI API",
-    description="API for Talisman AI subnet validators to score tweets and manage rewards/penalties",
+    title="Alpharidge AI API",
+    description="API for Alpharidge AI subnet validators to score tweets and manage rewards/penalties",
     version="1.0.0",
     lifespan=lifespan,
 )
