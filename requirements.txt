@@ -22,8 +22,10 @@ httpx>=0.25.0
 # Numeric operations (embedding cosine similarity)
 numpy>=1
 
-# Async support
-asyncio>=3.4.3
+# Async support: asyncio is part of the Python 3 standard library. Do NOT install the
+# PyPI `asyncio` backport (3.4.3, from 2015) — on modern Python it shadows and breaks
+# the stdlib module. Intentionally removed.
+# asyncio>=3.4.3
 
 pytest>=7.4.0
 pytest-asyncio>=0.23.0
