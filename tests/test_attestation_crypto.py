@@ -51,7 +51,7 @@ def test_miner_signature_roundtrip():
 
 
 def test_miner_sign_message_format():
-    assert ac.miner_sign_message("r1", "ab12", "n1") == "talisman-miner-verdict:r1:ab12:n1"
+    assert ac.miner_sign_message("r1", "ab12", "n1") == "alpharidge-miner-verdict:r1:ab12:n1"
 
 
 def test_load_signing_key_requires_env(monkeypatch):

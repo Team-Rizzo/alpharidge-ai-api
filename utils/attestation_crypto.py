@@ -36,7 +36,7 @@ def analysis_hash(analysis: dict) -> str:
 # ---- Miner per-item signature -----------------------------------------------
 def miner_sign_message(resource_id: str, analysis_hash_hex: str, nonce: str) -> str:
     """Message a miner signs (with its hotkey) for one scored item."""
-    return f"talisman-miner-verdict:{resource_id}:{analysis_hash_hex}:{nonce}"
+    return f"alpharidge-miner-verdict:{resource_id}:{analysis_hash_hex}:{nonce}"
 
 
 def verify_miner_signature(miner_hotkey: str, resource_id: str, analysis_hash_hex: str,

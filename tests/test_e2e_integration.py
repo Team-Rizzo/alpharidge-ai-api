@@ -12,7 +12,7 @@ Run:
     E2E=1 python -m pytest tests/test_e2e_integration.py -v
 
 Config (env overrides):
-    E2E_DATABASE_URL   default postgresql://talisman:talisman_dev@127.0.0.1:5433/talisman?schema=talisman_e2e
+    E2E_DATABASE_URL   default postgresql://alpharidge:alpharidge_dev@127.0.0.1:5433/alpharidge?schema=alpharidge_e2e
     API_ATTESTATION_PRIVKEY   default: a fresh random sr25519 seed
 """
 import os
@@ -28,10 +28,10 @@ if not E2E:
     pytest.skip("set E2E=1 to run DB integration tests", allow_module_level=True)
 
 # --- env MUST be set before importing the API app ---------------------------
-SCHEMA = os.environ.get("E2E_SCHEMA", "talisman_e2e")
+SCHEMA = os.environ.get("E2E_SCHEMA", "alpharidge_e2e")
 DATABASE_URL = os.environ.get(
     "E2E_DATABASE_URL",
-    f"postgresql://talisman:talisman_dev@127.0.0.1:5433/talisman?schema={SCHEMA}",
+    f"postgresql://alpharidge:alpharidge_dev@127.0.0.1:5433/alpharidge?schema={SCHEMA}",
 )
 os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ["AUTH_ENABLED"] = "false"
