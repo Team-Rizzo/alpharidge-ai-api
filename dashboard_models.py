@@ -5,7 +5,7 @@ These are read-only response models for the dashboard frontend.
 """
 
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from pydantic import BaseModel
 
 
@@ -253,6 +253,8 @@ class MinerLeaderboardEntry(BaseModel):
     first_seen: Optional[datetime] = None
     last_seen: Optional[datetime] = None
     total_rewards: float = 0.0
+    points_24h: float = 0.0
+    avg_points_day: float = 0.0  # 7-day rolling average
 
 
 class MinerLeaderboardResponse(BaseModel):
@@ -302,6 +304,89 @@ class MinerProfileResponse(BaseModel):
     recent_items: List[MinerRecentItem] = []
     rewards: List[MinerRewardEntry] = []
     penalties: List[MinerPenaltyEntry] = []
+
+
+# ============================================================================
+# Miner Batch / Scoring-Transparency Models
+# ============================================================================
+# Built on the standalone `penalty_detail` table + the `score_verdict` valid trail.
+# DECOUPLED from consensus: read-only, never writes, never touches attestation/Merkle.
+
+class Diagnosis(BaseModel):
+    """Plain-language diagnosis for a batch (server-side so it's consistent everywhere)."""
+    severity: str                       # ok | warn | error
+    headline: str
+    detail: Optional[str] = None
+    action: Optional[str] = None
+
+
+class MinerBatch(BaseModel):
+    """One epoch / block-window of a miner's scoring, as a statement line item."""
+    epoch: int
+    block_window_start: int
+    block_window_stop: int
+    last_activity_at: Optional[datetime] = None   # max(created_at) across the two trails (for "2h ago")
+    # Distinct valid items (pre-zeroing). Equals raw points while verdicts are uniformly
+    # 1.0 (true today); switch to summing points-per-item if valid-side gradation lands.
+    earned_items: int = 0
+    penalty_items: int = 0              # distinct items penalized (from penalty_detail)
+    penalty_breakdown: Dict[str, int] = {}   # cause -> distinct items penalized
+    # Best reward-table points for this epoch: MAX(points) across the per-validator rows
+    # (the rewards table has no validator column; MAX is the conservative "most generous"
+    # view). POST-zeroing. This is reward-table value, NOT the chain incentive/emission.
+    # None => no reward row written yet for this epoch (on-chain outcome pending).
+    reward_points_max: Optional[float] = None
+    # True only when the miner did valid work AND every reward row for the epoch is 0
+    # (consensus zeroed it). False while reward_points_max is None (pending), so the UI
+    # never shows "zeroed" before the reward row lands.
+    was_zeroed: bool = False
+    # Distinct validators that wrote per-item DETAIL this epoch (a subset of all validators
+    # that flagged the miner). Attribution copy only -- NOT the zeroing decision (use was_zeroed).
+    flagged_by_validators: int = 0
+    detail_coverage: bool = False       # whether per-item attribution exists for this epoch
+    diagnosis: Diagnosis
+
+
+class MinerBatchesResponse(BaseModel):
+    """Response for GET /dashboard/miners/{hotkey}/batches."""
+    hotkey: str
+    block_length: int
+    batches: List[MinerBatch] = []
+
+
+class MinerBatchItem(BaseModel):
+    """A single penalized item within a batch — the miner-vs-validator diff."""
+    resource_type: str
+    resource_id: str
+    content_preview: Optional[str] = None
+    cause: str
+    failed_fields: Optional[List[str]] = None
+    miner_values: Optional[Dict[str, Any]] = None
+    validator_values: Optional[Dict[str, Any]] = None
+    post_preview: Optional[str] = None
+    validator_hotkey: Optional[str] = None
+
+
+class EarnedItem(BaseModel):
+    """A single item the validator selected and scored VALID for this miner+epoch.
+    No miner-vs-validator diff (it matched); render as a 'selected and scored valid' card."""
+    resource_type: str
+    resource_id: str
+    content_preview: Optional[str] = None
+    points_awarded: float = 0.0
+    categorical_key: Optional[str] = None   # validator's categorization; optional to render
+    validator_hotkey: Optional[str] = None
+
+
+class MinerBatchItemsResponse(BaseModel):
+    """Response for GET /dashboard/miners/{hotkey}/batches/{epoch}/items."""
+    hotkey: str
+    epoch: int
+    block_window_start: int
+    block_window_stop: int
+    items: List[MinerBatchItem] = []        # penalized items (diffs) — unchanged contract
+    earned: List[EarnedItem] = []           # valid items the validator scored this epoch
+    earned_truncated: bool = False          # true if `earned` hit the row cap (not the full set)
 
 
 # ============================================================================

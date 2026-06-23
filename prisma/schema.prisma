@@ -802,10 +802,12 @@ model BroadcastReport {
   @@map("broadcast_report")
 }
 
-/// Per-item penalty attribution for the miner dashboard (scoring transparency).
-/// Standalone / decoupled from consensus + Merkle. Added on `main` after the
-/// article-intelligence-v2 branch was cut; carried forward so the v2 migration
-/// does NOT drop the live penalty_detail table (9.8k rows feed the dashboard).
+/// Display-only penalty attribution for the miner dashboard. DECOUPLED from the
+/// consensus pipeline by design: this table is never read by get_attestation,
+/// get_verdicts, write_verdict, or merkle_root, and carries no signatures, hashes,
+/// or points. It exists purely to explain to a miner why a penalty happened. The
+/// authoritative number already reaches the miner (signed) via the Score synapse.
+/// Do NOT fold this into score_verdict or any attestation/Merkle path.
 model PenaltyDetail {
   id              Int      @id @default(autoincrement())
   minerHotkey     String   @map("miner_hotkey")

@@ -383,6 +383,32 @@ class BroadcastReportCreate(BaseModel):
 
 
 # ============================================================================
+# Penalty Detail Models (display-only attribution for the miner dashboard)
+# ============================================================================
+# DECOUPLED from the consensus pipeline by design: these carry no signatures,
+# hashes, or points and are persisted to the standalone `penalty_detail` table
+# only. Never folded into score_verdict / attestation / Merkle.
+
+class PenaltyDetailItem(BaseModel):
+    """One penalty-attribution row from the validator, explaining why a single
+    sampled/timed-out item was penalized. Display-only."""
+    miner_hotkey: str
+    epoch: int
+    resource_type: str
+    resource_id: str
+    cause: str                  # classification_mismatch | timeout | missing_classification | needs_update
+    failed_fields: Optional[List[str]] = None
+    miner_values: Optional[Dict[str, Any]] = None
+    validator_values: Optional[Dict[str, Any]] = None
+    post_preview: Optional[str] = None
+
+
+class PenaltyDetailBulkCreate(BaseModel):
+    """Batch of penalty-detail rows flushed best-effort by the validator."""
+    items: List[PenaltyDetailItem]
+
+
+# ============================================================================
 # TAO Price Models
 # ============================================================================
 

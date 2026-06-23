@@ -5,6 +5,7 @@ Mounted on the main FastAPI app via `app.include_router(router)`.
 """
 
 import os
+import json
 import logging
 from typing import Optional
 
@@ -39,6 +40,12 @@ from dashboard_models import (
     MinerRewardEntry,
     MinerPenaltyEntry,
     MinerProfileResponse,
+    Diagnosis,
+    MinerBatch,
+    MinerBatchesResponse,
+    MinerBatchItem,
+    MinerBatchItemsResponse,
+    EarnedItem,
     AssetEntry,
     AssetCoverageResponse,
     ValidatorEntry,
@@ -67,6 +74,87 @@ router = APIRouter(prefix="/dashboard", dependencies=[Depends(_require_local)])
 def _get_prisma():
     from main import prisma
     return prisma
+
+
+# Epoch <-> block-window mapping (A5). Must match the validator's formula
+# (validation_client.py: start = epoch*BLOCK_LENGTH, stop = (epoch+1)*BLOCK_LENGTH-1).
+# Env-overridable; default 100 mirrors the validator's config default. Do not hardcode.
+BLOCK_LENGTH = int(os.getenv("BLOCK_LENGTH", "100"))
+
+
+def _block_window(epoch: int) -> tuple[int, int]:
+    return epoch * BLOCK_LENGTH, (epoch + 1) * BLOCK_LENGTH - 1
+
+
+def _as_json(val):
+    """Normalize a JSONB column from query_raw: it may arrive already-parsed (dict/list)
+    or as a JSON string depending on the driver. Returns None on anything unparseable."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except Exception:
+            return None
+    return val
+
+
+def _diagnose_batch(earned_items: int, penalty_items: int, breakdown: dict,
+                    was_zeroed: bool) -> Diagnosis:
+    """A6 diagnosis engine -- turn a batch's numbers into one human sentence.
+    Server-side so the chip text is identical across all surfaces.
+
+    The "zeroed your reward" headline gates on was_zeroed (derived from the authoritative
+    post-zeroing rewards table), NOT on penalty_detail's validator count -- penalty_detail
+    only captures new-build emitters and undercounts the true consensus flag count, so a
+    miner zeroed by other validators may have few or zero detail rows here."""
+    timeouts = breakdown.get("timeout", 0)
+    mismatches = breakdown.get("classification_mismatch", 0)
+    outdated = breakdown.get("missing_classification", 0) + breakdown.get("needs_update", 0)
+
+    # On-chain zeroing is the consequence the miner cares about most -- lead with it,
+    # even when this validator recorded no per-item detail for the epoch.
+    if was_zeroed:
+        if outdated > 0:
+            action = "Pull the latest alpharidge-ai and restart."
+        elif penalty_items > 0:
+            action = "Fix the items in this batch."
+        else:
+            action = "Multiple validators disagreed with your work this epoch."
+        return Diagnosis(severity="error", headline="This zeroed your on-chain reward.",
+                         detail="You did valid work, but consensus zeroed your reward this epoch.",
+                         action=action)
+
+    if penalty_items == 0:
+        if earned_items > 0:
+            return Diagnosis(severity="ok", headline="Scoring cleanly.",
+                             detail=f"{earned_items} item(s) matched the validator.", action=None)
+        return Diagnosis(severity="ok", headline="No issues this batch.",
+                         detail="Nothing was penalized.", action=None)
+
+    # Outdated code is the most actionable of the non-zeroing cases -- surface it first.
+    if outdated > 0:
+        return Diagnosis(severity="error", headline="Your miner is on outdated code.",
+                         detail="The validator couldn't read your classification.",
+                         action="Pull the latest alpharidge-ai and restart.")
+
+    if mismatches > 0 and timeouts == 0:
+        return Diagnosis(severity="warn",
+                         headline="Disagreeing with the validator's classification.",
+                         detail=f"{mismatches} item(s) didn't match on at least one field.",
+                         action="Review the field diffs below.")
+
+    if timeouts > 0 and mismatches == 0:
+        return Diagnosis(severity="warn", headline="Items timed out before scoring.",
+                         detail=f"{timeouts} item(s) weren't returned in time.",
+                         action="Check your response time / uptime.")
+
+    # Mixed causes.
+    return Diagnosis(severity="warn", headline="Some items were penalized.",
+                     detail=f"{timeouts} timeout(s), {mismatches} mismatch(es).",
+                     action="See the breakdown below.")
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
@@ -158,7 +246,7 @@ async def dashboard_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/feed", response_model=FeedResponse)
+# @router.get("/feed", response_model=FeedResponse)
 async def dashboard_feed(
     page: int = 1,
     limit: int = 50,
@@ -384,6 +472,127 @@ async def dashboard_feed(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+PREVIEW_LIMIT = 5
+PREVIEW_DELAY = "3 hours"  # constant, not user input
+RECENT_ITEMS_LIMIT = 10  # miner-profile recent items (same delay as PREVIEW_DELAY)
+
+
+@router.get("/preview", response_model=FeedResponse)
+async def dashboard_preview(
+    source_type: Optional[str] = None,
+    asset: Optional[str] = None,
+):
+    """Recent items preview."""
+    prisma = _get_prisma()
+    try:
+        source_types = {s.strip() for s in source_type.split(",") if s.strip()} if source_type else None
+        asset_list = [a.strip() for a in asset.split(",") if a.strip()] if asset else []
+
+        params: list = []
+        param_idx = 1
+
+        def _next_param(value):
+            nonlocal param_idx
+            params.append(value)
+            idx = param_idx
+            param_idx += 1
+            return f"${idx}"
+
+        def _asset_filter(asset_col: str) -> str:
+            if not asset_list:
+                return ""
+            placeholders = ", ".join(_next_param(a) for a in asset_list)
+            return f" AND {asset_col} IN ({placeholders})"
+
+        parts: list[str] = []
+        if source_types is None or "tweet" in source_types:
+            parts.append(f"""
+                SELECT 'tweet' AS source_type, t.id::text AS item_id, t.text AS content,
+                    ta.sentiment, ta.asset_symbol, ta.content_type, ta.impact_potential,
+                    ta.technical_quality, ta.market_analysis, t.created_at AS timestamp,
+                    a.screen_name AS author_screen_name, a.profile_image_url AS author_profile_image_url,
+                    NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
+                    NULL::text AS article_title, NULL::text AS article_source, NULL::text AS article_url, NULL::text AS sector_symbol
+                FROM tweets t JOIN tweet_analysis ta ON ta.tweet_id = t.id
+                LEFT JOIN accounts a ON a.id = t.author_id
+                WHERE ta.id IS NOT NULL{_asset_filter("ta.asset_symbol")}
+            """)
+        if source_types is None or "telegram" in source_types:
+            parts.append(f"""
+                SELECT 'telegram' AS source_type, tm.id AS item_id, tm.content,
+                    tma.sentiment, tma.asset_symbol, tma.content_type, tma.impact_potential,
+                    tma.technical_quality, tma.market_analysis, tm.created_at AS timestamp,
+                    NULL::text AS author_screen_name, NULL::text AS author_profile_image_url,
+                    tm.sender_username, tm.sender_name, tg.title AS group_title,
+                    NULL::text AS article_title, NULL::text AS article_source, NULL::text AS article_url, NULL::text AS sector_symbol
+                FROM telegram_messages tm JOIN telegram_message_analysis tma ON tma.message_id = tm.id
+                LEFT JOIN telegram_groups tg ON tg.id = tm.group_id
+                WHERE tma.id IS NOT NULL{_asset_filter("tma.asset_symbol")}
+            """)
+        if source_types is None or "article" in source_types:
+            parts.append(f"""
+                SELECT 'article' AS source_type, na.id::text AS item_id, COALESCE(na.summary, na.title) AS content,
+                    naa.sentiment, naa.sector_symbol AS asset_symbol, naa.content_type, naa.impact_potential,
+                    naa.technical_quality, naa.market_analysis, COALESCE(na.published, na.created_at) AS timestamp,
+                    NULL::text AS author_screen_name, NULL::text AS author_profile_image_url,
+                    NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
+                    na.title AS article_title, na.source AS article_source, na.url AS article_url, naa.sector_symbol
+                FROM news_articles na JOIN news_article_analysis naa ON naa.article_id = na.id
+                WHERE naa.id IS NOT NULL{_asset_filter("naa.sector_symbol")}
+            """)
+
+        if not parts:
+            return FeedResponse(items=[], total=0, page=1, limit=PREVIEW_LIMIT, has_more=False)
+
+        union_query = " UNION ALL ".join(parts)
+        data_sql = f"""
+            SELECT * FROM ({union_query}) AS feed
+            WHERE timestamp <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+            ORDER BY timestamp DESC NULLS LAST
+            LIMIT {PREVIEW_LIMIT}
+        """
+        rows = await prisma.query_raw(data_sql, *params)
+
+        items: list[FeedItem] = []
+        for row in (rows or []):
+            item = FeedItem(
+                source_type=row["source_type"],
+                id=row.get("item_id"),
+                content=row.get("content"),
+                sentiment=row.get("sentiment"),
+                asset_symbol=row.get("asset_symbol"),
+                content_type=row.get("content_type"),
+                impact_potential=row.get("impact_potential"),
+                technical_quality=row.get("technical_quality"),
+                market_analysis=row.get("market_analysis"),
+                timestamp=row.get("timestamp"),
+            )
+            if row["source_type"] == "tweet":
+                item.author = FeedItemAuthor(
+                    screen_name=row.get("author_screen_name"),
+                    profile_image_url=row.get("author_profile_image_url"),
+                )
+            elif row["source_type"] == "telegram":
+                item.telegram = FeedItemTelegramMeta(
+                    sender_username=row.get("sender_username"),
+                    sender_name=row.get("sender_name"),
+                    group_title=row.get("group_title"),
+                )
+            elif row["source_type"] == "article":
+                item.article = FeedItemArticleMeta(
+                    title=row.get("article_title"),
+                    source=row.get("article_source"),
+                    url=row.get("article_url"),
+                    sector_symbol=row.get("sector_symbol"),
+                )
+            items.append(item)
+
+        return FeedResponse(items=items, total=len(items), page=1, limit=PREVIEW_LIMIT, has_more=False)
+    except Exception as e:
+        logger.error(f"Error in dashboard_preview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/articles/sources", response_model=ArticleSourcesResponse)
 async def dashboard_article_sources():
     """
@@ -410,7 +619,38 @@ async def dashboard_article_sources():
             ORDER BY total_articles DESC
         """)
 
+        # Twitter + Telegram as aggregate "sources" (sentiment over analyzed items).
+        channel_rows = await prisma.query_raw("""
+            SELECT 'Twitter/X' AS source, COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bullish')::int AS very_bullish,
+                COUNT(*) FILTER (WHERE sentiment = 'bullish')::int AS bullish,
+                COUNT(*) FILTER (WHERE sentiment = 'neutral')::int AS neutral,
+                COUNT(*) FILTER (WHERE sentiment = 'bearish')::int AS bearish,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bearish')::int AS very_bearish
+            FROM tweet_analysis
+            UNION ALL
+            SELECT 'Telegram', COUNT(*)::int,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bullish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'bullish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'neutral')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'bearish')::int,
+                COUNT(*) FILTER (WHERE sentiment = 'very_bearish')::int
+            FROM telegram_message_analysis
+        """)
+
         sources = [
+            SourceStats(
+                source=row["source"],
+                total_articles=row["total"],
+                analyzed_articles=row["total"],
+                very_bullish=row["very_bullish"],
+                bullish=row["bullish"],
+                neutral=row["neutral"],
+                bearish=row["bearish"],
+                very_bearish=row["very_bearish"],
+            )
+            for row in (channel_rows or [])
+        ] + [
             SourceStats(
                 source=row["source"],
                 total_articles=row["total_articles"],
@@ -429,7 +669,7 @@ async def dashboard_article_sources():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/articles", response_model=ArticlesResponse)
+# @router.get("/articles", response_model=ArticlesResponse)
 async def dashboard_articles(
     page: int = 1,
     limit: int = 50,
@@ -501,9 +741,12 @@ async def dashboard_articles(
 
         where_clause = (" AND " + " AND ".join(conditions)) if conditions else ""
 
+        # INNER JOIN: only surface analyzed articles (matches the /feed behavior).
+        # Unanalyzed rows are the newest (analysis lags scraping) and would otherwise
+        # top the date-sorted list with empty sentiment/impact/type.
         base_query = f"""
             FROM news_articles na
-            LEFT JOIN news_article_analysis naa ON naa.article_id = na.id
+            JOIN news_article_analysis naa ON naa.article_id = na.id
             WHERE 1=1 {where_clause}
         """
 
@@ -574,7 +817,7 @@ async def dashboard_articles(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/articles/{article_id}", response_model=ArticleDetailResponse)
+# @router.get("/articles/{article_id}", response_model=ArticleDetailResponse)
 async def dashboard_article_detail(article_id: int):
     """
     Single article detail with full analysis.
@@ -641,7 +884,7 @@ async def dashboard_article_detail(article_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tweets/{tweet_id}", response_model=TweetDetailResponse)
+# @router.get("/tweets/{tweet_id}", response_model=TweetDetailResponse)
 async def dashboard_tweet_detail(tweet_id: int):
     """Single tweet detail with author and analysis."""
     prisma = _get_prisma()
@@ -707,7 +950,7 @@ async def dashboard_tweet_detail(tweet_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/telegram/{message_id}", response_model=TelegramDetailResponse)
+# @router.get("/telegram/{message_id}", response_model=TelegramDetailResponse)
 async def dashboard_telegram_detail(message_id: str):
     """Single telegram message detail with group and analysis."""
     prisma = _get_prisma()
@@ -775,8 +1018,8 @@ async def dashboard_sentiment(
     prisma = _get_prisma()
     try:
         days = max(1, min(days, 365))
-        # None => include all source types; otherwise restrict to the one requested.
-        source_types = None if source_type is None else {source_type}
+        # Parse source_type into a set for multi-value support (comma-separated)
+        source_types = {s.strip() for s in source_type.split(",") if s.strip()} if source_type else None
         parts: list[str] = []
         params: list = []
         param_idx = 1
@@ -934,10 +1177,15 @@ async def dashboard_miners(
             )
             SELECT
                 ms.*,
-                COALESCE(r.total_points, 0) AS total_rewards
+                COALESCE(r.total_points, 0) AS total_rewards,
+                COALESCE(r.points_24h, 0) AS points_24h,
+                COALESCE(r.avg_points_day, 0) AS avg_points_day
             FROM miner_stats ms
             LEFT JOIN (
-                SELECT hotkey, SUM(points) AS total_points
+                SELECT hotkey,
+                       SUM(points) AS total_points,
+                       SUM(points) FILTER (WHERE created_at >= now() - interval '24 hours') AS points_24h,
+                       SUM(points) FILTER (WHERE created_at >= now() - interval '7 days') / 7.0 AS avg_points_day
                 FROM rewards
                 GROUP BY hotkey
             ) r ON r.hotkey = ms.miner_hotkey
@@ -969,6 +1217,8 @@ async def dashboard_miners(
                 first_seen=row.get("first_seen"),
                 last_seen=row.get("last_seen"),
                 total_rewards=row.get("total_rewards", 0) or 0,
+                points_24h=row.get("points_24h", 0) or 0,
+                avg_points_day=row.get("avg_points_day", 0) or 0,
             ))
 
         return MinerLeaderboardResponse(miners=miners, total=len(miners))
@@ -1039,15 +1289,15 @@ async def dashboard_miner_profile(hotkey: str):
         )
 
         recent_rows = await prisma.query_raw(
-            """
+            f"""
             (
                 SELECT 'tweet' AS source_type, ta.tweet_id::text AS id,
                     t.text AS content, ta.sentiment, ta.asset_symbol,
                     ta.impact_potential, ta.technical_quality, ta.analyzed_at
                 FROM tweet_analysis ta
                 JOIN tweets t ON t.id = ta.tweet_id
-                WHERE ta.miner_hotkey = $1
-                ORDER BY ta.analyzed_at DESC LIMIT 20
+                WHERE ta.miner_hotkey = $1 AND ta.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY ta.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             UNION ALL
             (
@@ -1056,8 +1306,8 @@ async def dashboard_miner_profile(hotkey: str):
                     tma.impact_potential, tma.technical_quality, tma.analyzed_at
                 FROM telegram_message_analysis tma
                 JOIN telegram_messages tm ON tm.id = tma.message_id
-                WHERE tma.miner_hotkey = $1
-                ORDER BY tma.analyzed_at DESC LIMIT 20
+                WHERE tma.miner_hotkey = $1 AND tma.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY tma.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             UNION ALL
             (
@@ -1066,11 +1316,11 @@ async def dashboard_miner_profile(hotkey: str):
                     naa.impact_potential, naa.technical_quality, naa.analyzed_at
                 FROM news_article_analysis naa
                 JOIN news_articles na ON na.id = naa.article_id
-                WHERE naa.miner_hotkey = $1
-                ORDER BY naa.analyzed_at DESC LIMIT 20
+                WHERE naa.miner_hotkey = $1 AND naa.analyzed_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+                ORDER BY naa.analyzed_at DESC LIMIT {RECENT_ITEMS_LIMIT}
             )
             ORDER BY analyzed_at DESC
-            LIMIT 50
+            LIMIT {RECENT_ITEMS_LIMIT}
             """,
             hotkey,
         )
@@ -1126,6 +1376,262 @@ async def dashboard_miner_profile(hotkey: str):
         raise
     except Exception as e:
         logger.error(f"Error in dashboard_miner_profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Miner Batches (scoring transparency) — read-only, decoupled from consensus
+# ============================================================================
+
+@router.get("/miners/{hotkey}/batches", response_model=MinerBatchesResponse)
+async def dashboard_miner_batches(hotkey: str):
+    """Per-epoch statement line items for a miner: raw earned (pre-zeroing), penalty
+    breakdown by cause, and a server-side diagnosis. Sources: score_verdict valid rows
+    + the standalone penalty_detail table. Never reads attestation/Merkle."""
+    prisma = _get_prisma()
+    try:
+        # Distinct items earned (valid) per epoch. COUNT(DISTINCT (type,id)) dedups the
+        # same item scored by multiple validators (see §13.2 reconciliation). Equals raw
+        # points while verdicts are uniformly 1.0 (true today).
+        earned_rows = await prisma.query_raw(
+            """
+            SELECT epoch, COUNT(DISTINCT (resource_type, resource_id)) AS earned_items
+            FROM score_verdict
+            WHERE miner_hotkey = $1 AND validator_verdict = 'valid'
+            GROUP BY epoch
+            """,
+            hotkey,
+        )
+        # Penalty items + how many distinct validators flagged the miner, per epoch.
+        pen_rows = await prisma.query_raw(
+            """
+            SELECT epoch,
+                   COUNT(DISTINCT (resource_type, resource_id)) AS penalty_items,
+                   COUNT(DISTINCT validator_hotkey) AS flagged_by
+            FROM penalty_detail
+            WHERE miner_hotkey = $1
+            GROUP BY epoch
+            """,
+            hotkey,
+        )
+        # Cause breakdown (distinct items per cause), per epoch.
+        cause_rows = await prisma.query_raw(
+            """
+            SELECT epoch, cause, COUNT(DISTINCT (resource_type, resource_id)) AS cnt
+            FROM penalty_detail
+            WHERE miner_hotkey = $1
+            GROUP BY epoch, cause
+            """,
+            hotkey,
+        )
+        # Authoritative on-chain outcome: the post-zeroing rewards table. No validator
+        # column, so multiple rows per (hotkey, block); MAX is the conservative "most
+        # generous" view. Keyed by start_block, mapped to epoch = start_block / BLOCK_LENGTH.
+        reward_rows = await prisma.query_raw(
+            """
+            SELECT start_block, COUNT(*) AS n, MAX(points) AS max_points
+            FROM rewards
+            WHERE hotkey = $1
+            GROUP BY start_block
+            """,
+            hotkey,
+        )
+        # Last activity time per epoch (for the "2h ago" column).
+        activity_rows = await prisma.query_raw(
+            """
+            SELECT epoch, MAX(created_at) AS last_at FROM (
+                SELECT epoch, created_at FROM score_verdict WHERE miner_hotkey = $1
+                UNION ALL
+                SELECT epoch, created_at FROM penalty_detail WHERE miner_hotkey = $1
+            ) u
+            GROUP BY epoch
+            """,
+            hotkey,
+        )
+
+        earned_by_epoch = {r["epoch"]: int(r["earned_items"]) for r in earned_rows}
+        pen_by_epoch = {r["epoch"]: r for r in pen_rows}
+        breakdown_by_epoch: dict = {}
+        for r in cause_rows:
+            breakdown_by_epoch.setdefault(r["epoch"], {})[r["cause"]] = int(r["cnt"])
+        # reward_by_epoch[epoch] = {"n": rows_written, "max": max_points}
+        reward_by_epoch: dict = {}
+        if BLOCK_LENGTH > 0:
+            for r in reward_rows:
+                ep_r = int(r["start_block"]) // BLOCK_LENGTH
+                reward_by_epoch[ep_r] = {"n": int(r["n"]),
+                                         "max": float(r["max_points"]) if r["max_points"] is not None else 0.0}
+        activity_by_epoch = {r["epoch"]: r.get("last_at") for r in activity_rows}
+
+        all_epochs = sorted(
+            set(earned_by_epoch) | set(pen_by_epoch) | set(breakdown_by_epoch),
+            reverse=True,
+        )[:50]
+
+        batches = []
+        for ep in all_epochs:
+            start, stop = _block_window(int(ep))
+            earned = earned_by_epoch.get(ep, 0)
+            pen = pen_by_epoch.get(ep)
+            penalty_items = int(pen["penalty_items"]) if pen else 0
+            flagged_by = int(pen["flagged_by"]) if pen else 0
+            breakdown = breakdown_by_epoch.get(ep, {})
+            detail_coverage = ep in pen_by_epoch
+
+            # On-chain outcome (3-way gate, per section 16.1). reward_points_max is None
+            # until a reward row lands (rewards lag ~2 epochs) -> "pending", never "zeroed".
+            rwd = reward_by_epoch.get(ep)
+            reward_points_max = rwd["max"] if rwd else None
+            was_zeroed = bool(rwd and rwd["n"] > 0 and rwd["max"] <= 0.0 and earned > 0)
+
+            batches.append(MinerBatch(
+                epoch=int(ep),
+                block_window_start=start,
+                block_window_stop=stop,
+                last_activity_at=activity_by_epoch.get(ep),
+                earned_items=earned,
+                penalty_items=penalty_items,
+                penalty_breakdown=breakdown,
+                reward_points_max=reward_points_max,
+                was_zeroed=was_zeroed,
+                flagged_by_validators=flagged_by,
+                detail_coverage=detail_coverage,
+                diagnosis=_diagnose_batch(earned, penalty_items, breakdown, was_zeroed),
+            ))
+
+        return MinerBatchesResponse(hotkey=hotkey, block_length=BLOCK_LENGTH, batches=batches)
+    except Exception as e:
+        logger.error(f"Error in dashboard_miner_batches: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/miners/{hotkey}/batches/{epoch}/items", response_model=MinerBatchItemsResponse)
+async def dashboard_miner_batch_items(hotkey: str, epoch: int):
+    """Per-item penalty detail for one batch — the miner-vs-validator diff, joined to
+    the item's content preview. Read-only from penalty_detail (+ content tables)."""
+    prisma = _get_prisma()
+    try:
+        # Dedup by (resource_type, resource_id): at fleet scale the same item is flagged by
+        # many validators (and the append-only table can hold repeats from one validator
+        # reprocessing an item). One card per item, keeping the most recent row, so the
+        # drawer matches the deduped penalty_items count on /batches. flagged_by_validators
+        # already conveys "N validators agreed".
+        rows = await prisma.query_raw(
+            """
+            SELECT resource_type, resource_id, cause, failed_fields,
+                   miner_values, validator_values, post_preview, validator_hotkey
+            FROM (
+                SELECT DISTINCT ON (resource_type, resource_id)
+                       resource_type, resource_id, cause, failed_fields,
+                       miner_values, validator_values, post_preview, validator_hotkey, created_at
+                FROM penalty_detail
+                WHERE miner_hotkey = $1 AND epoch = $2
+                ORDER BY resource_type, resource_id, created_at DESC
+            ) d
+            ORDER BY created_at DESC
+            LIMIT 20
+            """,
+            hotkey,
+            epoch,
+        )
+        # Earned (valid) items for this batch (section 18). DISTINCT ON (type,id) dedups the
+        # same item scored by multiple validators and keeps the highest-points row — matches
+        # how earned_items is counted on /batches. Read-only from score_verdict.
+        EARNED_LIMIT = 10
+        earned_rows = await prisma.query_raw(
+            f"""
+            SELECT DISTINCT ON (resource_type, resource_id)
+                   resource_type, resource_id, points_awarded, categorical_key, validator_hotkey
+            FROM score_verdict
+            WHERE miner_hotkey = $1 AND epoch = $2 AND validator_verdict = 'valid'
+                  AND created_at <= NOW() - INTERVAL '{PREVIEW_DELAY}'
+            ORDER BY resource_type, resource_id, points_awarded DESC
+            LIMIT $3
+            """,
+            hotkey,
+            epoch,
+            EARNED_LIMIT,
+        )
+        # score_verdict uses resource_type "news" for articles; penalty_detail uses "article".
+        # Normalize the earned rows to the penalty_detail/frontend vocabulary so the whole
+        # response is self-consistent (tweet | telegram | article) and the preview resolver matches.
+        _RTYPE_NORM = {"news": "article"}
+        earned_norm = [{**r, "resource_type": _RTYPE_NORM.get(r["resource_type"], r["resource_type"])}
+                       for r in earned_rows]
+
+        # Resolve a content preview per item from the type-specific content table, for BOTH
+        # penalized and earned items in one pass. Small N per batch, so a per-type fetch
+        # keyed by id is cheap and clear.
+        by_type: dict = {}
+        for r in rows:
+            by_type.setdefault(r["resource_type"], set()).add(str(r["resource_id"]))
+        for r in earned_norm:
+            by_type.setdefault(r["resource_type"], set()).add(str(r["resource_id"]))
+
+        # Best-effort content previews. A failure here (e.g. driver array binding) must
+        # not 500 the endpoint — items still return with their stored post_preview.
+        previews: dict = {}  # (resource_type, resource_id) -> preview text
+        try:
+            if by_type.get("tweet"):
+                ids = list(by_type["tweet"])
+                trows = await prisma.query_raw(
+                    "SELECT id::text AS id, text FROM tweets WHERE id::text = ANY($1)", ids,
+                )
+                for t in trows:
+                    previews[("tweet", t["id"])] = t.get("text")
+            if by_type.get("telegram"):
+                ids = list(by_type["telegram"])
+                mrows = await prisma.query_raw(
+                    "SELECT id, content FROM telegram_messages WHERE id = ANY($1)", ids,
+                )
+                for m in mrows:
+                    previews[("telegram", str(m["id"]))] = m.get("content")
+            if by_type.get("article"):
+                ids = list(by_type["article"])
+                arows = await prisma.query_raw(
+                    "SELECT id::text AS id, title FROM news_articles WHERE id::text = ANY($1)", ids,
+                )
+                for a in arows:
+                    previews[("article", a["id"])] = a.get("title")
+        except Exception as e:
+            logger.warning(f"batch_items preview resolution failed (non-fatal): {e}")
+
+        items = []
+        for r in rows:
+            key = (r["resource_type"], str(r["resource_id"]))
+            items.append(MinerBatchItem(
+                resource_type=r["resource_type"],
+                resource_id=str(r["resource_id"]),
+                content_preview=previews.get(key) or r.get("post_preview"),
+                cause=r["cause"],
+                failed_fields=_as_json(r.get("failed_fields")),
+                miner_values=_as_json(r.get("miner_values")),
+                validator_values=_as_json(r.get("validator_values")),
+                post_preview=r.get("post_preview"),
+                validator_hotkey=r.get("validator_hotkey"),
+            ))
+
+        earned = []
+        for r in earned_norm:
+            key = (r["resource_type"], str(r["resource_id"]))
+            earned.append(EarnedItem(
+                resource_type=r["resource_type"],
+                resource_id=str(r["resource_id"]),
+                content_preview=previews.get(key),
+                points_awarded=float(r.get("points_awarded") or 0.0),
+                categorical_key=r.get("categorical_key"),
+                validator_hotkey=r.get("validator_hotkey"),
+            ))
+
+        start, stop = _block_window(int(epoch))
+        return MinerBatchItemsResponse(
+            hotkey=hotkey, epoch=int(epoch),
+            block_window_start=start, block_window_stop=stop,
+            items=items, earned=earned,
+            earned_truncated=(len(earned_rows) >= EARNED_LIMIT),
+        )
+    except Exception as e:
+        logger.error(f"Error in dashboard_miner_batch_items: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
