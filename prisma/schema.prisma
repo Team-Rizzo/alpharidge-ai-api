@@ -801,3 +801,25 @@ model BroadcastReport {
   @@index([accusedHotkey, epoch], name: "idx_broadcast_report_accused")
   @@map("broadcast_report")
 }
+
+/// Per-item penalty attribution for the miner dashboard (scoring transparency).
+/// Standalone / decoupled from consensus + Merkle. Added on `main` after the
+/// article-intelligence-v2 branch was cut; carried forward so the v2 migration
+/// does NOT drop the live penalty_detail table (9.8k rows feed the dashboard).
+model PenaltyDetail {
+  id              Int      @id @default(autoincrement())
+  minerHotkey     String   @map("miner_hotkey")
+  validatorHotkey String   @map("validator_hotkey")
+  epoch           Int
+  resourceType    String   @map("resource_type")
+  resourceId      String   @map("resource_id")
+  cause           String // classification_mismatch | timeout | missing_classification | needs_update
+  failedFields    Json?    @map("failed_fields")
+  minerValues     Json?    @map("miner_values")
+  validatorVals   Json?    @map("validator_values")
+  postPreview     String?  @map("post_preview")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([minerHotkey, epoch], name: "idx_penalty_detail_miner_epoch")
+  @@map("penalty_detail")
+}
