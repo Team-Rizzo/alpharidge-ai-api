@@ -441,7 +441,7 @@ SUBNET_CONFIG = {
     "MIN_PERCENT_PER_POINT": float(os.getenv("SUBNET_MIN_PERCENT_PER_POINT", "0.003")),
 }
 
-MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "2.0.0")
+MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
 MAX_POINTS_PER_ITEM = float(os.getenv("MAX_POINTS_PER_ITEM", "1"))
 # Prod-safety: these two levers live in the shared */unscored endpoints that EVERY
 # validator hits, so their defaults must be no-ops — enabling them is a deliberate
