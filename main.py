@@ -441,6 +441,9 @@ SUBNET_CONFIG = {
     "MINER_BATCH_SIZE": int(os.getenv("SUBNET_MINER_BATCH_SIZE", "20")),
     "VALIDATION_FETCH_LIMIT": int(os.getenv("SUBNET_VALIDATION_FETCH_LIMIT", "100")),
     "MIN_PERCENT_PER_POINT": float(os.getenv("SUBNET_MIN_PERCENT_PER_POINT", "0.003")),
+    # Master switch for tweet scoring across the subnet. Default OFF (article-first): validators
+    # skip tweet fetch + tweet timeout penalties so article-only miners aren't zeroed for tweets.
+    "ENABLE_TWEET_SCORING": os.getenv("SUBNET_ENABLE_TWEET_SCORING", "false").lower() == "true",
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
