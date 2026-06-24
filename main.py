@@ -1497,107 +1497,113 @@ async def get_unscored_articles(
     try:
         lease_ttl_seconds = int(os.getenv("SCORING_LEASE_TTL_SECONDS", "900"))
 
-        async with prisma.tx() as tx:
-            # 1) Reclaim expired leases: in_progress older than TTL → pending (unassigned).
-            await tx.execute_raw(
-                """
-                UPDATE news_article_scoring
-                SET status = 'pending',
-                    start_time = NULL,
-                    validator_hotkey = NULL
-                WHERE status = 'in_progress'
-                  AND start_time IS NOT NULL
-                  AND start_time < (NOW() AT TIME ZONE 'utc') - (MAKE_INTERVAL(secs => $1));
-                """,
-                lease_ttl_seconds,
+        # Run the claim statements in autocommit (no interactive prisma.tx()).
+        # Each statement below is atomic on its own and uses FOR UPDATE SKIP LOCKED, so two
+        # validators never claim the same article; cross-statement atomicity isn't required
+        # (the lease-reclaim self-heals any partially-claimed rows after the TTL). This avoids
+        # a prisma-client-py bug where interactive-transaction commit/rollback intermittently
+        # raises "422 malformed request" under the high traffic this endpoint sees.
+
+        # 1) Reclaim expired leases: in_progress older than TTL → pending (unassigned).
+        await prisma.execute_raw(
+            """
+            UPDATE news_article_scoring
+            SET status = 'pending',
+                start_time = NULL,
+                validator_hotkey = NULL
+            WHERE status = 'in_progress'
+              AND start_time IS NOT NULL
+              AND start_time < (NOW() AT TIME ZONE 'utc') - (MAKE_INTERVAL(secs => $1));
+            """,
+            lease_ttl_seconds,
+        )
+
+        # Outstanding-lease cap: count this validator's in-progress leases and
+        # reduce the grant so it never exceeds MAX_OUTSTANDING_LEASES.
+        outstanding_rows = await prisma.query_raw(
+            "SELECT COUNT(*)::int AS c FROM news_article_scoring "
+            "WHERE validator_hotkey = $1 AND status = 'in_progress';",
+            validator_hotkey,
+        )
+        outstanding = int((outstanding_rows or [{"c": 0}])[0]["c"])
+        limit = v.grant_count(limit=limit, outstanding=outstanding,
+                              max_outstanding=MAX_OUTSTANDING_LEASES)
+        if limit <= 0:
+            return NewsArticlesForScoringResponse(articles=[], count=0)
+
+        # 2) Pick from two sources:
+        #   A) Existing scoring records with status='pending'
+        #   B) Articles with no scoring record and no analysis record
+
+        # A: Atomically claim up to `limit` pending scorings using row locks.
+        claimed_pending = await prisma.query_raw(
+            """
+            WITH picked AS (
+                SELECT s.id, s.article_id
+                FROM news_article_scoring s
+                JOIN news_articles a ON a.id = s.article_id
+                WHERE s.status = 'pending'
+                  AND a.title IS NOT NULL
+                  AND BTRIM(a.title) <> ''
+                  AND a.content IS NOT NULL
+                  AND LENGTH(BTRIM(a.content)) >= $3
+                  AND a.source_type IN ('rss', 'ccnews')
+                ORDER BY a.published DESC NULLS LAST, a.id DESC
+                FOR UPDATE SKIP LOCKED
+                LIMIT $1
             )
+            UPDATE news_article_scoring s
+            SET status = 'in_progress',
+                start_time = (NOW() AT TIME ZONE 'utc'),
+                validator_hotkey = $2
+            FROM picked
+            WHERE s.id = picked.id
+            RETURNING picked.article_id;
+            """,
+            limit,
+            validator_hotkey,
+            MIN_ARTICLE_CONTENT_CHARS,
+        )
+        article_ids_pending = [row["article_id"] for row in (claimed_pending or [])]
 
-            # Outstanding-lease cap: count this validator's in-progress leases and
-            # reduce the grant so it never exceeds MAX_OUTSTANDING_LEASES.
-            outstanding_rows = await tx.query_raw(
-                "SELECT COUNT(*)::int AS c FROM news_article_scoring "
-                "WHERE validator_hotkey = $1 AND status = 'in_progress';",
-                validator_hotkey,
-            )
-            outstanding = int((outstanding_rows or [{"c": 0}])[0]["c"])
-            limit = v.grant_count(limit=limit, outstanding=outstanding,
-                                  max_outstanding=MAX_OUTSTANDING_LEASES)
-            if limit <= 0:
-                return NewsArticlesForScoringResponse(articles=[], count=0)
-
-            # 2) Pick from two sources:
-            #   A) Existing scoring records with status='pending'
-            #   B) Articles with no scoring record and no analysis record
-
-            # A: Atomically claim up to `limit` pending scorings using row locks.
-            claimed_pending = await tx.query_raw(
+        # If need more, get up to `slots_left` articles that have no scoring and no analysis
+        slots_left = max(0, limit - len(article_ids_pending))
+        article_ids_no_scoring = []
+        if slots_left > 0:
+            inserted_rows = await prisma.query_raw(
                 """
-                WITH picked AS (
-                    SELECT s.id, s.article_id
-                    FROM news_article_scoring s
-                    JOIN news_articles a ON a.id = s.article_id
-                    WHERE s.status = 'pending'
+                WITH unscored_articles AS (
+                    SELECT a.id AS article_id
+                    FROM news_articles a
+                    LEFT JOIN news_article_scoring s ON s.article_id = a.id
+                    LEFT JOIN news_article_analysis na ON na.article_id = a.id
+                    WHERE s.id IS NULL AND na.id IS NULL
                       AND a.title IS NOT NULL
                       AND BTRIM(a.title) <> ''
                       AND a.content IS NOT NULL
                       AND LENGTH(BTRIM(a.content)) >= $3
                       AND a.source_type IN ('rss', 'ccnews')
                     ORDER BY a.published DESC NULLS LAST, a.id DESC
-                    FOR UPDATE SKIP LOCKED
                     LIMIT $1
+                    FOR UPDATE OF a SKIP LOCKED
+                ), created_scoring AS (
+                    INSERT INTO news_article_scoring (article_id, status, start_time, validator_hotkey, created_at)
+                    SELECT article_id, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
+                    FROM unscored_articles
+                    RETURNING article_id
                 )
-                UPDATE news_article_scoring s
-                SET status = 'in_progress',
-                    start_time = (NOW() AT TIME ZONE 'utc'),
-                    validator_hotkey = $2
-                FROM picked
-                WHERE s.id = picked.id
-                RETURNING picked.article_id;
+                SELECT article_id FROM created_scoring;
                 """,
-                limit,
+                slots_left,
                 validator_hotkey,
                 MIN_ARTICLE_CONTENT_CHARS,
             )
-            article_ids_pending = [row["article_id"] for row in (claimed_pending or [])]
+            article_ids_no_scoring = [row["article_id"] for row in (inserted_rows or [])]
 
-            # If need more, get up to `slots_left` articles that have no scoring and no analysis
-            slots_left = max(0, limit - len(article_ids_pending))
-            article_ids_no_scoring = []
-            if slots_left > 0:
-                inserted_rows = await tx.query_raw(
-                    """
-                    WITH unscored_articles AS (
-                        SELECT a.id AS article_id
-                        FROM news_articles a
-                        LEFT JOIN news_article_scoring s ON s.article_id = a.id
-                        LEFT JOIN news_article_analysis na ON na.article_id = a.id
-                        WHERE s.id IS NULL AND na.id IS NULL
-                          AND a.title IS NOT NULL
-                          AND BTRIM(a.title) <> ''
-                          AND a.content IS NOT NULL
-                          AND LENGTH(BTRIM(a.content)) >= $3
-                          AND a.source_type IN ('rss', 'ccnews')
-                        ORDER BY a.published DESC NULLS LAST, a.id DESC
-                        LIMIT $1
-                        FOR UPDATE OF a SKIP LOCKED
-                    ), created_scoring AS (
-                        INSERT INTO news_article_scoring (article_id, status, start_time, validator_hotkey, created_at)
-                        SELECT article_id, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
-                        FROM unscored_articles
-                        RETURNING article_id
-                    )
-                    SELECT article_id FROM created_scoring;
-                    """,
-                    slots_left,
-                    validator_hotkey,
-                    MIN_ARTICLE_CONTENT_CHARS,
-                )
-                article_ids_no_scoring = [row["article_id"] for row in (inserted_rows or [])]
-
-            # Combine all claimed article ids
-            article_ids = article_ids_pending + article_ids_no_scoring
-            if not article_ids:
-                return NewsArticlesForScoringResponse(articles=[], count=0)
+        # Combine all claimed article ids
+        article_ids = article_ids_pending + article_ids_no_scoring
+        if not article_ids:
+            return NewsArticlesForScoringResponse(articles=[], count=0)
 
         # Fetch the claimed articles for response.
         articles = await prisma.newsarticle.find_many(
