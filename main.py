@@ -12,7 +12,9 @@ Only validators with valid signatures are allowed to access the API.
 
 import os
 import math
+import json
 import logging
+from pathlib import Path
 from datetime import datetime, timezone
 
 
@@ -107,6 +109,9 @@ from hotkey_whitelist import (
 )
 import verification as v
 from utils import attestation_crypto as ac
+# Reuse the dashboard's localhost-only guard (allowlist incl. DASHBOARD_ALLOWED_IPS env).
+# Safe to import at module top: dashboard_routes only imports main lazily inside functions.
+from dashboard_routes import _require_local
 
 # Configure logging
 logging.basicConfig(
@@ -485,6 +490,37 @@ PURGE_BROADCAST_HOTKEYS: list[str] = [
 RESET_SCORES_ID: str = os.getenv("RESET_SCORES_ID", "")
 
 
+# Per-validator record of the latest version reported on the hourly /config/subnet
+# poll (version, first/last seen, poll count). Persisted to disk so it survives API
+# restarts: loaded on startup, rewritten on each poll. Exposed at /validators/versions.
+_VALIDATOR_VERSIONS_PATH = Path(os.getenv(
+    "VALIDATOR_VERSIONS_PATH",
+    str(Path(__file__).resolve().parent / ".validator_versions.json"),
+))
+
+
+def _load_validator_versions() -> dict:
+    try:
+        if _VALIDATOR_VERSIONS_PATH.exists():
+            return json.loads(_VALIDATOR_VERSIONS_PATH.read_text())
+    except Exception as e:
+        logger.warning(f"Failed to load validator versions from {_VALIDATOR_VERSIONS_PATH}: {e}")
+    return {}
+
+
+def _save_validator_versions() -> None:
+    # Atomic write (temp + rename) so a crash mid-write can't corrupt the file.
+    try:
+        tmp = _VALIDATOR_VERSIONS_PATH.with_name(_VALIDATOR_VERSIONS_PATH.name + ".tmp")
+        tmp.write_text(json.dumps(_validator_versions, indent=2))
+        tmp.replace(_VALIDATOR_VERSIONS_PATH)
+    except Exception as e:
+        logger.warning(f"Failed to save validator versions to {_VALIDATOR_VERSIONS_PATH}: {e}")
+
+
+_validator_versions: dict = _load_validator_versions()
+
+
 @app.get("/config/subnet")
 async def get_subnet_config(
     request: Request,
@@ -499,6 +535,19 @@ async def get_subnet_config(
     client_version = request.headers.get("X-Validator-Version", "unknown")
     logger.info(f"Config request from {validator_hotkey[:12]}.. version={client_version}")
 
+    # Record the latest reported version per validator (exposed at /validators/versions).
+    _now = datetime.now(timezone.utc).isoformat()
+    _rec = _validator_versions.get(validator_hotkey)
+    if _rec is None:
+        _validator_versions[validator_hotkey] = {
+            "version": client_version, "first_seen": _now, "last_seen": _now, "poll_count": 1,
+        }
+    else:
+        _rec["version"] = client_version
+        _rec["last_seen"] = _now
+        _rec["poll_count"] = _rec.get("poll_count", 0) + 1
+    _save_validator_versions()
+
     return {
         "config": SUBNET_CONFIG,
         "min_validator_version": MIN_VALIDATOR_VERSION,
@@ -507,6 +556,32 @@ async def get_subnet_config(
         "purge_broadcast_hotkeys": PURGE_BROADCAST_HOTKEYS,
         "reset_scores_id": RESET_SCORES_ID,
         "version": 2,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/validators/versions", dependencies=[Depends(_require_local)])
+async def get_validator_versions():
+    """
+    Report the latest validator version seen on /config/subnet polls.
+
+    Sourced from the validators' hourly config polls (X-Validator-Version header)
+    and held in memory — resets on API restart and repopulates within ~1h as
+    validators poll. Useful for confirming a release has propagated to every
+    validator. Sorted most-recently-seen first.
+    """
+    validators = [
+        {"hotkey": hk, **rec}
+        for hk, rec in sorted(
+            _validator_versions.items(),
+            key=lambda kv: kv[1].get("last_seen", ""),
+            reverse=True,
+        )
+    ]
+    return {
+        "validators": validators,
+        "count": len(validators),
+        "min_validator_version": MIN_VALIDATOR_VERSION,
         "timestamp": datetime.utcnow().isoformat(),
     }
 
