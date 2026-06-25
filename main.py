@@ -1558,6 +1558,20 @@ async def get_unscored_articles(
                   AND a.content IS NOT NULL
                   AND LENGTH(BTRIM(a.content)) >= $3
                   AND a.source_type IN ('rss', 'ccnews')
+                  -- Title dedup (path A): never lease a pending article whose title is
+                  -- already in_progress or completed. Same-title articles produce identical
+                  -- title_embeddings and trip the validator's cloned-embeddings anti-cheat
+                  -- gate (cosine=1.0), zeroing the whole batch. Path B's NOT EXISTS only
+                  -- blocked NEW dup scoring records; this stops PENDING dups (incl. rows
+                  -- the lease-reclaim cycle returns to 'pending') from being served while a
+                  -- sibling is already being / has been scored.
+                  AND NOT EXISTS (
+                      SELECT 1 FROM news_article_scoring s2
+                      JOIN news_articles a2 ON a2.id = s2.article_id
+                      WHERE a2.title = a.title
+                        AND s2.article_id <> s.article_id
+                        AND s2.status IN ('in_progress', 'completed')
+                  )
                 ORDER BY a.published DESC NULLS LAST, a.id DESC
                 FOR UPDATE SKIP LOCKED
                 LIMIT $1
