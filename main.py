@@ -1593,6 +1593,15 @@ async def get_unscored_articles(
                       AND a.content IS NOT NULL
                       AND LENGTH(BTRIM(a.content)) >= $3
                       AND a.source_type IN ('rss', 'ccnews')
+                      -- Title dedup: don't enter a second article with a title that is
+                      -- already in the scoring pipeline. Duplicate titles produce
+                      -- identical title_embeddings and trip the validator's
+                      -- cloned-embeddings anti-cheat gate (cosine=1.0), zeroing batches.
+                      AND NOT EXISTS (
+                          SELECT 1 FROM news_article_scoring s2
+                          JOIN news_articles a2 ON a2.id = s2.article_id
+                          WHERE a2.title = a.title
+                      )
                     ORDER BY a.published DESC NULLS LAST, a.id DESC
                     LIMIT $1
                     FOR UPDATE OF a SKIP LOCKED
@@ -1625,10 +1634,22 @@ async def get_unscored_articles(
         ordered = [articles_by_id.get(aid) for aid in article_ids if aid in articles_by_id]
 
         articles_for_scoring = []
+        seen_titles = set()
         for article in ordered:
             # Defensive safety check: never send articles with NULL/empty/whitespace-only title.
             if article is None or article.title is None or not str(article.title).strip():
                 continue
+
+            # Title dedup (final guard): never put two same-title articles in one response.
+            # Identical titles -> identical title_embeddings -> the validator's
+            # cloned-embeddings gate zeros the batch. The NOT EXISTS in the lease query
+            # stops new dup scoring records; this catches pre-existing pending dups and
+            # same-fetch dups. Skipped dups keep their lease and revert via TTL, then get
+            # dispatched alone in a later (non-duplicate) batch.
+            _title_key = str(article.title).strip()
+            if _title_key in seen_titles:
+                continue
+            seen_titles.add(_title_key)
 
             # Hard guard: never send a title/summary-only article. The miner must
             # never run full analysis on a record that lacks a real body.
