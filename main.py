@@ -134,6 +134,10 @@ price_prisma: Optional[Prisma] = None  # Will be set if PRICE_DATABASE_URL is co
 
 # Feature gate for news article scoring
 SERVE_NEWS_ARTICLES = os.getenv("SERVE_NEWS_ARTICLES", "false").lower() == "true"
+# Feature gate for telegram scoring. OFF -> /telegram/messages/unscored returns
+# empty so validators dispatch no telegram batches (article-only mode). Avoids
+# telegram failures generating penalties that zero miner rewards.
+SERVE_TELEGRAM = os.getenv("SERVE_TELEGRAM", "true").lower() == "true"
 # Include each article's raw HTML in the /articles/unscored response so miners
 # and validators can run trafilatura on the real DOM. OFF by default: raw HTML
 # is large and rides in the miner synapse. Both sides analyze the same article
@@ -444,6 +448,9 @@ SUBNET_CONFIG = {
     # Master switch for tweet scoring across the subnet. Default OFF (article-first): validators
     # skip tweet fetch + tweet timeout penalties so article-only miners aren't zeroed for tweets.
     "ENABLE_TWEET_SCORING": os.getenv("SUBNET_ENABLE_TWEET_SCORING", "false").lower() == "true",
+    # Rolling buffer cap for each validator's local article store (prune keeps this many
+    # most-recent articles). Tunable subnet-wide; honored by validators >= 3.0.3.
+    "ARTICLE_STORE_MAX_ARTICLES": int(os.getenv("SUBNET_ARTICLE_STORE_MAX_ARTICLES", "2000")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
@@ -1042,6 +1049,9 @@ async def get_unscored_telegram_messages(
     limit: int = 3,
     validator_hotkey: str = Depends(get_validator_hotkey),
 ):
+    if not SERVE_TELEGRAM:
+        return TelegramMessagesForScoringResponse(messages=[], count=0)
+
     if TWEET_ALLOWLIST and validator_hotkey not in TWEET_ALLOWLIST:
         return TelegramMessagesForScoringResponse(messages=[], count=0)
 
