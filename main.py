@@ -456,6 +456,19 @@ SUBNET_CONFIG = {
     # Rolling buffer cap for each validator's local article store (prune keeps this many
     # most-recent articles). Tunable subnet-wide; honored by validators >= 3.0.3.
     "ARTICLE_STORE_MAX_ARTICLES": int(os.getenv("SUBNET_ARTICLE_STORE_MAX_ARTICLES", "2000")),
+    # Adaptive dispatch (RFC 2026-06-28). Master switch defaults OFF so validators behave
+    # exactly as today until deliberately enabled; the rest are inert while it is off.
+    # Honored by validators that ship the adaptive-dispatch build; older ones ignore them.
+    "ADAPTIVE_DISPATCH_ENABLED": os.getenv("SUBNET_ADAPTIVE_DISPATCH_ENABLED", "false").lower() == "true",
+    "DISPATCH_WINDOW_MIN": int(os.getenv("SUBNET_DISPATCH_WINDOW_MIN", "1")),
+    "DISPATCH_WINDOW_CAP_PCT": float(os.getenv("SUBNET_DISPATCH_WINDOW_CAP_PCT", "0.15")),
+    "DISPATCH_WINDOW_GROW": float(os.getenv("SUBNET_DISPATCH_WINDOW_GROW", "1.0")),
+    "DISPATCH_WINDOW_SHRINK": float(os.getenv("SUBNET_DISPATCH_WINDOW_SHRINK", "0.5")),
+    "DISPATCH_LATE_FRACTION": float(os.getenv("SUBNET_DISPATCH_LATE_FRACTION", "0.6")),
+    "DISPATCH_ACK_TIMEOUT_S": float(os.getenv("SUBNET_DISPATCH_ACK_TIMEOUT_S", "3.0")),
+    "DISPATCH_CHRONIC_TIMEOUT_N": int(os.getenv("SUBNET_DISPATCH_CHRONIC_TIMEOUT_N", "5")),
+    "LIVENESS_TTL_S": int(os.getenv("SUBNET_LIVENESS_TTL_S", "120")),
+    "LIVENESS_SWEEP_INTERVAL_S": int(os.getenv("SUBNET_LIVENESS_SWEEP_INTERVAL_S", "60")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
