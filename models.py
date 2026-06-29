@@ -408,6 +408,25 @@ class PenaltyDetailBulkCreate(BaseModel):
     items: List[PenaltyDetailItem]
 
 
+class DispatchStatusItem(BaseModel):
+    """Per-miner adaptive-dispatch status as seen by one validator. Display-only,
+    decoupled from consensus — explanatory data for the miner dashboard."""
+    hotkey: str
+    uid: int
+    alive: bool
+    window: float
+    inflight: int
+    consec_to: int
+    covered_epoch: int
+    on_cooldown: bool
+    cooldown_remaining_s: int
+
+
+class DispatchStatusBulkCreate(BaseModel):
+    """Snapshot of per-miner adaptive-dispatch status flushed best-effort by a validator."""
+    miners: List[DispatchStatusItem]
+
+
 # ============================================================================
 # TAO Price Models
 # ============================================================================

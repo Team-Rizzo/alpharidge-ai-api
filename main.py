@@ -95,7 +95,10 @@ from models import (
     AttestationResponse, VerdictsResponse, VerdictLeaf, BroadcastReportCreate,
     # Penalty detail (display-only dashboard attribution)
     PenaltyDetailBulkCreate,
+    # Adaptive-dispatch status (display-only dashboard attribution)
+    DispatchStatusBulkCreate,
 )
+import dispatch_status_store
 from utils.auth import (
     AuthRequest,
     auth_config,
@@ -456,6 +459,25 @@ SUBNET_CONFIG = {
     # Rolling buffer cap for each validator's local article store (prune keeps this many
     # most-recent articles). Tunable subnet-wide; honored by validators >= 3.0.3.
     "ARTICLE_STORE_MAX_ARTICLES": int(os.getenv("SUBNET_ARTICLE_STORE_MAX_ARTICLES", "2000")),
+    # Adaptive dispatch (RFC 2026-06-28). Master switch defaults OFF so validators behave
+    # exactly as today until deliberately enabled; the rest are inert while it is off.
+    # Honored by validators that ship the adaptive-dispatch build; older ones ignore them.
+    "ADAPTIVE_DISPATCH_ENABLED": os.getenv("SUBNET_ADAPTIVE_DISPATCH_ENABLED", "false").lower() == "true",
+    "DISPATCH_WINDOW_MIN": int(os.getenv("SUBNET_DISPATCH_WINDOW_MIN", "1")),
+    "DISPATCH_WINDOW_CAP_PCT": float(os.getenv("SUBNET_DISPATCH_WINDOW_CAP_PCT", "0.15")),
+    "DISPATCH_WINDOW_GROW": float(os.getenv("SUBNET_DISPATCH_WINDOW_GROW", "1.0")),
+    "DISPATCH_WINDOW_SHRINK": float(os.getenv("SUBNET_DISPATCH_WINDOW_SHRINK", "0.5")),
+    "DISPATCH_LATE_FRACTION": float(os.getenv("SUBNET_DISPATCH_LATE_FRACTION", "0.6")),
+    "DISPATCH_ACK_TIMEOUT_S": float(os.getenv("SUBNET_DISPATCH_ACK_TIMEOUT_S", "12.0")),
+    "DISPATCH_CHRONIC_TIMEOUT_N": int(os.getenv("SUBNET_DISPATCH_CHRONIC_TIMEOUT_N", "5")),
+    "LIVENESS_TTL_S": int(os.getenv("SUBNET_LIVENESS_TTL_S", "120")),
+    "LIVENESS_SWEEP_INTERVAL_S": int(os.getenv("SUBNET_LIVENESS_SWEEP_INTERVAL_S", "60")),
+    # Penalty-split sub-flag — decouples the consensus-affecting timeout→broadcast
+    # change from the dispatch flag (enable/roll back independently). Default true.
+    "ADAPTIVE_PENALTY_SPLIT_ENABLED": os.getenv("SUBNET_ADAPTIVE_PENALTY_SPLIT_ENABLED", "true").lower() == "true",
+    # Validation quality floor — served centrally so every validator uses the same
+    # threshold (divergent thresholds would score the same article differently). Default 0.70.
+    "TIER3_THRESHOLD": float(os.getenv("SUBNET_TIER3_THRESHOLD", "0.70")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
@@ -2431,6 +2453,33 @@ async def submit_penalty_detail(
 
     logger.info(f"Validator {validator_hotkey} submitted {created}/{len(submission.items)} penalty-detail rows")
     return SubmissionResponse(success=True, message="penalty detail recorded", count=created)
+
+
+@app.post(
+    "/diagnostics/dispatch-status",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_dispatch_status(
+    submission: DispatchStatusBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """Store the latest per-miner adaptive-dispatch status from a validator (RFC 2026-06-28).
+
+    DECOUPLED from consensus by design: display-only status for the miner dashboard
+    (window, in-flight, liveness, cooldown, etc.), never an input to scoring,
+    attestation, or weights. Latest-snapshot-per-validator only (no history), kept in
+    a lightweight disk-backed store rather than Prisma. The validator hotkey is taken
+    from auth, not the payload, so attribution can't be spoofed.
+    """
+    miners = [it.model_dump() for it in submission.miners]
+    dispatch_status_store.set_status(
+        validator_hotkey=validator_hotkey,
+        updated=datetime.now(timezone.utc).isoformat(),
+        miners=miners,
+    )
+    logger.info(f"Validator {validator_hotkey} submitted dispatch status for {len(miners)} miner(s)")
+    return SubmissionResponse(success=True, message="dispatch status recorded", count=len(miners))
 
 
 # ============================================================================

@@ -216,6 +216,21 @@ def _diagnose_batch(earned_items: int, penalty_items: int, breakdown: dict,
                      action="See the breakdown below.")
 
 
+@router.get("/miner-dispatch")
+async def dashboard_miner_dispatch(hotkey: Optional[str] = None):
+    """Adaptive-dispatch status for the miner dashboard (RFC 2026-06-28).
+
+    Display-only, consensus-decoupled. With ?hotkey=<ss58> returns that miner's
+    status across every reporting validator (one row per validator). Without it,
+    returns every validator's full latest snapshot. Empty until a validator running
+    adaptive dispatch has flushed at least once.
+    """
+    import dispatch_status_store
+    if hotkey:
+        return {"hotkey": hotkey, "validators": dispatch_status_store.get_for_miner(hotkey)}
+    return {"validators": dispatch_status_store.get_all()}
+
+
 @router.get("/stats", response_model=DashboardStatsResponse)
 async def dashboard_stats():
     """
