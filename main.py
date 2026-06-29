@@ -475,8 +475,8 @@ SUBNET_CONFIG = {
     # Penalty-split sub-flag — decouples the consensus-affecting timeout→broadcast
     # change from the dispatch flag (enable/roll back independently). Default true.
     "ADAPTIVE_PENALTY_SPLIT_ENABLED": os.getenv("SUBNET_ADAPTIVE_PENALTY_SPLIT_ENABLED", "true").lower() == "true",
-    # Validation quality floor — served subnet-wide so all legit validators validate
-    # IDENTICALLY (divergent thresholds break consistent co-backing). Default 0.70.
+    # Validation quality floor — served centrally so every validator uses the same
+    # threshold (divergent thresholds would score the same article differently). Default 0.70.
     "TIER3_THRESHOLD": float(os.getenv("SUBNET_TIER3_THRESHOLD", "0.70")),
 }
 
