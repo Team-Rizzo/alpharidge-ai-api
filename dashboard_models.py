@@ -354,6 +354,39 @@ class MinerBatchesResponse(BaseModel):
     batches: List[MinerBatch] = []
 
 
+class ItemEntity(BaseModel):
+    """One extracted entity from the v2 ArticleIntelligence analysis (trimmed for display)."""
+    name: str
+    entity_type: Optional[str] = None
+    role: Optional[str] = None
+    ticker: Optional[str] = None
+    mention_count: Optional[int] = None
+
+
+class ItemAnalysis(BaseModel):
+    """The v2 ArticleIntelligence analysis of record for an article — the richer extraction
+    a miner's node produces beyond the six scored classification fields. Display-only context
+    shown on the batch drill-down; NOT part of consensus scoring. Article items only.
+
+    Note: this is the analysis ON RECORD for the article (one row per article), attributed via
+    `miner_hotkey` — not guaranteed to be this exact miner's submission. The miner's own scored
+    values remain exact in the diff (miner_values/validator_values)."""
+    impact_level: Optional[str] = None          # negligible|low|medium|high|critical
+    event_type: Optional[str] = None
+    event_date: Optional[str] = None            # YYYY-MM-DD
+    primary_geo: Optional[str] = None
+    factual_confidence: Optional[str] = None
+    overall_sentiment_score: Optional[float] = None   # continuous -1..1
+    urgency: Optional[str] = None
+    source_name: Optional[str] = None
+    source_credibility: Optional[float] = None
+    is_original_reporting: Optional[bool] = None
+    entities: List[ItemEntity] = []
+    assets: List[str] = []
+    quote_count: int = 0
+    analyzed_by: Optional[str] = None           # miner_hotkey on the analysis row (provenance)
+
+
 class MinerBatchItem(BaseModel):
     """A single penalized item within a batch — the miner-vs-validator diff."""
     resource_type: str
@@ -365,6 +398,7 @@ class MinerBatchItem(BaseModel):
     validator_values: Optional[Dict[str, Any]] = None
     post_preview: Optional[str] = None
     validator_hotkey: Optional[str] = None
+    analysis: Optional[ItemAnalysis] = None     # v2 richer extraction (article items only)
 
 
 class EarnedItem(BaseModel):
@@ -376,6 +410,7 @@ class EarnedItem(BaseModel):
     points_awarded: float = 0.0
     categorical_key: Optional[str] = None   # validator's categorization; optional to render
     validator_hotkey: Optional[str] = None
+    analysis: Optional[ItemAnalysis] = None     # v2 richer extraction (article items only)
 
 
 class MinerBatchItemsResponse(BaseModel):

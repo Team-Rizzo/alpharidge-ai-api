@@ -46,6 +46,8 @@ from dashboard_models import (
     MinerBatchItem,
     MinerBatchItemsResponse,
     EarnedItem,
+    ItemAnalysis,
+    ItemEntity,
     AssetEntry,
     AssetCoverageResponse,
     ValidatorEntry,
@@ -99,6 +101,63 @@ def _as_json(val):
         except Exception:
             return None
     return val
+
+
+# Max entities surfaced per item on the drill-down. The full extraction can list dozens;
+# the report-card only needs the salient few so the panel stays readable.
+ITEM_ANALYSIS_MAX_ENTITIES = 12
+
+
+def _build_item_analysis(row: dict) -> "ItemAnalysis":
+    """Map a news_article_analysis row (+ its analysis_data JSON) to the display-only
+    ItemAnalysis. Tolerant of missing/legacy rows: every field is optional, and the rich
+    analysis_data blob (entities/assets/source/urgency) may be absent on older analyses."""
+    data = _as_json(row.get("analysis_data")) or {}
+
+    entities = []
+    for e in (data.get("entities") or [])[:ITEM_ANALYSIS_MAX_ENTITIES]:
+        if not isinstance(e, dict):
+            continue
+        name = e.get("name")
+        if not name:
+            continue
+        entities.append(ItemEntity(
+            name=str(name),
+            entity_type=e.get("entity_type"),
+            role=e.get("role"),
+            ticker=e.get("ticker"),
+            mention_count=e.get("mention_count"),
+        ))
+
+    # `assets` can be a list of strings or of {symbol/ticker/name} dicts; normalize to symbols.
+    assets = []
+    for a in (data.get("assets") or []):
+        if isinstance(a, str):
+            assets.append(a)
+        elif isinstance(a, dict):
+            sym = a.get("symbol") or a.get("ticker") or a.get("name")
+            if sym:
+                assets.append(str(sym))
+
+    source = data.get("source") if isinstance(data.get("source"), dict) else {}
+    event_date = row.get("event_date")
+
+    return ItemAnalysis(
+        impact_level=row.get("impact_level"),
+        event_type=row.get("event_type"),
+        event_date=event_date.isoformat() if hasattr(event_date, "isoformat") else (event_date or None),
+        primary_geo=row.get("primary_geo"),
+        factual_confidence=row.get("factual_confidence"),
+        overall_sentiment_score=row.get("overall_sentiment_score"),
+        urgency=data.get("urgency"),
+        source_name=source.get("source_name") or source.get("source_id"),
+        source_credibility=source.get("credibility_score"),
+        is_original_reporting=source.get("is_original_reporting"),
+        entities=entities,
+        assets=assets,
+        quote_count=len(data.get("quotes") or []),
+        analyzed_by=row.get("miner_hotkey"),
+    )
 
 
 def _diagnose_batch(earned_items: int, penalty_items: int, breakdown: dict,
@@ -1596,6 +1655,31 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
         except Exception as e:
             logger.warning(f"batch_items preview resolution failed (non-fatal): {e}")
 
+        # v2 richer analysis (display-only context) for article items — the entities/event/geo/
+        # impact-level/source extraction a miner's node produces beyond the six scored fields.
+        # One row per article in news_article_analysis; best-effort and never 500s the endpoint.
+        analyses: dict = {}  # article_id (str) -> ItemAnalysis
+        try:
+            if by_type.get("article"):
+                ids = list(by_type["article"])
+                narows = await prisma.query_raw(
+                    """
+                    SELECT article_id::text AS article_id, impact_level, event_type, event_date,
+                           primary_geo, factual_confidence, overall_sentiment_score,
+                           miner_hotkey, analysis_data
+                    FROM news_article_analysis
+                    WHERE article_id::text = ANY($1)
+                    """,
+                    ids,
+                )
+                for r in narows:
+                    analyses[r["article_id"]] = _build_item_analysis(r)
+        except Exception as e:
+            logger.warning(f"batch_items analysis resolution failed (non-fatal): {e}")
+
+        def _analysis_for(resource_type: str, resource_id: str):
+            return analyses.get(resource_id) if resource_type == "article" else None
+
         items = []
         for r in rows:
             key = (r["resource_type"], str(r["resource_id"]))
@@ -1609,6 +1693,7 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
                 validator_values=_as_json(r.get("validator_values")),
                 post_preview=r.get("post_preview"),
                 validator_hotkey=r.get("validator_hotkey"),
+                analysis=_analysis_for(r["resource_type"], str(r["resource_id"])),
             ))
 
         earned = []
@@ -1621,6 +1706,7 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
                 points_awarded=float(r.get("points_awarded") or 0.0),
                 categorical_key=r.get("categorical_key"),
                 validator_hotkey=r.get("validator_hotkey"),
+                analysis=_analysis_for(r["resource_type"], str(r["resource_id"])),
             ))
 
         start, stop = _block_window(int(epoch))
