@@ -95,7 +95,10 @@ from models import (
     AttestationResponse, VerdictsResponse, VerdictLeaf, BroadcastReportCreate,
     # Penalty detail (display-only dashboard attribution)
     PenaltyDetailBulkCreate,
+    # Adaptive-dispatch status (display-only dashboard attribution)
+    DispatchStatusBulkCreate,
 )
+import dispatch_status_store
 from utils.auth import (
     AuthRequest,
     auth_config,
@@ -2450,6 +2453,33 @@ async def submit_penalty_detail(
 
     logger.info(f"Validator {validator_hotkey} submitted {created}/{len(submission.items)} penalty-detail rows")
     return SubmissionResponse(success=True, message="penalty detail recorded", count=created)
+
+
+@app.post(
+    "/diagnostics/dispatch-status",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_dispatch_status(
+    submission: DispatchStatusBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """Store the latest per-miner adaptive-dispatch status from a validator (RFC 2026-06-28).
+
+    DECOUPLED from consensus by design: display-only status for the miner dashboard
+    (window, in-flight, liveness, cooldown, etc.), never an input to scoring,
+    attestation, or weights. Latest-snapshot-per-validator only (no history), kept in
+    a lightweight disk-backed store rather than Prisma. The validator hotkey is taken
+    from auth, not the payload, so attribution can't be spoofed.
+    """
+    miners = [it.model_dump() for it in submission.miners]
+    dispatch_status_store.set_status(
+        validator_hotkey=validator_hotkey,
+        updated=datetime.now(timezone.utc).isoformat(),
+        miners=miners,
+    )
+    logger.info(f"Validator {validator_hotkey} submitted dispatch status for {len(miners)} miner(s)")
+    return SubmissionResponse(success=True, message="dispatch status recorded", count=len(miners))
 
 
 # ============================================================================
