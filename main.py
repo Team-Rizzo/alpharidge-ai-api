@@ -469,6 +469,12 @@ SUBNET_CONFIG = {
     "DISPATCH_CHRONIC_TIMEOUT_N": int(os.getenv("SUBNET_DISPATCH_CHRONIC_TIMEOUT_N", "5")),
     "LIVENESS_TTL_S": int(os.getenv("SUBNET_LIVENESS_TTL_S", "120")),
     "LIVENESS_SWEEP_INTERVAL_S": int(os.getenv("SUBNET_LIVENESS_SWEEP_INTERVAL_S", "60")),
+    # Penalty-split sub-flag — decouples the consensus-affecting timeout→broadcast
+    # change from the dispatch flag (enable/roll back independently). Default true.
+    "ADAPTIVE_PENALTY_SPLIT_ENABLED": os.getenv("SUBNET_ADAPTIVE_PENALTY_SPLIT_ENABLED", "true").lower() == "true",
+    # Validation quality floor — served subnet-wide so all legit validators validate
+    # IDENTICALLY (divergent thresholds break consistent co-backing). Default 0.70.
+    "TIER3_THRESHOLD": float(os.getenv("SUBNET_TIER3_THRESHOLD", "0.70")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
