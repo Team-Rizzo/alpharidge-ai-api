@@ -1807,6 +1807,18 @@ async def get_unscored_articles(
         )
 
 
+def _strip_nul(o):
+    """Recursively strip NUL bytes — Postgres text/jsonb reject \\u0000 (error 22P05);
+    they only arrive from bad scraped content. Sanitize before any DB write."""
+    if isinstance(o, str):
+        return o.replace("\x00", "")
+    if isinstance(o, dict):
+        return {k: _strip_nul(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_strip_nul(v) for v in o]
+    return o
+
+
 @app.post(
     "/articles/completed",
     response_model=SubmissionResponse,
@@ -1855,11 +1867,14 @@ async def submit_completed_articles(
             }
             for k, v in optional_fields.items():
                 if v is not None:
+                    v = _strip_nul(v)
                     analysis_create[k] = v
                     analysis_update[k] = v
 
-            # V2: Store full ArticleIntelligence in analysisData JSONB
-            ad = completed.analysis_data
+            # V2: Store full ArticleIntelligence in analysisData JSONB.
+            # Strip NUL bytes once here: ad flows into the jsonb upsert AND the downstream
+            # clustering/narrative-matching writes, all of which Postgres rejects (22P05).
+            ad = _strip_nul(completed.analysis_data)
             if ad and isinstance(ad, dict):
                 analysis_create["analysisData"] = Json(ad)
                 analysis_update["analysisData"] = Json(ad)
