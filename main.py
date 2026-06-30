@@ -478,6 +478,12 @@ SUBNET_CONFIG = {
     # Validation quality floor — served centrally so every validator uses the same
     # threshold (divergent thresholds would score the same article differently). Default 0.70.
     "TIER3_THRESHOLD": float(os.getenv("SUBNET_TIER3_THRESHOLD", "0.70")),
+    # Cloned-embedding gate. Defaults reproduce the legacy absolute rule (no-op);
+    # serving CLONE_DIFFERENTIAL_ENABLED=true switches the fleet to the validator-
+    # corroborated check that lets honest syndicated clusters through.
+    "CLONE_COSINE_THRESHOLD": float(os.getenv("SUBNET_CLONE_COSINE_THRESHOLD", "0.99")),
+    "CLONE_DIFFERENTIAL_ENABLED": os.getenv("SUBNET_CLONE_DIFFERENTIAL_ENABLED", "false").lower() == "true",
+    "CLONE_DIVERGENCE_MARGIN": float(os.getenv("SUBNET_CLONE_DIVERGENCE_MARGIN", "0.05")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
