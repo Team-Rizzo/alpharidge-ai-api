@@ -6,6 +6,8 @@ Mounted on the main FastAPI app via `app.include_router(router)`.
 
 import os
 import json
+import time
+import asyncio
 import logging
 from typing import Optional
 
@@ -1213,68 +1215,122 @@ async def dashboard_sentiment(
 # Miner Leaderboard & Profile Endpoints
 # ============================================================================
 
+# The leaderboard aggregation scans every analysis row and de-TOASTs article
+# content to score articles by length (~12s over ~1M items). Running that on
+# each request made the page intermittently time out. We instead compute the
+# full set at most once per TTL and serve every sort/limit variant from that
+# snapshot (sorting/slicing in Python). Stale-while-revalidate: a stale hit is
+# returned immediately while a single background task refreshes.
+_MINERS_CACHE_TTL = 120.0
+_miners_cache = {"rows": None, "ts": 0.0}
+_miners_refresh_lock = asyncio.Lock()
+
+_MINERS_AGG_SQL = """
+    WITH miner_stats AS (
+        SELECT
+            miner_hotkey,
+            COUNT(*) AS total_items,
+            SUM(CASE WHEN source = 'tweet' THEN 1 ELSE 0 END) AS tweet_count,
+            SUM(CASE WHEN source = 'telegram' THEN 1 ELSE 0 END) AS telegram_count,
+            SUM(CASE WHEN source = 'article' THEN 1 ELSE 0 END) AS article_count,
+            SUM(CASE WHEN sentiment = 'very_bullish' THEN 1 ELSE 0 END) AS very_bullish,
+            SUM(CASE WHEN sentiment = 'bullish' THEN 1 ELSE 0 END) AS bullish,
+            SUM(CASE WHEN sentiment = 'neutral' THEN 1 ELSE 0 END) AS neutral,
+            SUM(CASE WHEN sentiment = 'bearish' THEN 1 ELSE 0 END) AS bearish,
+            SUM(CASE WHEN sentiment = 'very_bearish' THEN 1 ELSE 0 END) AS very_bearish,
+            -- True per-item points from the scoring rule (tweet/telegram = 1;
+            -- article = 1/2/3 by content length, per neurons/validator.py).
+            SUM(points) AS total_points,
+            COALESCE(SUM(points) FILTER (WHERE analyzed_at >= now() - interval '24 hours'), 0) AS points_24h,
+            COALESCE(SUM(points) FILTER (WHERE analyzed_at >= now() - interval '7 days') / 7.0, 0) AS avg_points_day,
+            MIN(analyzed_at) AS first_seen,
+            MAX(analyzed_at) AS last_seen
+        FROM (
+            SELECT miner_hotkey, sentiment, analyzed_at, 'tweet' AS source, 1 AS points
+            FROM tweet_analysis WHERE miner_hotkey IS NOT NULL
+            UNION ALL
+            SELECT miner_hotkey, sentiment, analyzed_at, 'telegram' AS source, 1 AS points
+            FROM telegram_message_analysis WHERE miner_hotkey IS NOT NULL
+            UNION ALL
+            SELECT naa.miner_hotkey, naa.sentiment, naa.analyzed_at, 'article' AS source,
+                   CASE WHEN length(na.content) >= 2000 THEN 3
+                        WHEN length(na.content) >= 500  THEN 2
+                        ELSE 1 END AS points
+            FROM news_article_analysis naa
+            JOIN news_articles na ON na.id = naa.article_id
+            WHERE naa.miner_hotkey IS NOT NULL
+        ) AS all_analyses
+        GROUP BY miner_hotkey
+    )
+    SELECT ms.*, ms.total_points AS total_rewards
+    FROM miner_stats ms
+"""
+
+
+async def _refresh_miners_cache(prisma) -> None:
+    """Recompute the leaderboard snapshot. At most one runs at a time; while it
+    is in flight the previous (stale) snapshot keeps serving."""
+    if _miners_refresh_lock.locked():
+        return
+    async with _miners_refresh_lock:
+        try:
+            rows = await prisma.query_raw(_MINERS_AGG_SQL)
+            _miners_cache["rows"] = rows
+            _miners_cache["ts"] = time.monotonic()
+        except Exception as e:
+            logger.error(f"miners cache refresh failed: {e}")
+
+
+async def _get_miner_rows(prisma):
+    """Return the cached leaderboard rows, refreshing as needed. Cold start
+    blocks once; a stale cache serves immediately and refreshes in the
+    background so requests never pay the full query cost after the first."""
+    age = time.monotonic() - _miners_cache["ts"]
+    if _miners_cache["rows"] is None:
+        await _refresh_miners_cache(prisma)
+    elif age > _MINERS_CACHE_TTL:
+        asyncio.create_task(_refresh_miners_cache(prisma))
+    return _miners_cache["rows"] or []
+
+
+def _recent_sort_key(last_seen) -> float:
+    """Epoch seconds for a last_seen value that query_raw may return as a
+    datetime or an ISO string."""
+    if last_seen is None:
+        return 0.0
+    if hasattr(last_seen, "timestamp"):
+        return last_seen.timestamp()
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(last_seen).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
 @router.get("/miners", response_model=MinerLeaderboardResponse)
 async def dashboard_miners(
     sort_by: Optional[str] = "total_items",
     limit: int = 50,
 ):
-    """Miner leaderboard with aggregated stats across all source types."""
-    prisma = _get_prisma()
+    """Miner leaderboard with aggregated stats across all source types.
+
+    Served from a short-lived in-process snapshot (see _get_miner_rows): the
+    aggregation is expensive, so it runs at most once per TTL and every
+    sort/limit variant is derived from the same snapshot here in Python.
+    """
     try:
-        rows = await prisma.query_raw(
-            """
-            WITH miner_stats AS (
-                SELECT
-                    miner_hotkey,
-                    COUNT(*) AS total_items,
-                    SUM(CASE WHEN source = 'tweet' THEN 1 ELSE 0 END) AS tweet_count,
-                    SUM(CASE WHEN source = 'telegram' THEN 1 ELSE 0 END) AS telegram_count,
-                    SUM(CASE WHEN source = 'article' THEN 1 ELSE 0 END) AS article_count,
-                    SUM(CASE WHEN sentiment = 'very_bullish' THEN 1 ELSE 0 END) AS very_bullish,
-                    SUM(CASE WHEN sentiment = 'bullish' THEN 1 ELSE 0 END) AS bullish,
-                    SUM(CASE WHEN sentiment = 'neutral' THEN 1 ELSE 0 END) AS neutral,
-                    SUM(CASE WHEN sentiment = 'bearish' THEN 1 ELSE 0 END) AS bearish,
-                    SUM(CASE WHEN sentiment = 'very_bearish' THEN 1 ELSE 0 END) AS very_bearish,
-                    MIN(analyzed_at) AS first_seen,
-                    MAX(analyzed_at) AS last_seen
-                FROM (
-                    SELECT miner_hotkey, sentiment, analyzed_at, 'tweet' AS source
-                    FROM tweet_analysis WHERE miner_hotkey IS NOT NULL
-                    UNION ALL
-                    SELECT miner_hotkey, sentiment, analyzed_at, 'telegram' AS source
-                    FROM telegram_message_analysis WHERE miner_hotkey IS NOT NULL
-                    UNION ALL
-                    SELECT miner_hotkey, sentiment, analyzed_at, 'article' AS source
-                    FROM news_article_analysis WHERE miner_hotkey IS NOT NULL
-                ) AS all_analyses
-                GROUP BY miner_hotkey
-            )
-            SELECT
-                ms.*,
-                COALESCE(r.total_points, 0) AS total_rewards,
-                COALESCE(r.points_24h, 0) AS points_24h,
-                COALESCE(r.avg_points_day, 0) AS avg_points_day
-            FROM miner_stats ms
-            LEFT JOIN (
-                SELECT hotkey,
-                       SUM(points) AS total_points,
-                       SUM(points) FILTER (WHERE created_at >= now() - interval '24 hours') AS points_24h,
-                       SUM(points) FILTER (WHERE created_at >= now() - interval '7 days') / 7.0 AS avg_points_day
-                FROM rewards
-                GROUP BY hotkey
-            ) r ON r.hotkey = ms.miner_hotkey
-            ORDER BY
-                CASE WHEN $1 = 'total_rewards' THEN COALESCE(r.total_points, 0) ELSE 0 END DESC,
-                CASE WHEN $1 = 'recent' THEN EXTRACT(EPOCH FROM ms.last_seen) ELSE 0 END DESC,
-                ms.total_items DESC
-            LIMIT $2
-            """,
-            sort_by,
-            limit,
-        )
+        rows = await _get_miner_rows(_get_prisma())
+
+        if sort_by == "total_rewards":
+            key = lambda r: float(r.get("total_points") or 0)
+        elif sort_by == "recent":
+            key = lambda r: _recent_sort_key(r.get("last_seen"))
+        else:
+            key = lambda r: float(r.get("total_items") or 0)
+        ordered = sorted(rows, key=key, reverse=True)[: max(0, limit)]
 
         miners = []
-        for row in rows:
+        for row in ordered:
             miners.append(MinerLeaderboardEntry(
                 hotkey=row["miner_hotkey"],
                 total_items=row["total_items"],
@@ -1806,49 +1862,103 @@ async def dashboard_assets():
 
 @router.get("/validators", response_model=ValidatorActivityResponse)
 async def dashboard_validators():
-    """Validator activity stats across all source types."""
+    """Validator activity stats across all source types.
+
+    Counts are de-duplicated to distinct items. An item re-scored across epochs,
+    or scored by multiple validators, is counted once. Per-validator counts are
+    the distinct items that validator scored; the response-level
+    ``total_distinct_scored`` is the distinct item count across validators active
+    in the last 24h — a plain sum of per-validator counts would double-count
+    items scored by more than one validator.
+
+    Distinct items are counted per source table on the indexed integer id, which
+    is far cheaper than a DISTINCT over a unioned (source, id) key.
+    """
     prisma = _get_prisma()
     try:
-        rows = await prisma.query_raw(
-            """
-            SELECT
-                validator_hotkey,
-                COUNT(*) AS total_scored,
-                SUM(CASE WHEN source = 'tweet' THEN 1 ELSE 0 END) AS tweet_count,
-                SUM(CASE WHEN source = 'telegram' THEN 1 ELSE 0 END) AS telegram_count,
-                SUM(CASE WHEN source = 'article' THEN 1 ELSE 0 END) AS article_count,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
-                MIN(created_at) AS first_seen,
-                MAX(created_at) AS last_seen
-            FROM (
-                SELECT validator_hotkey, status, created_at, 'tweet' AS source
-                FROM scoring WHERE validator_hotkey IS NOT NULL
-                UNION ALL
-                SELECT validator_hotkey, status, created_at, 'telegram' AS source
-                FROM telegram_scoring WHERE validator_hotkey IS NOT NULL
-                UNION ALL
-                SELECT validator_hotkey, status, created_at, 'article' AS source
-                FROM news_article_scoring WHERE validator_hotkey IS NOT NULL
-            ) AS all_scoring
-            GROUP BY validator_hotkey
-            ORDER BY total_scored DESC
-            """
+        per_source = (
+            ("tweet", "scoring", "tweet_id"),
+            ("telegram", "telegram_scoring", "message_id"),
+            ("article", "news_article_scoring", "article_id"),
         )
 
-        validators = []
-        for row in rows:
-            validators.append(ValidatorEntry(
-                hotkey=row["validator_hotkey"],
-                total_scored=row["total_scored"],
-                tweet_count=row["tweet_count"],
-                telegram_count=row["telegram_count"],
-                article_count=row["article_count"],
-                completed_count=row["completed_count"],
-                first_seen=row.get("first_seen"),
-                last_seen=row.get("last_seen"),
-            ))
+        # validator_hotkey -> aggregated per-source distinct stats
+        agg: dict[str, dict] = {}
+        for source, table, id_col in per_source:
+            src_rows = await prisma.query_raw(
+                f"""
+                SELECT
+                    validator_hotkey,
+                    COUNT(DISTINCT {id_col}) AS items,
+                    COUNT(DISTINCT {id_col}) FILTER (WHERE status = 'completed') AS completed,
+                    MIN(created_at) AS first_seen,
+                    MAX(created_at) AS last_seen
+                FROM {table}
+                WHERE validator_hotkey IS NOT NULL
+                GROUP BY validator_hotkey
+                """
+            )
+            for row in src_rows:
+                hk = row["validator_hotkey"]
+                v = agg.setdefault(hk, {
+                    "tweet": 0, "telegram": 0, "article": 0,
+                    "completed": 0, "first_seen": None, "last_seen": None,
+                })
+                v[source] = row["items"] or 0
+                v["completed"] += row["completed"] or 0
+                fs, ls = row.get("first_seen"), row.get("last_seen")
+                if fs and (v["first_seen"] is None or fs < v["first_seen"]):
+                    v["first_seen"] = fs
+                if ls and (v["last_seen"] is None or ls > v["last_seen"]):
+                    v["last_seen"] = ls
 
-        return ValidatorActivityResponse(validators=validators, total=len(validators))
+        validators = []
+        for hk, v in agg.items():
+            validators.append(ValidatorEntry(
+                hotkey=hk,
+                total_scored=v["tweet"] + v["telegram"] + v["article"],
+                tweet_count=v["tweet"],
+                telegram_count=v["telegram"],
+                article_count=v["article"],
+                completed_count=v["completed"],
+                first_seen=v["first_seen"],
+                last_seen=v["last_seen"],
+            ))
+        validators.sort(key=lambda e: e.total_scored, reverse=True)
+
+        # Header figure: distinct items scored across validators active in the
+        # last 24h. Computed globally (not summed from the rows above) so an item
+        # scored by multiple active validators is counted once.
+        gdist_rows = await prisma.query_raw(
+            """
+            WITH active AS (
+                SELECT validator_hotkey FROM (
+                    SELECT validator_hotkey, created_at FROM scoring WHERE validator_hotkey IS NOT NULL
+                    UNION ALL
+                    SELECT validator_hotkey, created_at FROM telegram_scoring WHERE validator_hotkey IS NOT NULL
+                    UNION ALL
+                    SELECT validator_hotkey, created_at FROM news_article_scoring WHERE validator_hotkey IS NOT NULL
+                ) u
+                GROUP BY validator_hotkey
+                HAVING MAX(created_at) >= now() - interval '24 hours'
+            )
+            SELECT
+                (SELECT COUNT(DISTINCT tweet_id) FROM scoring
+                   WHERE validator_hotkey IN (SELECT validator_hotkey FROM active)) AS tw,
+                (SELECT COUNT(DISTINCT message_id) FROM telegram_scoring
+                   WHERE validator_hotkey IN (SELECT validator_hotkey FROM active)) AS tg,
+                (SELECT COUNT(DISTINCT article_id) FROM news_article_scoring
+                   WHERE validator_hotkey IN (SELECT validator_hotkey FROM active)) AS ar
+            """
+        )
+        g = gdist_rows[0] if gdist_rows else {}
+        total_distinct_scored = (g.get("tw") or 0) + (g.get("tg") or 0) + (g.get("ar") or 0)
+
+        return ValidatorActivityResponse(
+            validators=validators,
+            total=len(validators),
+            total_distinct_scored=total_distinct_scored,
+        )
     except Exception as e:
         logger.error(f"Error in dashboard_validators: {e}")
         raise HTTPException(status_code=500, detail=str(e))
