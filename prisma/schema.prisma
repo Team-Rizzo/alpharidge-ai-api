@@ -598,6 +598,11 @@ model NewsArticleScoring {
   // whole-table anti-join over news_articles (the /articles/unscored pool
   // exhaustion). Article titles are immutable post-ingest, so this never drifts.
   title           String?
+  // Denormalized copy of news_articles.published, same immutability. Lets path A
+  // order the pending pool by published via an index (status, published) instead of
+  // sorting the whole pool before LIMIT — so path A halts at 150 regardless of how
+  // large pending grows (required once ccnews routes all inflow into pending).
+  published       DateTime?    @db.Timestamptz
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   article         NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -610,6 +615,9 @@ model NewsArticleScoring {
   // path A probes (title, status). Created CONCURRENTLY out-of-band — see the
   // migration runbook. NOTE: kept in sync with the DB index built concurrently.
   @@index([title, status], name: "idx_news_scoring_title_status")
+  // Serves path A's pending pick in published order without a sort (index scan
+  // halts at LIMIT). Built CONCURRENTLY as (status, published DESC, id DESC).
+  @@index([status, published, id], name: "idx_news_scoring_status_published")
   @@map("news_article_scoring")
 }
 

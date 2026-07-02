@@ -1654,7 +1654,7 @@ async def get_unscored_articles(
         claimed_pending = await prisma.query_raw(
             """
             WITH picked AS (
-                SELECT s.id, s.article_id, a.title AS article_title
+                SELECT s.id, s.article_id, a.title AS article_title, a.published AS article_published
                 FROM news_article_scoring s
                 JOIN news_articles a ON a.id = s.article_id
                 WHERE s.status = 'pending'
@@ -1686,11 +1686,12 @@ async def get_unscored_articles(
             SET status = 'in_progress',
                 start_time = (NOW() AT TIME ZONE 'utc'),
                 validator_hotkey = $2,
-                -- Self-heal: guarantee the denormalized title is set the moment a row
-                -- becomes in_progress, so any NULL straggler (e.g. a scoring row created
-                -- before its writer populated title) can't slip past the dedup once it
-                -- enters the in_progress/completed set the dedup probes against.
-                title = COALESCE(s.title, picked.article_title)
+                -- Self-heal: guarantee the denormalized title AND published are set the
+                -- moment a row becomes in_progress, so any NULL straggler (e.g. a scoring
+                -- row created before its writer populated them) can't slip past the title
+                -- dedup or fall out of path A's published-ordered index.
+                title = COALESCE(s.title, picked.article_title),
+                published = COALESCE(s.published, picked.article_published)
             FROM picked
             WHERE s.id = picked.id
             RETURNING picked.article_id;
@@ -1708,7 +1709,7 @@ async def get_unscored_articles(
             inserted_rows = await prisma.query_raw(
                 """
                 WITH unscored_articles AS (
-                    SELECT a.id AS article_id, a.title AS title
+                    SELECT a.id AS article_id, a.title AS title, a.published AS published
                     FROM news_articles a
                     LEFT JOIN news_article_scoring s ON s.article_id = a.id
                     LEFT JOIN news_article_analysis na ON na.article_id = a.id
@@ -1736,8 +1737,8 @@ async def get_unscored_articles(
                     -- Populate the denormalized title so the read-side dedup can probe
                     -- an index on news_article_scoring instead of joining back to
                     -- news_articles (see idx_news_scoring_title_status).
-                    INSERT INTO news_article_scoring (article_id, title, status, start_time, validator_hotkey, created_at)
-                    SELECT article_id, title, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
+                    INSERT INTO news_article_scoring (article_id, title, published, status, start_time, validator_hotkey, created_at)
+                    SELECT article_id, title, published, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
                     FROM unscored_articles
                     RETURNING article_id
                 )

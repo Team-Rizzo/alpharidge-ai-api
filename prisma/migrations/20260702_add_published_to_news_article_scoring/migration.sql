@@ -1,0 +1,11 @@
+-- Denormalize the article published timestamp onto news_article_scoring so path A
+-- can order the pending pool by published via an index (status, published DESC, id)
+-- instead of sorting the whole pool before LIMIT 150. Once ccnews routes all inflow
+-- into pending, the pool grows with ingest; without this, path A's sort-before-LIMIT
+-- re-creates exactly the path-B pool-exhaustion we're fixing.
+--
+-- Additive + nullable: safe online. Backfill + the CONCURRENTLY index run outside
+-- this migration (batched / non-transactional) — see backfill_scoring_published.sql.
+-- The read-side switch (path A ORDER BY s.published) must not deploy until published
+-- is backfilled on every row and the index is valid.
+ALTER TABLE "news_article_scoring" ADD COLUMN IF NOT EXISTS "published" TIMESTAMPTZ;
