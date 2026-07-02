@@ -1671,9 +1671,10 @@ async def get_unscored_articles(
                   -- the lease-reclaim cycle returns to 'pending') from being served while a
                   -- sibling is already being / has been scored.
                   AND NOT EXISTS (
+                      -- Probe the denormalized scoring.title (idx_news_scoring_title_status)
+                      -- instead of joining scoring->news_articles for the title.
                       SELECT 1 FROM news_article_scoring s2
-                      JOIN news_articles a2 ON a2.id = s2.article_id
-                      WHERE a2.title = a.title
+                      WHERE s2.title = a.title
                         AND s2.article_id <> s.article_id
                         AND s2.status IN ('in_progress', 'completed')
                   )
@@ -1722,9 +1723,11 @@ async def get_unscored_articles(
                       -- identical title_embeddings and trip the validator's
                       -- cloned-embeddings anti-cheat gate (cosine=1.0), zeroing batches.
                       AND NOT EXISTS (
+                          -- Probe the denormalized scoring.title (idx_news_scoring_title_status)
+                          -- instead of the whole-table anti-join over news_articles that
+                          -- exhausted the connection pool.
                           SELECT 1 FROM news_article_scoring s2
-                          JOIN news_articles a2 ON a2.id = s2.article_id
-                          WHERE a2.title = a.title
+                          WHERE s2.title = a.title
                       )
                     ORDER BY a.published DESC NULLS LAST, a.id DESC
                     LIMIT $1
