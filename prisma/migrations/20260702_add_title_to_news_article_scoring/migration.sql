@@ -1,0 +1,11 @@
+-- Denormalize the article title onto news_article_scoring so the
+-- /articles/unscored title dedup can probe an index on this table instead of a
+-- whole-table hash anti-join over ~2M news_articles rows on every poll (the
+-- Prisma connection-pool exhaustion that 500s ~1/3 of work-fetch polls).
+--
+-- Additive + nullable: safe to apply online; existing rows keep title NULL until
+-- the backfill runs. The backfill and the CONCURRENTLY index are deliberately NOT
+-- in this migration (they must run outside a transaction / batched) — see
+-- 2026-07-02-unscored-dedup-fix-runbook.md. The read-side query switch must not
+-- deploy until the backfill has populated every existing scoring row.
+ALTER TABLE "news_article_scoring" ADD COLUMN IF NOT EXISTS "title" TEXT;

@@ -593,6 +593,11 @@ model NewsArticleScoring {
   score           Float?
   epoch           Int?         @map("epoch")
   minerHotkey     String?      @map("miner_hotkey")
+  // Denormalized copy of news_articles.title, populated at insert. Lets the
+  // unscored-article title dedup probe an index on this table instead of a
+  // whole-table anti-join over news_articles (the /articles/unscored pool
+  // exhaustion). Article titles are immutable post-ingest, so this never drifts.
+  title           String?
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   article         NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -601,6 +606,10 @@ model NewsArticleScoring {
   @@index([status], name: "idx_news_scoring_status")
   @@index([validatorHotkey], name: "idx_news_scoring_validator")
   @@index([status, startTime], name: "idx_news_scoring_status_start_time")
+  // Supports the title dedup in get_unscored_articles: path B probes title,
+  // path A probes (title, status). Created CONCURRENTLY out-of-band — see the
+  // migration runbook. NOTE: kept in sync with the DB index built concurrently.
+  @@index([title, status], name: "idx_news_scoring_title_status")
   @@map("news_article_scoring")
 }
 

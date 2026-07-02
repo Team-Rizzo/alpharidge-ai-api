@@ -1654,7 +1654,7 @@ async def get_unscored_articles(
         claimed_pending = await prisma.query_raw(
             """
             WITH picked AS (
-                SELECT s.id, s.article_id
+                SELECT s.id, s.article_id, a.title AS article_title
                 FROM news_article_scoring s
                 JOIN news_articles a ON a.id = s.article_id
                 WHERE s.status = 'pending'
@@ -1684,7 +1684,12 @@ async def get_unscored_articles(
             UPDATE news_article_scoring s
             SET status = 'in_progress',
                 start_time = (NOW() AT TIME ZONE 'utc'),
-                validator_hotkey = $2
+                validator_hotkey = $2,
+                -- Self-heal: guarantee the denormalized title is set the moment a row
+                -- becomes in_progress, so any NULL straggler (e.g. a scoring row created
+                -- before its writer populated title) can't slip past the dedup once it
+                -- enters the in_progress/completed set the dedup probes against.
+                title = COALESCE(s.title, picked.article_title)
             FROM picked
             WHERE s.id = picked.id
             RETURNING picked.article_id;
@@ -1702,7 +1707,7 @@ async def get_unscored_articles(
             inserted_rows = await prisma.query_raw(
                 """
                 WITH unscored_articles AS (
-                    SELECT a.id AS article_id
+                    SELECT a.id AS article_id, a.title AS title
                     FROM news_articles a
                     LEFT JOIN news_article_scoring s ON s.article_id = a.id
                     LEFT JOIN news_article_analysis na ON na.article_id = a.id
@@ -1725,8 +1730,11 @@ async def get_unscored_articles(
                     LIMIT $1
                     FOR UPDATE OF a SKIP LOCKED
                 ), created_scoring AS (
-                    INSERT INTO news_article_scoring (article_id, status, start_time, validator_hotkey, created_at)
-                    SELECT article_id, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
+                    -- Populate the denormalized title so the read-side dedup can probe
+                    -- an index on news_article_scoring instead of joining back to
+                    -- news_articles (see idx_news_scoring_title_status).
+                    INSERT INTO news_article_scoring (article_id, title, status, start_time, validator_hotkey, created_at)
+                    SELECT article_id, title, 'in_progress', (NOW() AT TIME ZONE 'utc'), $2, (NOW() AT TIME ZONE 'utc')
                     FROM unscored_articles
                     RETURNING article_id
                 )
