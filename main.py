@@ -1650,37 +1650,23 @@ async def get_unscored_articles(
         #   A) Existing scoring records with status='pending'
         #   B) Articles with no scoring record and no analysis record
 
-        # A: Atomically claim up to `limit` pending scorings using row locks.
+        # A: Atomically claim up to `limit` pending scorings. Pending is a
+        # servable-only ready-queue: every servability filter (title non-empty,
+        # content >= MIN, source in (rss,ccnews), title-not-already-in-pipeline) is
+        # enforced at INSERT by the writers (scraper rss + ccnews_ingest + path B
+        # below), and title/published are denormalized there too. So this is a BARE
+        # ordered index walk on idx_scoring_pending_published (published DESC NULLS
+        # LAST WHERE status='pending') — a pure Index Scan that halts at LIMIT
+        # regardless of how large pending grows; no join to news_articles, no sort,
+        # no runtime dedup. The clone gate is batch-local (validator scoring.py), and
+        # the in-app response guards (seen_titles + the NULL/empty-title skip in the
+        # loop below) remain as the final same-batch clone safety net.
         claimed_pending = await prisma.query_raw(
             """
             WITH picked AS (
-                SELECT s.id, s.article_id, a.title AS article_title, a.published AS article_published
+                SELECT s.id, s.article_id
                 FROM news_article_scoring s
-                JOIN news_articles a ON a.id = s.article_id
                 WHERE s.status = 'pending'
-                  AND a.title IS NOT NULL
-                  AND BTRIM(a.title) <> ''
-                  AND a.content IS NOT NULL
-                  AND LENGTH(BTRIM(a.content)) >= $3
-                  AND a.source_type IN ('rss', 'ccnews')
-                  -- Title dedup (path A): never lease a pending article whose title is
-                  -- already in_progress or completed. Same-title articles produce identical
-                  -- title_embeddings and trip the validator's cloned-embeddings anti-cheat
-                  -- gate (cosine=1.0), zeroing the whole batch. Path B's NOT EXISTS only
-                  -- blocked NEW dup scoring records; this stops PENDING dups (incl. rows
-                  -- the lease-reclaim cycle returns to 'pending') from being served while a
-                  -- sibling is already being / has been scored.
-                  AND NOT EXISTS (
-                      -- Probe the denormalized scoring.title (idx_news_scoring_title_status)
-                      -- instead of joining scoring->news_articles for the title.
-                      SELECT 1 FROM news_article_scoring s2
-                      WHERE s2.title = a.title
-                        AND s2.article_id <> s.article_id
-                        AND s2.status IN ('in_progress', 'completed')
-                  )
-                -- Order by the denormalized s.published (idx_news_scoring_status_published)
-                -- so this is an index scan that halts at LIMIT — no sort of the pending
-                -- pool, so path A stays fast no matter how large pending grows.
                 ORDER BY s.published DESC NULLS LAST, s.id DESC
                 FOR UPDATE SKIP LOCKED
                 LIMIT $1
@@ -1688,20 +1674,13 @@ async def get_unscored_articles(
             UPDATE news_article_scoring s
             SET status = 'in_progress',
                 start_time = (NOW() AT TIME ZONE 'utc'),
-                validator_hotkey = $2,
-                -- Self-heal: guarantee the denormalized title AND published are set the
-                -- moment a row becomes in_progress, so any NULL straggler (e.g. a scoring
-                -- row created before its writer populated them) can't slip past the title
-                -- dedup or fall out of path A's published-ordered index.
-                title = COALESCE(s.title, picked.article_title),
-                published = COALESCE(s.published, picked.article_published)
+                validator_hotkey = $2
             FROM picked
             WHERE s.id = picked.id
             RETURNING picked.article_id;
             """,
             limit,
             validator_hotkey,
-            MIN_ARTICLE_CONTENT_CHARS,
         )
         article_ids_pending = [row["article_id"] for row in (claimed_pending or [])]
 
