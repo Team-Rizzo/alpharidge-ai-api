@@ -1,7 +1,9 @@
 # Runbook — /articles/unscored connection-pool exhaustion fix
 
-**Repos:** `alpharidge-ai-api` (branch `fix/unscored-dedup-pool-exhaustion`) **and** `news-scraper`
-(branch `fix/scoring-title` — the scraper is a second live writer of the table). Off `main` in both.
+**Repos:** `alpharidge-ai-api` (branch `fix/unscored-dedup-pool-exhaustion`, off/into `main`) **and**
+`news-scraper` (branch `fix/scoring-title` — the scraper is a second live writer of the table).
+⚠️ **news-scraper deploys from `article-intelligence-v2`, NOT main** — base and merge `fix/scoring-title`
+into `article-intelligence-v2` (it currently equals main, but merging to main would not reach prod).
 **Status:** built, syntax-clean, **not deployed** — parked for a dev to validate on prod.
 **Owner note:** parallel to the depth canary; don't pull the depth prod dev off the canary for this.
 
@@ -37,8 +39,9 @@ straggler is populated the moment it enters the `in_progress`/`completed` set th
 
 ## Deploy sequence (ordered — do not reorder)
 
-1. **Deploy the `news-scraper` fix** (writes `title` on its pending insert). From here the primary
-   writer stops injecting NULL titles.
+1. **Deploy the `news-scraper` fix** (merge `fix/scoring-title` into **`article-intelligence-v2`** — the
+   branch prod runs — then redeploy). Writes `title` on its pending insert; the primary writer stops
+   injecting NULL titles.
 2. **Apply the phase-1 migration** (`prisma/migrations/20260702_add_title_to_news_article_scoring/` —
    `ADD COLUMN title TEXT`, additive/instant/online).
 3. **Deploy phase-1 API (`7949458`).** Now every new scoring row (both writers) has its title, and
