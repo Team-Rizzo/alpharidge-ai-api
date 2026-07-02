@@ -615,9 +615,12 @@ model NewsArticleScoring {
   // path A probes (title, status). Created CONCURRENTLY out-of-band — see the
   // migration runbook. NOTE: kept in sync with the DB index built concurrently.
   @@index([title, status], name: "idx_news_scoring_title_status")
-  // Serves path A's pending pick in published order without a sort (index scan
-  // halts at LIMIT). Built CONCURRENTLY as (status, published DESC, id DESC).
-  @@index([status, published, id], name: "idx_news_scoring_status_published")
+  // NOTE: path A's pending pick is served by a hand-built PARTIAL index that Prisma
+  // can't express — `(published DESC NULLS LAST, id DESC) WHERE status='pending'`
+  // (idx_scoring_pending_published), created CONCURRENTLY. The null-ordering and the
+  // WHERE both matter: they're what let the planner index-scan pending in published
+  // order and halt at LIMIT 150 instead of sorting the whole pool. Built out-of-band
+  // in backfill_scoring_published.sql; not managed here.
   @@map("news_article_scoring")
 }
 
