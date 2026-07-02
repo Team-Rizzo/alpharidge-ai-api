@@ -466,6 +466,9 @@ class ValidatorActivityResponse(BaseModel):
     """Response for GET /dashboard/validators."""
     validators: List[ValidatorEntry]
     total: int
+    # Distinct items scored across validators active in the last 24h. Not a sum of
+    # per-validator total_scored, which would double-count multi-validator items.
+    total_distinct_scored: int = 0
 
 
 # ============================================================================
