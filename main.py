@@ -467,6 +467,14 @@ SUBNET_CONFIG = {
     "DISPATCH_WINDOW_CAP_PCT": float(os.getenv("SUBNET_DISPATCH_WINDOW_CAP_PCT", "0.15")),
     "DISPATCH_WINDOW_GROW": float(os.getenv("SUBNET_DISPATCH_WINDOW_GROW", "1.0")),
     "DISPATCH_WINDOW_SHRINK": float(os.getenv("SUBNET_DISPATCH_WINDOW_SHRINK", "0.5")),
+    # Capacity-class window backoff (lease-timeout / incomplete-analysis), served
+    # separately from the integrity shrink above. Default = DISPATCH_WINDOW_SHRINK so
+    # it's a no-op; set SUBNET_DISPATCH_CAPACITY_SHRINK=1.0 to FREEZE the window on
+    # capacity signals (hold, don't shrink) so transient timeouts don't collapse a
+    # depth window. Honored by validators shipping the capacity-shrink build; older
+    # ones ignore it. At window≈1 (coverage-only) shrink≡freeze, so serving 1.0 is
+    # inert on any validator not exercising depth.
+    "DISPATCH_CAPACITY_SHRINK": float(os.getenv("SUBNET_DISPATCH_CAPACITY_SHRINK", "0.5")),
     "DISPATCH_LATE_FRACTION": float(os.getenv("SUBNET_DISPATCH_LATE_FRACTION", "0.6")),
     "DISPATCH_ACK_TIMEOUT_S": float(os.getenv("SUBNET_DISPATCH_ACK_TIMEOUT_S", "12.0")),
     "DISPATCH_CHRONIC_TIMEOUT_N": int(os.getenv("SUBNET_DISPATCH_CHRONIC_TIMEOUT_N", "5")),
