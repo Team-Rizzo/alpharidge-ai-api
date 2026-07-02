@@ -1678,7 +1678,10 @@ async def get_unscored_articles(
                         AND s2.article_id <> s.article_id
                         AND s2.status IN ('in_progress', 'completed')
                   )
-                ORDER BY a.published DESC NULLS LAST, a.id DESC
+                -- Order by the denormalized s.published (idx_news_scoring_status_published)
+                -- so this is an index scan that halts at LIMIT — no sort of the pending
+                -- pool, so path A stays fast no matter how large pending grows.
+                ORDER BY s.published DESC NULLS LAST, s.id DESC
                 FOR UPDATE SKIP LOCKED
                 LIMIT $1
             )
