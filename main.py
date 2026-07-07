@@ -160,6 +160,18 @@ SERVE_RAW_HTML = os.getenv("SERVE_RAW_HTML", "false").lower() == "true"
 # failed). Mirrors MIN_BODY_CHARS in news-scraper/run.py.
 MIN_ARTICLE_CONTENT_CHARS = int(os.getenv("MIN_ARTICLE_CONTENT_CHARS", "200"))
 
+# Recency bound for the Branch B ("no scoring + no analysis") lease scan in
+# get_unscored_articles. When the `pending` ready-queue is empty, every request falls
+# through to Branch B; without a bound its LEFT JOIN ... IS NULL anti-join degrades to a
+# full parallel seq-scan of the whole news_articles + news_article_analysis tables (~60s,
+# holding a connection past pool_timeout -> pool exhaustion -> 500 storm) because the
+# corpus is title-saturated and almost nothing qualifies. Restricting to rows ingested in
+# the last N hours turns it into a bounded index scan on idx_news_articles_created. Fresh,
+# servable work always has a recent created_at (ingestion time), so nothing that would be
+# served is skipped; the filter is on created_at, not published, so freshly-ingested but
+# back-dated articles are still covered.
+BRANCH_B_RECENCY_HOURS = int(os.getenv("BRANCH_B_RECENCY_HOURS", "12"))
+
 
 def _setup_log_filters():
     """Set up log filters to suppress blocked hotkey spam."""
@@ -1758,6 +1770,14 @@ async def get_unscored_articles(
                       AND a.content IS NOT NULL
                       AND LENGTH(BTRIM(a.content)) >= $3
                       AND a.source_type IN ('rss', 'ccnews')
+                      -- Recency bound (idx_news_articles_created): keep this scan an
+                      -- index range on recently-ingested rows instead of a full-table
+                      -- anti-join. Without it, an empty `pending` queue makes every
+                      -- request run a ~60s whole-table scan that exhausts the pool (the
+                      -- corpus is title-saturated, so almost nothing qualifies and the
+                      -- ORDER BY published DESC walk is O(table)). Filtered on created_at
+                      -- (ingestion time), so back-dated-but-fresh articles are still seen.
+                      AND a.created_at > NOW() - MAKE_INTERVAL(hours => $4::int)
                       -- Title dedup: don't enter a second article with a title that is
                       -- already in the scoring pipeline. Duplicate titles produce
                       -- identical title_embeddings and trip the validator's
@@ -1786,6 +1806,7 @@ async def get_unscored_articles(
                 slots_left,
                 validator_hotkey,
                 MIN_ARTICLE_CONTENT_CHARS,
+                BRANCH_B_RECENCY_HOURS,
             )
             article_ids_no_scoring = [row["article_id"] for row in (inserted_rows or [])]
 
