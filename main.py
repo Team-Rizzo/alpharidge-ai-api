@@ -84,6 +84,7 @@ from models import (
     TweetsForScoringResponse, CompletedTweetsSubmission,
     SubmissionResponse, ErrorResponse, TaoPriceResponse,
     AxonCheckRequest, AxonCheckResponse,
+    ReputationSnapshotRequest,
     # Telegram models
     TelegramGroup, TelegramMessage, TelegramMessageAnalysis,
     TelegramMessageWithContext, TelegramMessageForScoring,
@@ -715,6 +716,51 @@ async def check_axon(
             f"{request.ip}:{request.port} - {error_msg}"
         )
         return AxonCheckResponse(reachable=False, error=error_msg)
+
+
+@app.post("/reputation/snapshot")
+async def post_reputation_snapshot(
+    request: ReputationSnapshotRequest,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """Append per-hotkey reputation rows for one epoch (display/monitoring only; decoupled
+    from consensus). Append-only insert — never updates or deletes existing rows."""
+    rows = request.snapshots or []
+    if not rows:
+        return {"inserted": 0}
+    inserted = 0
+    try:
+        async with prisma.tx() as tx:
+            # Idempotent per (sender, epoch): a sender restart resets its in-memory
+            # push guard and would re-send an already-recorded epoch. Skip if present
+            # so a re-send never duplicates rows (no update/delete of existing data).
+            existing = await tx.query_raw(
+                'SELECT 1 FROM "reputation_snapshot" '
+                'WHERE "validator_hotkey"=$1 AND "epoch"=$2 LIMIT 1;',
+                validator_hotkey, int(request.epoch),
+            )
+            if existing:
+                logger.info(
+                    f"reputation_snapshot: epoch={request.epoch} already present "
+                    f"from {validator_hotkey[:12]}..; skipped {len(rows)} rows"
+                )
+                return {"inserted": 0, "skipped": len(rows)}
+            for r in rows:
+                await tx.execute_raw(
+                    """
+                    INSERT INTO "reputation_snapshot"
+                        ("validator_hotkey","miner_hotkey","epoch","reputation","samples","gate","projected_share")
+                    VALUES ($1,$2,$3,$4,$5,$6,$7);
+                    """,
+                    validator_hotkey, r.miner_hotkey, int(request.epoch),
+                    float(r.reputation), int(r.samples), r.gate, r.projected_share,
+                )
+                inserted += 1
+    except Exception as e:
+        logger.warning(f"reputation_snapshot insert failed from {validator_hotkey[:12]}..: {e}")
+        raise HTTPException(status_code=500, detail="insert failed")
+    logger.info(f"reputation_snapshot: inserted {inserted} rows from {validator_hotkey[:12]}.. epoch={request.epoch}")
+    return {"inserted": inserted}
 
 
 # ============================================================================

@@ -845,3 +845,22 @@ model PenaltyDetail {
   @@index([minerHotkey, epoch], name: "idx_penalty_detail_miner_epoch")
   @@map("penalty_detail")
 }
+
+// Reputation tracking telemetry. DECOUPLED from consensus/scoring — display/monitoring
+// only, never read by attestation/verdict/merkle. Both validators push, so rows can be
+// compared per (miner, epoch) across validator_hotkey for agreement.
+model ReputationSnapshot {
+  id              BigInt   @id @default(autoincrement())
+  validatorHotkey String   @map("validator_hotkey")
+  minerHotkey     String   @map("miner_hotkey")
+  epoch           Int
+  reputation      Float
+  samples         Int      @default(0)
+  gate            Float?
+  projectedShare  Float?   @map("projected_share")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([minerHotkey, epoch], name: "idx_reputation_snapshot_miner_epoch")
+  @@index([validatorHotkey, epoch], name: "idx_reputation_snapshot_validator_epoch")
+  @@map("reputation_snapshot")
+}

@@ -455,6 +455,21 @@ class AxonCheckResponse(BaseModel):
     error: Optional[str] = None
 
 
+class ReputationSnapshotRow(BaseModel):
+    """One per-hotkey reputation row (display/monitoring only)."""
+    miner_hotkey: str
+    reputation: float
+    samples: int = 0
+    gate: Optional[float] = None
+    projected_share: Optional[float] = None
+
+
+class ReputationSnapshotRequest(BaseModel):
+    """A validator's reputation snapshot for one epoch."""
+    epoch: int
+    snapshots: List[ReputationSnapshotRow]
+
+
 # ============================================================================
 # Telegram Models
 # ============================================================================
