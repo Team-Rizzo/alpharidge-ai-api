@@ -58,18 +58,31 @@ from dashboard_models import (
 
 logger = logging.getLogger(__name__)
 
-DASHBOARD_ALLOWED_IPS: set[str] = {"127.0.0.1", "::1"}
-DASHBOARD_ALLOWED_IPS.update(
+# Peers allowed to reach internal-only routes. Localhost is always allowed; other
+# internal hosts come from env (the reverse-proxy address is deliberately not listed,
+# so proxied public requests can't reach these routes). Fail-closed: if the env is
+# unset, only localhost is allowed.
+_INTERNAL_ALLOWED_IPS: set[str] = {"127.0.0.1", "::1"}
+_INTERNAL_ALLOWED_IPS.update(
     ip.strip()
-    for ip in os.getenv("DASHBOARD_ALLOWED_IPS", "").split(",")
+    for ip in os.getenv("INTERNAL_ALLOWED_IPS", "").split(",")
     if ip.strip()
 )
 
+# Dashboard read routes are public; other guarded routes are internal-only.
+_INTERNAL_DASHBOARD_PATHS: set[str] = {"/dashboard/miner-dispatch"}
+
+
+def _is_public_dashboard(path: str) -> bool:
+    return path.startswith("/dashboard/") and path not in _INTERNAL_DASHBOARD_PATHS
+
 
 async def _require_local(request: Request):
+    if _is_public_dashboard(request.url.path):
+        return
     client_ip = request.client.host if request.client else None
-    if client_ip not in DASHBOARD_ALLOWED_IPS:
-        raise HTTPException(status_code=403, detail="Dashboard access restricted.")
+    if client_ip not in _INTERNAL_ALLOWED_IPS:
+        raise HTTPException(status_code=403, detail="Access restricted.")
 
 
 router = APIRouter(prefix="/dashboard", dependencies=[Depends(_require_local)])
