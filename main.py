@@ -487,6 +487,17 @@ SUBNET_CONFIG = {
     "CLONE_COSINE_THRESHOLD": float(os.getenv("SUBNET_CLONE_COSINE_THRESHOLD", "0.99")),
     "CLONE_DIFFERENTIAL_ENABLED": os.getenv("SUBNET_CLONE_DIFFERENTIAL_ENABLED", "false").lower() == "true",
     "CLONE_DIVERGENCE_MARGIN": float(os.getenv("SUBNET_CLONE_DIVERGENCE_MARGIN", "0.05")),
+    # Reputation-scoring track — served so every validator scores identically. Both
+    # switches default OFF (deploy stays a no-op until enabled); tuning params are
+    # served so scores can't diverge. Honored by validators that ship this build.
+    "REPUTATION_SCORING_ENABLED":  os.getenv("SUBNET_REPUTATION_SCORING_ENABLED", "false").lower() == "true",
+    "REPUTATION_GATING_ENABLED":   os.getenv("SUBNET_REPUTATION_GATING_ENABLED", "false").lower() == "true",
+    "REPUTATION_EMA_ALPHA":        float(os.getenv("SUBNET_REPUTATION_EMA_ALPHA", "0.03")),
+    "REPUTATION_PRIOR":            float(os.getenv("SUBNET_REPUTATION_PRIOR", "0.5")),
+    "EMISSION_MIDPOINT":           float(os.getenv("SUBNET_EMISSION_MIDPOINT", "0.59")),
+    "EMISSION_GAIN":               float(os.getenv("SUBNET_EMISSION_GAIN", "100.0")),
+    "VALIDATION_SAMPLE_SIZE":      int(os.getenv("SUBNET_VALIDATION_SAMPLE_SIZE", "1")),
+    "SAMPLING_SUBSTANTIVE_WEIGHT": float(os.getenv("SUBNET_SAMPLING_SUBSTANTIVE_WEIGHT", "2.0")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
