@@ -417,6 +417,7 @@ class DispatchStatusItem(BaseModel):
     window: float
     inflight: int
     consec_to: int
+    batch_size: Optional[int] = None
     covered_epoch: int
     on_cooldown: bool
     cooldown_remaining_s: int

@@ -466,15 +466,8 @@ SUBNET_CONFIG = {
     "MINER_BATCH_SIZE": int(os.getenv("SUBNET_MINER_BATCH_SIZE", "20")),
     "VALIDATION_FETCH_LIMIT": int(os.getenv("SUBNET_VALIDATION_FETCH_LIMIT", "100")),
     "MIN_PERCENT_PER_POINT": float(os.getenv("SUBNET_MIN_PERCENT_PER_POINT", "0.003")),
-    # Master switch for tweet scoring across the subnet. Default OFF (article-first): validators
-    # skip tweet fetch + tweet timeout penalties so article-only miners aren't zeroed for tweets.
     "ENABLE_TWEET_SCORING": os.getenv("SUBNET_ENABLE_TWEET_SCORING", "false").lower() == "true",
-    # Rolling buffer cap for each validator's local article store (prune keeps this many
-    # most-recent articles). Tunable subnet-wide; honored by validators >= 3.0.3.
     "ARTICLE_STORE_MAX_ARTICLES": int(os.getenv("SUBNET_ARTICLE_STORE_MAX_ARTICLES", "2000")),
-    # Adaptive dispatch (RFC 2026-06-28). Master switch defaults OFF so validators behave
-    # exactly as today until deliberately enabled; the rest are inert while it is off.
-    # Honored by validators that ship the adaptive-dispatch build; older ones ignore them.
     "ADAPTIVE_DISPATCH_ENABLED": os.getenv("SUBNET_ADAPTIVE_DISPATCH_ENABLED", "false").lower() == "true",
     "DISPATCH_WINDOW_MIN": int(os.getenv("SUBNET_DISPATCH_WINDOW_MIN", "1")),
     "DISPATCH_WINDOW_CAP_PCT": float(os.getenv("SUBNET_DISPATCH_WINDOW_CAP_PCT", "0.15")),
@@ -511,31 +504,27 @@ SUBNET_CONFIG = {
     "VALIDATION_SAMPLE_SIZE":      int(os.getenv("SUBNET_VALIDATION_SAMPLE_SIZE", "1")),
     "SAMPLING_SUBSTANTIVE_WEIGHT": float(os.getenv("SUBNET_SAMPLING_SUBSTANTIVE_WEIGHT", "2.0")),
     "SUMMARY_AGREEMENT_FLOOR":     float(os.getenv("SUBNET_SUMMARY_AGREEMENT_FLOOR", "0.4")),
-    # Faithfulness cooldown (2026-07-09). Default shadow (log-only); FLOOR=0 disables fleet-wide.
     "DISPATCH_COOLDOWN_SHADOW_MODE":        os.getenv("SUBNET_DISPATCH_COOLDOWN_SHADOW_MODE", "true").lower() == "true",
     "DISPATCH_COOLDOWN_FAITHFULNESS_FLOOR": float(os.getenv("SUBNET_DISPATCH_COOLDOWN_FAITHFULNESS_FLOOR", "0.33")),
     "DISPATCH_CONSEC_INVALID_N":            int(os.getenv("SUBNET_DISPATCH_CONSEC_INVALID_N", "3")),
     "DISPATCH_INVALID_COOLDOWN_FIRST_S":    int(os.getenv("SUBNET_DISPATCH_INVALID_COOLDOWN_FIRST_S", "60")),
     "DISPATCH_INVALID_COOLDOWN_MAX_S":      int(os.getenv("SUBNET_DISPATCH_INVALID_COOLDOWN_MAX_S", "600")),
+    "ADAPTIVE_BATCH_SIZE_ENABLED": os.getenv("SUBNET_ADAPTIVE_BATCH_SIZE_ENABLED", "false").lower() == "true",
+    "MINER_BATCH_SIZE_MAX":        int(os.getenv("SUBNET_MINER_BATCH_SIZE_MAX", os.getenv("SUBNET_MINER_BATCH_SIZE", "20"))),
+    "MINER_BATCH_SIZE_MIN":        int(os.getenv("SUBNET_MINER_BATCH_SIZE_MIN", os.getenv("SUBNET_MINER_BATCH_SIZE", "20"))),
+    "BATCH_SIZE_GROW_STEP":        int(os.getenv("SUBNET_BATCH_SIZE_GROW_STEP", "2")),
+    "BATCH_SIZE_SHRINK_FACTOR":    float(os.getenv("SUBNET_BATCH_SIZE_SHRINK_FACTOR", "0.75")),
+    "EMISSION_BONUS_CEILING":      float(os.getenv("SUBNET_EMISSION_BONUS_CEILING", "0.0")),
+    "EMISSION_BONUS_START":        float(os.getenv("SUBNET_EMISSION_BONUS_START", "0.63")),
+    "EMISSION_BONUS_FULL":         float(os.getenv("SUBNET_EMISSION_BONUS_FULL", "0.75")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
 MAX_POINTS_PER_ITEM = float(os.getenv("MAX_POINTS_PER_ITEM", "1"))
-# Prod-safety: these two levers live in the shared */unscored endpoints that EVERY
-# validator hits, so their defaults must be no-ops — enabling them is a deliberate
-# operator action, never inherited from a deploy.
-#   MAX_OUTSTANDING_LEASES <= 0  => unlimited (no lease cap)  [see verification.grant_count]
-#   AUDIT_OVERLAP_RATE     == 0  => no silent audit re-leasing
 MAX_OUTSTANDING_LEASES = int(os.getenv("MAX_OUTSTANDING_LEASES", "0"))
 REPORT_CONSENSUS_THRESHOLD = int(os.getenv("REPORT_CONSENSUS_THRESHOLD", "2"))
 AUDIT_OVERLAP_RATE = float(os.getenv("AUDIT_OVERLAP_RATE", "0"))
-# §3 prod-safety: report consensus is ALARM-ONLY by default. Automated blacklisting of an
-# accused validator stays off until the false-positive rate is observed (a deep-verify
-# mismatch can signal benign API-side data drift, and sybil reporters could knock out an
-# honest validator). Flip to "true" only as a deliberate operator action.
 REPORTS_AUTO_BLACKLIST = os.getenv("REPORTS_AUTO_BLACKLIST", "false").lower() == "true"
-# §4 scoped-test allowlist: when non-empty, verdicts are only written / attestations only
-# issued for these validator hotkeys. Empty (default) = no restriction (backward compatible).
 VERDICT_ALLOWLIST_HOTKEYS = set(filter(None, (
     h.strip() for h in os.getenv("VERDICT_ALLOWLIST_HOTKEYS", "").split(","))))
 
