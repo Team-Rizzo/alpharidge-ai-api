@@ -478,23 +478,12 @@ SUBNET_CONFIG = {
     "DISPATCH_CHRONIC_TIMEOUT_N": int(os.getenv("SUBNET_DISPATCH_CHRONIC_TIMEOUT_N", "5")),
     "LIVENESS_TTL_S": int(os.getenv("SUBNET_LIVENESS_TTL_S", "120")),
     "LIVENESS_SWEEP_INTERVAL_S": int(os.getenv("SUBNET_LIVENESS_SWEEP_INTERVAL_S", "60")),
-    # Penalty-split sub-flag — decouples the consensus-affecting timeout→broadcast
-    # change from the dispatch flag (enable/roll back independently). Default true.
     "ADAPTIVE_PENALTY_SPLIT_ENABLED": os.getenv("SUBNET_ADAPTIVE_PENALTY_SPLIT_ENABLED", "true").lower() == "true",
-    # Missing/incomplete-analysis = capacity, not integrity (default off = legacy penalize).
     "ADAPTIVE_MISSING_ANALYSIS_SPLIT_ENABLED": os.getenv("SUBNET_ADAPTIVE_MISSING_ANALYSIS_SPLIT_ENABLED", "false").lower() == "true",
-    # Validation quality floor — served centrally so every validator uses the same
-    # threshold (divergent thresholds would score the same article differently). Default 0.70.
     "TIER3_THRESHOLD": float(os.getenv("SUBNET_TIER3_THRESHOLD", "0.70")),
-    # Cloned-embedding gate. Defaults reproduce the legacy absolute rule (no-op);
-    # serving CLONE_DIFFERENTIAL_ENABLED=true switches the fleet to the validator-
-    # corroborated check that lets honest syndicated clusters through.
     "CLONE_COSINE_THRESHOLD": float(os.getenv("SUBNET_CLONE_COSINE_THRESHOLD", "0.99")),
     "CLONE_DIFFERENTIAL_ENABLED": os.getenv("SUBNET_CLONE_DIFFERENTIAL_ENABLED", "false").lower() == "true",
     "CLONE_DIVERGENCE_MARGIN": float(os.getenv("SUBNET_CLONE_DIVERGENCE_MARGIN", "0.05")),
-    # Reputation-scoring track — served so every validator scores identically. Both
-    # switches default OFF (deploy stays a no-op until enabled); tuning params are
-    # served so scores can't diverge. Honored by validators that ship this build.
     "REPUTATION_SCORING_ENABLED":  os.getenv("SUBNET_REPUTATION_SCORING_ENABLED", "false").lower() == "true",
     "REPUTATION_GATING_ENABLED":   os.getenv("SUBNET_REPUTATION_GATING_ENABLED", "false").lower() == "true",
     "REPUTATION_EMA_ALPHA":        float(os.getenv("SUBNET_REPUTATION_EMA_ALPHA", "0.03")),
@@ -509,6 +498,8 @@ SUBNET_CONFIG = {
     "DISPATCH_CONSEC_INVALID_N":            int(os.getenv("SUBNET_DISPATCH_CONSEC_INVALID_N", "3")),
     "DISPATCH_INVALID_COOLDOWN_FIRST_S":    int(os.getenv("SUBNET_DISPATCH_INVALID_COOLDOWN_FIRST_S", "60")),
     "DISPATCH_INVALID_COOLDOWN_MAX_S":      int(os.getenv("SUBNET_DISPATCH_INVALID_COOLDOWN_MAX_S", "600")),
+    "DISPATCH_FAILSTREAK_SHADOW_MODE":      os.getenv("SUBNET_DISPATCH_FAILSTREAK_SHADOW_MODE", "true").lower() == "true",
+    "DISPATCH_CONSEC_FAIL_N":               int(os.getenv("SUBNET_DISPATCH_CONSEC_FAIL_N", "10")),
     "ADAPTIVE_BATCH_SIZE_ENABLED": os.getenv("SUBNET_ADAPTIVE_BATCH_SIZE_ENABLED", "false").lower() == "true",
     "MINER_BATCH_SIZE_MAX":        int(os.getenv("SUBNET_MINER_BATCH_SIZE_MAX", os.getenv("SUBNET_MINER_BATCH_SIZE", "20"))),
     "MINER_BATCH_SIZE_MIN":        int(os.getenv("SUBNET_MINER_BATCH_SIZE_MIN", os.getenv("SUBNET_MINER_BATCH_SIZE", "20"))),
