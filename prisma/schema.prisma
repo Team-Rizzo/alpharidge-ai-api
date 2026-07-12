@@ -840,6 +840,7 @@ model PenaltyDetail {
   minerValues     Json?    @map("miner_values")
   validatorVals   Json?    @map("validator_values")
   postPreview     String?  @map("post_preview")
+  score           Float?   // numeric score behind the rejection (e.g. composite vs 0.65, summary cosine vs 0.40)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([minerHotkey, epoch], name: "idx_penalty_detail_miner_epoch")
@@ -863,4 +864,26 @@ model ReputationSnapshot {
   @@index([minerHotkey, epoch], name: "idx_reputation_snapshot_miner_epoch")
   @@index([validatorHotkey, epoch], name: "idx_reputation_snapshot_validator_epoch")
   @@map("reputation_snapshot")
+}
+
+/// Display-only per-miner dispatch/cooldown event log for the miner dashboard.
+/// DECOUPLED from consensus — never read by attestation/verdict/merkle. Append-only;
+/// records discrete dispatch-state transitions (parked/unparked/batch_size_changed/
+/// reward_zeroed/chronic_timeout) so a miner can see WHEN and WHY their dispatch state
+/// changed. occurredAt is the validator-supplied event time; createdAt is server ingest.
+model MinerEvent {
+  id              BigInt   @id @default(autoincrement())
+  validatorHotkey String   @map("validator_hotkey")
+  minerHotkey     String   @map("miner_hotkey")
+  eventType       String   @map("event_type") // parked | unparked | batch_size_changed | reward_zeroed | chronic_timeout
+  streak          String?  // which streak tripped a park: faith | failstreak | timeout
+  shadow          Boolean? // park emitted in shadow mode (logged, not enforced)
+  epoch           Int?
+  reason          String?  // short human-readable detail
+  detail          Json?    // event-specific numerics (from/to, last_faith, cooldown_s, level, points, penalties)
+  occurredAt      DateTime @map("occurred_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([minerHotkey, occurredAt], name: "idx_miner_event_miner_time")
+  @@map("miner_event")
 }

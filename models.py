@@ -401,6 +401,7 @@ class PenaltyDetailItem(BaseModel):
     miner_values: Optional[Dict[str, Any]] = None
     validator_values: Optional[Dict[str, Any]] = None
     post_preview: Optional[str] = None
+    score: Optional[float] = None   # numeric behind the rejection (composite vs 0.65, cosine vs 0.40)
 
 
 class PenaltyDetailBulkCreate(BaseModel):
@@ -421,11 +422,37 @@ class DispatchStatusItem(BaseModel):
     covered_epoch: int
     on_cooldown: bool
     cooldown_remaining_s: int
+    # New telemetry (default None so a pre-upgrade validator still validates):
+    consec_inv: Optional[int] = None            # consecutive low-faithfulness batches (X/N to faith park)
+    consec_fail: Optional[int] = None           # consecutive validation-fails (X/N to failstreak park)
+    inv_level: Optional[int] = None             # cooldown escalation level (1 -> 60s, 2 -> 600s)
+    last_faith: Optional[float] = None          # last observed min-faithfulness (vs the 0.5 floor)
+    emission_mult: Optional[float] = None        # reputation emission multiplier (~0 below cliff, ~1, up to ~1.3)
+    median_latency_s: Optional[float] = None     # median per-article return time (vs the on-time threshold)
 
 
 class DispatchStatusBulkCreate(BaseModel):
     """Snapshot of per-miner adaptive-dispatch status flushed best-effort by a validator."""
     miners: List[DispatchStatusItem]
+
+
+class MinerEventItem(BaseModel):
+    """One per-miner dispatch/cooldown event from a validator (display-only). Records a
+    discrete transition (park/unpark/batch-size change/reward-zeroed) with its own
+    occurred_at so buffered events keep accurate timing regardless of flush cadence."""
+    miner_hotkey: str
+    event_type: str                             # parked | unparked | batch_size_changed | reward_zeroed | chronic_timeout
+    occurred_at: datetime
+    streak: Optional[str] = None                # faith | failstreak | timeout (for a park)
+    shadow: Optional[bool] = None               # park emitted in shadow mode (logged, not enforced)
+    epoch: Optional[int] = None
+    reason: Optional[str] = None
+    detail: Optional[Dict[str, Any]] = None     # numerics: from/to, last_faith, cooldown_s, level, points, penalties
+
+
+class MinerEventBulkCreate(BaseModel):
+    """Batch of miner events flushed best-effort by a validator."""
+    events: List[MinerEventItem]
 
 
 # ============================================================================

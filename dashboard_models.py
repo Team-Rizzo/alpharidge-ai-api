@@ -397,6 +397,7 @@ class MinerBatchItem(BaseModel):
     miner_values: Optional[Dict[str, Any]] = None
     validator_values: Optional[Dict[str, Any]] = None
     post_preview: Optional[str] = None
+    score: Optional[float] = None               # numeric behind the rejection (composite vs 0.65, cosine vs 0.40)
     validator_hotkey: Optional[str] = None
     analysis: Optional[ItemAnalysis] = None     # v2 richer extraction (article items only)
 
@@ -422,6 +423,54 @@ class MinerBatchItemsResponse(BaseModel):
     items: List[MinerBatchItem] = []        # penalized items (diffs) — unchanged contract
     earned: List[EarnedItem] = []           # valid items the validator scored this epoch
     earned_truncated: bool = False          # true if `earned` hit the row cap (not the full set)
+
+
+# ============================================================================
+# Reputation Models (display-only; decoupled from consensus)
+# ============================================================================
+
+class ReputationPoint(BaseModel):
+    """One per-epoch reputation observation for a miner (display/monitoring only)."""
+    epoch: int
+    reputation: float
+    samples: int = 0
+    emission_mult: Optional[float] = None       # multiplier (stored in the 'gate' column): ~0 below cliff, ~1, up to ~1.3
+    validator_hotkey: str
+    created_at: Optional[datetime] = None
+
+
+class MinerReputationResponse(BaseModel):
+    """Response for GET /dashboard/miners/{hotkey}/reputation. Carries the served gate/bonus
+    params so the UI can draw the cliff + bonus band without a second call."""
+    hotkey: str
+    emission_midpoint: float        # below this reputation, emission is withheld/burned (the cliff)
+    bonus_start: float              # reputation where the >1.0 bonus ramp begins
+    bonus_full: float               # reputation at full bonus
+    bonus_ceiling: float = 0.0      # >0 once the emission bonus is live (UI hides bonus while 0)
+    latest: Optional[ReputationPoint] = None
+    history: List[ReputationPoint] = []
+
+
+# ============================================================================
+# Miner Event Log Models (display-only; decoupled from consensus)
+# ============================================================================
+
+class MinerEventRow(BaseModel):
+    """One per-miner dispatch/cooldown event (display-only)."""
+    event_type: str                             # parked | unparked | batch_size_changed | reward_zeroed | chronic_timeout
+    occurred_at: datetime
+    streak: Optional[str] = None                # faith | failstreak | timeout (for a park)
+    shadow: Optional[bool] = None
+    epoch: Optional[int] = None
+    reason: Optional[str] = None
+    detail: Optional[Dict[str, Any]] = None
+    validator_hotkey: str
+
+
+class MinerEventsResponse(BaseModel):
+    """Response for GET /dashboard/miners/{hotkey}/events."""
+    hotkey: str
+    events: List[MinerEventRow] = []
 
 
 # ============================================================================

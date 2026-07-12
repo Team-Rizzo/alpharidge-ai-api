@@ -98,6 +98,8 @@ from models import (
     PenaltyDetailBulkCreate,
     # Adaptive-dispatch status (display-only dashboard attribution)
     DispatchStatusBulkCreate,
+    # Per-miner dispatch/cooldown event log (display-only dashboard attribution)
+    MinerEventBulkCreate,
 )
 import dispatch_status_store
 from utils.auth import (
@@ -2516,6 +2518,7 @@ async def submit_penalty_detail(
                 "resourceId": str(it.resource_id),
                 "cause": it.cause,
                 "postPreview": it.post_preview,
+                "score": it.score,   # nullable scalar — None is fine (only Json? fields reject None)
             }
             # Optional Json? fields must be OMITTED when null — prisma-client-py
             # rejects an explicit None for a Json field ("value required but not
@@ -2562,6 +2565,55 @@ async def submit_dispatch_status(
     )
     logger.info(f"Validator {validator_hotkey} submitted dispatch status for {len(miners)} miner(s)")
     return SubmissionResponse(success=True, message="dispatch status recorded", count=len(miners))
+
+
+@app.post(
+    "/diagnostics/miner-event",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_miner_event(
+    submission: MinerEventBulkCreate,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """Persist display-only per-miner dispatch/cooldown events for the miner dashboard.
+
+    DECOUPLED from consensus by design: writes ONLY to `miner_event` and never touches
+    score_verdict, attestation, get_verdicts, or merkle_root. Append-only event log
+    (park/unpark, batch-size change, reward-zeroed) so a miner can see WHEN and WHY their
+    dispatch state changed. Best-effort: a bad row is skipped rather than failing the
+    batch, and the validator hotkey is taken from auth (not the payload) so it can't be
+    spoofed per-row.
+    """
+    if not submission.events:
+        return SubmissionResponse(success=True, message="no miner events", count=0)
+
+    created = 0
+    for ev in submission.events:
+        try:
+            data = {
+                "minerHotkey": ev.miner_hotkey,
+                # From the authenticated caller, not the row — un-spoofable attribution.
+                "validatorHotkey": validator_hotkey,
+                "eventType": ev.event_type,
+                "occurredAt": ev.occurred_at,
+                "streak": ev.streak,
+                "shadow": ev.shadow,
+                "epoch": ev.epoch,
+                "reason": ev.reason,
+            }
+            # Optional Json? field must be OMITTED when null (prisma-client-py rejects None).
+            if ev.detail is not None:
+                data["detail"] = Json(ev.detail)
+            await prisma.minerevent.create(data=data)
+            created += 1
+        except Exception as e:
+            # Never let one malformed row drop the rest; this is explanatory data only.
+            logger.warning(f"miner-event row skipped (non-fatal): {e}")
+            continue
+
+    logger.info(f"Validator {validator_hotkey} submitted {created}/{len(submission.events)} miner-event row(s)")
+    return SubmissionResponse(success=True, message="miner events recorded", count=created)
 
 
 # ============================================================================

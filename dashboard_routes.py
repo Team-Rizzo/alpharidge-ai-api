@@ -47,6 +47,10 @@ from dashboard_models import (
     MinerBatchesResponse,
     MinerBatchItem,
     MinerBatchItemsResponse,
+    ReputationPoint,
+    MinerReputationResponse,
+    MinerEventRow,
+    MinerEventsResponse,
     EarnedItem,
     ItemAnalysis,
     ItemEntity,
@@ -1662,11 +1666,11 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
         rows = await prisma.query_raw(
             """
             SELECT resource_type, resource_id, cause, failed_fields,
-                   miner_values, validator_values, post_preview, validator_hotkey
+                   miner_values, validator_values, post_preview, score, validator_hotkey
             FROM (
                 SELECT DISTINCT ON (resource_type, resource_id)
                        resource_type, resource_id, cause, failed_fields,
-                       miner_values, validator_values, post_preview, validator_hotkey, created_at
+                       miner_values, validator_values, post_preview, score, validator_hotkey, created_at
                 FROM penalty_detail
                 WHERE miner_hotkey = $1 AND epoch = $2
                 ORDER BY resource_type, resource_id, created_at DESC
@@ -1776,6 +1780,7 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
                 miner_values=_as_json(r.get("miner_values")),
                 validator_values=_as_json(r.get("validator_values")),
                 post_preview=r.get("post_preview"),
+                score=(float(r["score"]) if r.get("score") is not None else None),
                 validator_hotkey=r.get("validator_hotkey"),
                 analysis=_analysis_for(r["resource_type"], str(r["resource_id"])),
             ))
@@ -1802,6 +1807,89 @@ async def dashboard_miner_batch_items(hotkey: str, epoch: int):
         )
     except Exception as e:
         logger.error(f"Error in dashboard_miner_batch_items: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/miners/{hotkey}/reputation", response_model=MinerReputationResponse)
+async def dashboard_miner_reputation(hotkey: str):
+    """Per-epoch reputation history for a miner (display-only, decoupled from consensus).
+    Reads the append-only reputation_snapshot table. The 'gate' column already holds the
+    emission multiplier (~0 below the cliff, ~1, up to ~1.3 with the bonus); surfaced as
+    emission_mult. Dedups to one row per epoch (most recent write) for a clean series, and
+    includes the served gate/bonus params so the UI can draw the cliff + bonus band."""
+    prisma = _get_prisma()
+    try:
+        rows = await prisma.query_raw(
+            """
+            SELECT DISTINCT ON (epoch)
+                   epoch, reputation, samples, gate, validator_hotkey, created_at
+            FROM reputation_snapshot
+            WHERE miner_hotkey = $1
+            ORDER BY epoch DESC, created_at DESC
+            LIMIT 200
+            """,
+            hotkey,
+        )
+        history = [
+            ReputationPoint(
+                epoch=int(r["epoch"]),
+                reputation=float(r["reputation"]),
+                samples=int(r["samples"] or 0),
+                emission_mult=(float(r["gate"]) if r["gate"] is not None else None),
+                validator_hotkey=r["validator_hotkey"],
+                created_at=r.get("created_at"),
+            )
+            for r in rows
+        ]
+        return MinerReputationResponse(
+            hotkey=hotkey,
+            emission_midpoint=float(os.getenv("SUBNET_EMISSION_MIDPOINT", "0.59")),
+            bonus_start=float(os.getenv("SUBNET_EMISSION_BONUS_START", "0.63")),
+            bonus_full=float(os.getenv("SUBNET_EMISSION_BONUS_FULL", "0.75")),
+            bonus_ceiling=float(os.getenv("SUBNET_EMISSION_BONUS_CEILING", "0.0")),
+            latest=(history[0] if history else None),
+            history=history,
+        )
+    except Exception as e:
+        logger.error(f"Error in dashboard_miner_reputation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/miners/{hotkey}/events", response_model=MinerEventsResponse)
+async def dashboard_miner_events(hotkey: str, limit: int = 100):
+    """Per-miner dispatch/cooldown event log (display-only, decoupled from consensus).
+    Reads the append-only miner_event table, newest first — park/unpark, batch-size
+    changes, reward-zeroed, so a miner can see when and why their dispatch state changed."""
+    prisma = _get_prisma()
+    try:
+        limit = max(1, min(int(limit), 500))
+        rows = await prisma.query_raw(
+            """
+            SELECT event_type, occurred_at, streak, shadow, epoch, reason, detail, validator_hotkey
+            FROM miner_event
+            WHERE miner_hotkey = $1
+            ORDER BY occurred_at DESC
+            LIMIT $2
+            """,
+            hotkey,
+            limit,
+        )
+        events = [
+            MinerEventRow(
+                event_type=r["event_type"],
+                occurred_at=r["occurred_at"],
+                streak=r.get("streak"),
+                shadow=r.get("shadow"),
+                epoch=(int(r["epoch"]) if r.get("epoch") is not None else None),
+                reason=r.get("reason"),
+                detail=_as_json(r.get("detail")),
+                validator_hotkey=r["validator_hotkey"],
+            )
+            for r in rows
+        ]
+        return MinerEventsResponse(hotkey=hotkey, events=events)
+    except Exception as e:
+        logger.error(f"Error in dashboard_miner_events: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
