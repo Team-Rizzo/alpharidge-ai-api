@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 import numpy as np
-from prisma import Prisma
+from prisma import Json, Prisma
 
 logger = logging.getLogger("event_clustering")
 
@@ -134,7 +134,9 @@ async def cluster_article(
     event_date = None
     if event_date_str:
         try:
-            event_date = datetime.strptime(event_date_str, "%Y-%m-%d").date()
+            # Keep the datetime: the column is DateTime? @db.Date, and the client cannot
+            # serialise a bare date (every create raised "date not serializable").
+            event_date = datetime.strptime(event_date_str, "%Y-%m-%d")
         except (ValueError, TypeError):
             pass
 
@@ -149,7 +151,7 @@ async def cluster_article(
             "articleCount": 1,
             "sentiment": sentiment,
             "impactPotential": impact,
-            "entities": entities,
+            "entities": Json(entities),  # column is Json? @db.JsonB; a bare list is rejected
             "titleEmbedding": title_emb or [],
         },
     )

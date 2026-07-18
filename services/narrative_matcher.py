@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from prisma import Prisma
+from prisma import Json, Prisma
 
 logger = logging.getLogger("narrative_matcher")
 
@@ -211,8 +211,8 @@ async def seed_narratives(db: Prisma):
                     "slug": n["slug"],
                     "name": n["name"],
                     "description": n.get("description"),
-                    "keywords": n.get("keywords", []),
-                    "sectorIds": n.get("sector_ids"),
+                    "keywords": Json(n.get("keywords", [])),
+                    "sectorIds": Json(n.get("sector_ids")) if n.get("sector_ids") is not None else None,
                     "phase": n.get("status", "active"),
                     "source": "seed",
                 },
@@ -386,7 +386,7 @@ async def auto_discover_narratives(db: Prisma):
                     "slug": slug,
                     "name": cand.keyword.title(),
                     "description": f"Auto-discovered narrative: {cand.keyword}",
-                    "keywords": [cand.keyword],
+                    "keywords": Json([cand.keyword]),
                     "phase": "emerging",
                     "source": "discovered",
                     "articleCount": cand.articleCount,
