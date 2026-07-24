@@ -1238,7 +1238,10 @@ async def dashboard_sentiment(
 # full set at most once per TTL and serve every sort/limit variant from that
 # snapshot (sorting/slicing in Python). Stale-while-revalidate: a stale hit is
 # returned immediately while a single background task refreshes.
-_MINERS_CACHE_TTL = 120.0
+# Freshness normally comes from the periodic warm in jobs/background_tasks
+# (every 15 min); this TTL is only the request-path fallback if that loop
+# dies. The aggregation costs ~45s of DB time, so keep the cadence low.
+_MINERS_CACHE_TTL = 1200.0
 _miners_cache = {"rows": None, "ts": 0.0}
 _miners_refresh_lock = asyncio.Lock()
 
@@ -1295,17 +1298,25 @@ async def _refresh_miners_cache(prisma) -> None:
             _miners_cache["rows"] = rows
             _miners_cache["ts"] = time.monotonic()
         except Exception as e:
-            logger.error(f"miners cache refresh failed: {e}")
+            # repr, not str: the common failure is an httpx timeout whose
+            # str() is empty, which once hid the root cause of a blank page.
+            logger.error(f"miners cache refresh failed: {e!r}")
+
+
+async def refresh_miners_snapshot(prisma) -> None:
+    """Public entrypoint for the periodic warm in jobs/background_tasks.
+    Keeps the leaderboard snapshot fresh so no user request ever waits on
+    the ~45s aggregation."""
+    await _refresh_miners_cache(prisma)
 
 
 async def _get_miner_rows(prisma):
-    """Return the cached leaderboard rows, refreshing as needed. Cold start
-    blocks once; a stale cache serves immediately and refreshes in the
-    background so requests never pay the full query cost after the first."""
+    """Return the cached leaderboard rows without ever blocking on the
+    aggregation: a missing or stale snapshot kicks a background refresh and
+    serves what we have (empty only in the first minute after a restart,
+    until the startup warm lands)."""
     age = time.monotonic() - _miners_cache["ts"]
-    if _miners_cache["rows"] is None:
-        await _refresh_miners_cache(prisma)
-    elif age > _MINERS_CACHE_TTL:
+    if _miners_cache["rows"] is None or age > _MINERS_CACHE_TTL:
         asyncio.create_task(_refresh_miners_cache(prisma))
     return _miners_cache["rows"] or []
 
