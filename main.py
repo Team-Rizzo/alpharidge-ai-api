@@ -10,6 +10,7 @@ This API provides endpoints for validators to:
 Only validators with valid signatures are allowed to access the API.
 """
 
+import asyncio
 import os
 import math
 import json
@@ -137,7 +138,10 @@ uvicorn_access_logger.addFilter(SuppressBlockedHotkeyLogFilter())
 uvicorn_access_logger.addFilter(SuppressBlockedRequestsFilter())
 
 # Initialize Prisma clients
-prisma = Prisma()
+# http timeout must exceed the slowest raw query we run: the dashboard miner
+# leaderboard aggregation (dashboard_routes._MINERS_AGG_SQL) scans every
+# analysis row and currently takes ~45s; the default 30s made it unservable.
+prisma = Prisma(http={"timeout": 180})
 
 # Optional separate database for price data
 PRICE_DATABASE_URL = os.getenv("PRICE_DATABASE_URL", "")
@@ -510,6 +514,23 @@ SUBNET_CONFIG = {
     "EMISSION_BONUS_CEILING":      float(os.getenv("SUBNET_EMISSION_BONUS_CEILING", "0.0")),
     "EMISSION_BONUS_START":        float(os.getenv("SUBNET_EMISSION_BONUS_START", "0.63")),
     "EMISSION_BONUS_FULL":         float(os.getenv("SUBNET_EMISSION_BONUS_FULL", "0.75")),
+    # Article triage (schema v3). TRIAGE_ENABLED stays false until every
+    # validator runs a triage-aware release; flipping it on a mixed fleet would
+    # have older validators score triage-only articles as incomplete analyses.
+    "TRIAGE_ENABLED":              os.getenv("SUBNET_TRIAGE_ENABLED", "false").lower() == "true",
+    "TRIAGE_FEE_POINTS":           float(os.getenv("SUBNET_TRIAGE_FEE_POINTS", "0.2")),
+    "TRIAGE_REL_POINT_MULT":       int(os.getenv("SUBNET_TRIAGE_REL_POINT_MULT", "5")),
+    "TRIAGE_CANARY_POS_RATE":      float(os.getenv("SUBNET_TRIAGE_CANARY_POS_RATE", "0.7")),
+    "TRIAGE_CANARY_NEG_RATE":      float(os.getenv("SUBNET_TRIAGE_CANARY_NEG_RATE", "0.7")),
+    "TRIAGE_AUDIT_IRRELEVANT_N":   int(os.getenv("SUBNET_TRIAGE_AUDIT_IRRELEVANT_N", "1")),
+    "TRIAGE_BORDERLINE_CAP":       int(os.getenv("SUBNET_TRIAGE_BORDERLINE_CAP", "3")),
+    "TRIAGE_HARD_LLM_VERDICTS":    os.getenv("SUBNET_TRIAGE_HARD_LLM_VERDICTS", "false").lower() == "true",
+    "TRIAGE_AUDIT_LLM_ENABLED":    os.getenv("SUBNET_TRIAGE_AUDIT_LLM_ENABLED", "false").lower() == "true",
+    "TRIAGE_AUDIT_MIN_CONFIDENCE": float(os.getenv("SUBNET_TRIAGE_AUDIT_MIN_CONFIDENCE", "0.75")),
+    "TRIAGE_HARD_WEIGHT":          float(os.getenv("SUBNET_TRIAGE_HARD_WEIGHT", "2.0")),
+    "TRIAGE_SOFT_WEIGHT":          float(os.getenv("SUBNET_TRIAGE_SOFT_WEIGHT", "0.4")),
+    "TRIAGE_CANARY_TTL_S":         float(os.getenv("SUBNET_TRIAGE_CANARY_TTL_S", "21600")),
+    "TRIAGE_CANARY_MAX_EXPOSURES": int(os.getenv("SUBNET_TRIAGE_CANARY_MAX_EXPOSURES", "30")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")

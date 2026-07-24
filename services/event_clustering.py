@@ -52,6 +52,13 @@ async def cluster_article(
     if not analysis_data:
         return None
 
+    # Triage-only submissions (schema v3: articles a miner filtered out as not
+    # market-relevant) carry a triage claim and proof-of-read but no analytic
+    # payload. Clustering them would compute the same empty fingerprint for
+    # every one and collapse the entire filtered stream into a single event.
+    if not analysis_data.get("event_fingerprint"):
+        return None
+
     event_fp = analysis_data.get("event_fingerprint", {})
     event_type = event_fp.get("event_type", "other")
     event_title = event_fp.get("event_title", "")
@@ -200,7 +207,7 @@ async def merge_fragmented_clusters(db: Prisma):
     cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
     recent_events = await db.event.find_many(
         where={"lastArticleAt": {"gte": cutoff}, "articleCount": {"gt": 0}},
-        order_by={"articleCount": "desc"},
+        order={"articleCount": "desc"},
     )
 
     merged_count = 0
