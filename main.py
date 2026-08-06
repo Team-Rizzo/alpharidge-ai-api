@@ -490,6 +490,12 @@ SUBNET_CONFIG = {
     "CLONE_COSINE_THRESHOLD": float(os.getenv("SUBNET_CLONE_COSINE_THRESHOLD", "0.99")),
     "CLONE_DIFFERENTIAL_ENABLED": os.getenv("SUBNET_CLONE_DIFFERENTIAL_ENABLED", "false").lower() == "true",
     "CLONE_DIVERGENCE_MARGIN": float(os.getenv("SUBNET_CLONE_DIVERGENCE_MARGIN", "0.05")),
+    # Weight window. These must stay in step with _REMOTE_CONFIG_KEYS on the
+    # validator: a key present there but missing here is never applied, and the
+    # rollout silently does nothing. Defaults reproduce the prior behaviour.
+    "WEIGHT_WINDOW_EPOCHS":       int(os.getenv("SUBNET_WEIGHT_WINDOW_EPOCHS", "1")),
+    "WEIGHT_WINDOW_EPOCHS_PREV":  int(os.getenv("SUBNET_WEIGHT_WINDOW_EPOCHS_PREV", "1")),
+    "WEIGHT_WINDOW_ACTIVE_BLOCK": int(os.getenv("SUBNET_WEIGHT_WINDOW_ACTIVE_BLOCK", "0")),
     "REPUTATION_SCORING_ENABLED":  os.getenv("SUBNET_REPUTATION_SCORING_ENABLED", "false").lower() == "true",
     "REPUTATION_GATING_ENABLED":   os.getenv("SUBNET_REPUTATION_GATING_ENABLED", "false").lower() == "true",
     "REPUTATION_EMA_ALPHA":        float(os.getenv("SUBNET_REPUTATION_EMA_ALPHA", "0.03")),
