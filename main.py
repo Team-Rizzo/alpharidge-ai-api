@@ -1908,6 +1908,39 @@ def _strip_nul(o):
 
 
 @app.post(
+    "/articles/variants",
+    response_model=SubmissionResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def submit_analysis_variants(
+    submission: dict,
+    validator_hotkey: str = Depends(get_validator_hotkey),
+):
+    """Store verifier analyses from overlap dispatch. Append-only; one row per
+    (article, miner), later submissions for the same pair are ignored."""
+    variants = submission.get("variants") or []
+    if not isinstance(variants, list) or not variants:
+        return SubmissionResponse(success=False, message="No variants", count=0)
+    stored = failed = 0
+    for v in variants[:500]:
+        try:
+            await prisma.analysisvariant.create(data={
+                "articleId": int(v["article_id"]),
+                "minerHotkey": str(v["miner_hotkey"]),
+                "analysisData": Json(_strip_nul(v["analysis_data"])),
+            })
+            stored += 1
+        except (KeyError, TypeError, ValueError):
+            continue   # malformed entry: drop
+        except Exception as e:
+            if "Unique constraint" in str(e):
+                continue   # duplicate (article, miner): already stored
+            failed += 1
+    ok = failed == 0 or stored > 0
+    return SubmissionResponse(success=ok, message=f"Stored {stored}, failed {failed}", count=stored)
+
+
+@app.post(
     "/articles/completed",
     response_model=SubmissionResponse,
     responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},

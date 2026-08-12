@@ -544,6 +544,21 @@ model NewsArticle {
 }
 
 /// News article analysis/classification results
+/// Additional analyses of the same article from overlap verifier miners.
+/// The canonical analysis stays 1:1 in news_article_analysis; this table is
+/// append-only raw material for comparison, consensus, and display.
+model AnalysisVariant {
+  id           Int      @id @default(autoincrement())
+  articleId    Int      @map("article_id")
+  minerHotkey  String   @map("miner_hotkey")
+  analysisData Json     @map("analysis_data") @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([articleId, minerHotkey], name: "uq_variant_article_miner")
+  @@index([articleId], name: "idx_variant_article")
+  @@map("analysis_variants")
+}
+
 model NewsArticleAnalysis {
   id                  Int          @id @default(autoincrement())
   articleId           Int          @unique @map("article_id")
