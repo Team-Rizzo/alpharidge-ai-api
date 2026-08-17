@@ -64,11 +64,35 @@ async def test_write_verdict_writes_valid_signed_row(monkeypatch):
     assert written is True
     assert len(fake.scoreverdict.rows) == 1
     row = fake.scoreverdict.rows[0]
-    assert row["pointsAwarded"] == 1.0           # clamped to MAX_POINTS_PER_ITEM (default 1)
+    assert row["pointsAwarded"] == 5.0           # real per-item pay, under MAX_POINTS_PER_ITEM
     assert row["minerHotkey"] == kp.ss58_address
     assert row["validatorVerdict"] == "valid"
     assert row["isAudit"] is False
     assert row["auditGroupId"] == "tweet:123:7"
+
+
+@pytest.mark.asyncio
+async def test_write_verdict_clamps_and_uses_storage_id(monkeypatch):
+    import main
+    fake = _FakePrisma()
+    monkeypatch.setattr(main, "prisma", fake, raising=False)
+    kp = Keypair.create_from_seed("0x" + "44" * 32)
+    monkeypatch.setattr(main.hotkey_whitelist, "is_miner_hotkey", lambda hk: hk == kp.ss58_address)
+    ah = "h"
+    # signature is over the item id; the row is stored under a per-miner key
+    sig = kp.sign(ac.miner_sign_message("555", ah, "n2").encode("utf-8")).hex()
+    written = await main.write_verdict(
+        resource_type="news_variant", resource_id="555",
+        storage_id=f"555:{kp.ss58_address}", validator_hotkey="vali1",
+        miner_hotkey=kp.ss58_address, miner_signature=sig, nonce="n2",
+        miner_analysis_hash=ah, validator_verdict="valid",
+        categorical_key="k", points_awarded=1e6, epoch=7,
+    )
+    assert written is True
+    row = fake.scoreverdict.rows[0]
+    assert row["resourceId"] == f"555:{kp.ss58_address}"
+    assert row["auditGroupId"] == f"news_variant:555:{kp.ss58_address}:7"
+    assert row["pointsAwarded"] == main.MAX_POINTS_PER_ITEM == 64.0
 
 
 def test_prod_safe_lever_defaults():

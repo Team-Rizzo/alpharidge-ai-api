@@ -525,7 +525,7 @@ SUBNET_CONFIG = {
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
-MAX_POINTS_PER_ITEM = float(os.getenv("MAX_POINTS_PER_ITEM", "1"))
+MAX_POINTS_PER_ITEM = float(os.getenv("MAX_POINTS_PER_ITEM", "64"))
 MAX_OUTSTANDING_LEASES = int(os.getenv("MAX_OUTSTANDING_LEASES", "0"))
 REPORT_CONSENSUS_THRESHOLD = int(os.getenv("REPORT_CONSENSUS_THRESHOLD", "2"))
 AUDIT_OVERLAP_RATE = float(os.getenv("AUDIT_OVERLAP_RATE", "0"))
@@ -1043,7 +1043,8 @@ async def write_verdict(*, resource_type: str, resource_id: str, validator_hotke
                         miner_hotkey: str, miner_signature: str, nonce: str,
                         miner_analysis_hash: str, validator_verdict: str,
                         categorical_key: str, points_awarded: float,
-                        epoch: int, is_audit: bool = False) -> bool:
+                        epoch: int, is_audit: bool = False,
+                        storage_id: Optional[str] = None) -> bool:
     """Verify the miner signature against the metagraph and upsert a ScoreVerdict.
     Returns True if a verdict row was written, False if rejected/skipped/errored.
     Best-effort: never raises, so a verdict failure can't break the completed-submission
@@ -1068,10 +1069,13 @@ async def write_verdict(*, resource_type: str, resource_id: str, validator_hotke
                              MAX_POINTS_PER_ITEM)
     # Deterministic group id: all validators scoring the same item+epoch share it,
     # enabling audit/divergence comparison regardless of whether this was an audit lease.
-    audit_group_id = f"{resource_type}:{resource_id}:{int(epoch)}"
+    # storage_id lets several verdicts for one item coexist (overlap dispatch);
+    # the miner signature is still verified against the item id.
+    stored_id = str(storage_id if storage_id is not None else resource_id)
+    audit_group_id = f"{resource_type}:{stored_id}:{int(epoch)}"
     data = {
         "resourceType": resource_type,
-        "resourceId": str(resource_id),
+        "resourceId": stored_id,
         "epoch": int(epoch),
         "validatorHotkey": validator_hotkey,
         "minerHotkey": miner_hotkey,
@@ -1088,7 +1092,7 @@ async def write_verdict(*, resource_type: str, resource_id: str, validator_hotke
     try:
         await prisma.scoreverdict.upsert(
             where={"uq_score_verdict_item": {
-                "resourceType": resource_type, "resourceId": str(resource_id),
+                "resourceType": resource_type, "resourceId": stored_id,
                 "validatorHotkey": validator_hotkey, "epoch": int(epoch)}},
             data={"create": data, "update": data},
         )
@@ -1902,16 +1906,18 @@ async def submit_analysis_variants(
     validator_hotkey: str = Depends(get_validator_hotkey),
 ):
     """Store verifier analyses from overlap dispatch. Append-only; one row per
-    (article, miner), later submissions for the same pair are ignored."""
+    (article, miner), later submissions for the same pair are ignored. Entries
+    carrying verdict fields also record a signed verdict."""
     variants = submission.get("variants") or []
     if not isinstance(variants, list) or not variants:
         return SubmissionResponse(success=False, message="No variants", count=0)
     stored = failed = 0
     for v in variants[:500]:
         try:
+            aid = int(v["article_id"]); mhk = str(v["miner_hotkey"])
             await prisma.analysisvariant.create(data={
-                "articleId": int(v["article_id"]),
-                "minerHotkey": str(v["miner_hotkey"]),
+                "articleId": aid,
+                "minerHotkey": mhk,
                 "analysisData": Json(_strip_nul(v["analysis_data"])),
             })
             stored += 1
@@ -1921,6 +1927,27 @@ async def submit_analysis_variants(
             if "Unique constraint" in str(e):
                 continue   # duplicate (article, miner): already stored
             failed += 1
+            continue
+        if v.get("miner_signature") and v.get("epoch") is not None:
+            # Verdicts only for items this validator leased.
+            owned = await prisma.newsarticlescoring.find_first(
+                where={"articleId": aid, "validatorHotkey": validator_hotkey})
+            if owned is None:
+                continue
+            await write_verdict(
+                resource_type="news_variant",
+                resource_id=str(aid),
+                storage_id=f"{aid}:{mhk}",
+                validator_hotkey=validator_hotkey,
+                miner_hotkey=mhk,
+                miner_signature=v.get("miner_signature"),
+                nonce=v.get("nonce"),
+                miner_analysis_hash=v.get("miner_analysis_hash"),
+                validator_verdict=v.get("validator_verdict"),
+                categorical_key=v.get("categorical_key"),
+                points_awarded=v.get("points_awarded"),
+                epoch=v.get("epoch"),
+            )
     ok = failed == 0 or stored > 0
     return SubmissionResponse(success=ok, message=f"Stored {stored}, failed {failed}", count=stored)
 
