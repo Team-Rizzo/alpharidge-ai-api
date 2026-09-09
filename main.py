@@ -527,6 +527,10 @@ SUBNET_CONFIG = {
     "EMISSION_BONUS_FULL":         float(os.getenv("SUBNET_EMISSION_BONUS_FULL", "0.75")),
     # Article triage (schema v3): single cutover switch.
     "TRIAGE_ENFORCED":             os.getenv("SUBNET_TRIAGE_ENFORCED", "false").lower() == "true",
+    # Keyed audit (Article Intelligence V3). Shadow = audit runs and logs on validators,
+    # records nothing; the validator reads both keys from this payload.
+    "AUDIT_SHADOW_ENABLED":        os.getenv("SUBNET_AUDIT_SHADOW_ENABLED", "false").lower() == "true",
+    "AUDIT_MAX_PER_BATCH":         int(os.getenv("SUBNET_AUDIT_MAX_PER_BATCH", "4")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
