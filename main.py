@@ -2731,7 +2731,8 @@ async def _current_block():
     """Chain head, or None when it cannot be read."""
     try:
         import bittensor as bt
-        return int(bt.subtensor(network=os.getenv("SUBTENSOR_NETWORK", "finney")).block)
+        return int(bt.Subtensor(network=os.getenv("SUBTENSOR_NETWORK")
+                             or os.getenv("BT_NETWORK", "finney")).block)
     except Exception as e:
         logger.warning(f"Could not read the chain head for profile resolution: {e}")
         return None

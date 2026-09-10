@@ -79,7 +79,8 @@ def chain_block() -> int | None:
     activation, and nothing downstream would notice."""
     try:
         import bittensor as bt
-        return int(bt.subtensor(network=os.getenv("SUBTENSOR_NETWORK", "finney")).block)
+        return int(bt.Subtensor(network=os.getenv("SUBTENSOR_NETWORK")
+                             or os.getenv("BT_NETWORK", "finney")).block)
     except Exception as e:
         print(f"could not read the chain head: {e}")
         return None
