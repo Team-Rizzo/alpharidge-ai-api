@@ -91,8 +91,8 @@ def _check_emission(d: dict) -> None:
     if full < start:
         raise ProfileError("emission.bonus_full below bonus_start")
     _num("emission", d, "midpoint", 0.0, 1.0)
-    _num("emission", d, "gain", 1.0, 50.0)
-    _num("emission", d, "ceiling", 0.0, 3.0)
+    _num("emission", d, "gain", 1.0, 200.0)
+    _num("emission", d, "ceiling", 0.0, 20.0)
     _int("emission", d, "n_min", 0, 1_000_000)
     _num("emission", d, "ema_alpha", 0.0, 1.0, lo_open=True)
 
@@ -137,7 +137,7 @@ def _check_oracle(d: dict) -> None:
     _num("oracle", d, "keyed_rate_pool", 0.0, 1.0)
     _num("oracle", d, "keyed_rate_keeper", 0.0, 1.0)
     _int("oracle", d, "claim_cap", 1, 10_000)
-    _num("oracle", d, "keeper_weight", 0.0, 10.0)
+    _num("oracle", d, "keeper_weight", 0.0, 100.0)
     _int("oracle", d, "schema_cutover_block", 0, 2**63 - 1)
     _bool("oracle", d, "live")
 
