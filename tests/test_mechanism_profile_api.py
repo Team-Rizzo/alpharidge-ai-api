@@ -154,3 +154,19 @@ def test_bad_channel_weights_are_refused(bad):
     raw["emission"]["channel_weights"] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(raw)
+
+
+def test_grader_model_scales_pass():
+    raw = valid()
+    raw["oracle"]["grader_models"][0]["scale"] = 0.8
+    raw["oracle"]["grader_models"][1]["keeper_scale"] = 0.9
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("field", ["scale", "keeper_scale"])
+@pytest.mark.parametrize("bad", [0.0, -0.1, 1.01, "x"])
+def test_bad_grader_model_scales_are_refused(field, bad):
+    raw = valid()
+    raw["oracle"]["grader_models"][0][field] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)

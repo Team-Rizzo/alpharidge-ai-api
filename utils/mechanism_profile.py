@@ -153,6 +153,9 @@ def _check_oracle(d: dict) -> None:
         if not isinstance(m.get("id"), str) or not m.get("id"):
             raise ProfileError(f"oracle.grader_models[{i}].id missing")
         total += _num(f"oracle.grader_models[{i}]", m, "weight", 0.0, 1e6)
+        for key in ("scale", "keeper_scale"):
+            if key in m:
+                _num(f"oracle.grader_models[{i}]", m, key, 0.0, 1.0, lo_open=True)
     if total <= 0:
         raise ProfileError("oracle.grader_models weights sum to zero")
 
