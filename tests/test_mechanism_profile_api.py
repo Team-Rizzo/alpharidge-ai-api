@@ -128,3 +128,59 @@ def test_a_tampered_body_fails_verification():
     body["settlement"]["C"] = 999_999.0
     assert not ac.verify_attestation(keypair.ss58_address, mp.signing_payload(body),
                                      signature)
+
+
+def test_channel_weights_are_optional():
+    raw = valid()
+    assert "channel_weights" not in raw["emission"]
+    assert mp.validate(raw) is not None
+
+
+def test_named_channel_weights_pass():
+    raw = valid()
+    raw["emission"]["channel_weights"] = {"audit": 4.0, "legacy": 0.0}
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [
+    {"nonsense": 1.0},
+    {"audit": -1.0},
+    {"audit": 101.0},
+    {name: 0.0 for name in mp.REPUTATION_CHANNELS},
+    [1, 2],
+])
+def test_bad_channel_weights_are_refused(bad):
+    raw = valid()
+    raw["emission"]["channel_weights"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+def test_grader_model_scales_pass():
+    raw = valid()
+    raw["oracle"]["grader_models"][0]["scale"] = 0.8
+    raw["oracle"]["grader_models"][1]["keeper_scale"] = 0.9
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("field", ["scale", "keeper_scale"])
+@pytest.mark.parametrize("bad", [0.0, -0.1, 1.01, "x"])
+def test_bad_grader_model_scales_are_refused(field, bad):
+    raw = valid()
+    raw["oracle"]["grader_models"][0][field] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+def test_channel_alphas_pass():
+    raw = valid()
+    raw["emission"]["channel_alphas"] = {"audit": 0.015}
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [{"nonsense": 0.1}, {"audit": 0.0}, {"audit": 1.5}, [0.1]])
+def test_bad_channel_alphas_are_refused(bad):
+    raw = valid()
+    raw["emission"]["channel_alphas"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
