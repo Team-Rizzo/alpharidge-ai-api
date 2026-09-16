@@ -106,6 +106,18 @@ def _check_channel_weights(d: dict) -> None:
         raise ProfileError("emission.channel_weights sum to zero")
 
 
+def _check_channel_alphas(d: dict) -> None:
+    raw = d.get("channel_alphas")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ProfileError("emission.channel_alphas must be an object")
+    for name in raw:
+        if name not in REPUTATION_CHANNELS:
+            raise ProfileError(f"emission.channel_alphas has unknown channel {name!r}")
+        _num("emission.channel_alphas", raw, name, 0.0, 1.0, lo_open=True)
+
+
 def _check_emission(d: dict) -> None:
     start = _num("emission", d, "bonus_start", 0.0, 1.0)
     full = _num("emission", d, "bonus_full", 0.0, 1.0)
@@ -117,6 +129,7 @@ def _check_emission(d: dict) -> None:
     _int("emission", d, "n_min", 0, 1_000_000)
     _num("emission", d, "ema_alpha", 0.0, 1.0, lo_open=True)
     _check_channel_weights(d)
+    _check_channel_alphas(d)
 
 
 def _check_rations(d: dict) -> None:

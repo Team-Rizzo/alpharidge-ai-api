@@ -170,3 +170,17 @@ def test_bad_grader_model_scales_are_refused(field, bad):
     raw["oracle"]["grader_models"][0][field] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(raw)
+
+
+def test_channel_alphas_pass():
+    raw = valid()
+    raw["emission"]["channel_alphas"] = {"audit": 0.015}
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [{"nonsense": 0.1}, {"audit": 0.0}, {"audit": 1.5}, [0.1]])
+def test_bad_channel_alphas_are_refused(bad):
+    raw = valid()
+    raw["emission"]["channel_alphas"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
