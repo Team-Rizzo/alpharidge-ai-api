@@ -85,6 +85,27 @@ def _check_settlement(d: dict) -> None:
     _bool("settlement", d, "live")
 
 
+# Must match alpharidge_ai/mechanism/channels.py.
+REPUTATION_CHANNELS = ("legacy", "triage", "floor", "audit", "keeper", "graded")
+DEFAULT_CHANNEL_WEIGHTS = {"legacy": 1.0, "triage": 1.0, "floor": 1.0,
+                           "audit": 2.0, "keeper": 0.5, "graded": 1.0}
+
+
+def _check_channel_weights(d: dict) -> None:
+    raw = d.get("channel_weights")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ProfileError("emission.channel_weights must be an object")
+    weights = dict(DEFAULT_CHANNEL_WEIGHTS)
+    for name in raw:
+        if name not in REPUTATION_CHANNELS:
+            raise ProfileError(f"emission.channel_weights has unknown channel {name!r}")
+        weights[name] = _num("emission.channel_weights", raw, name, 0.0, 100.0)
+    if sum(weights.values()) <= 0.0:
+        raise ProfileError("emission.channel_weights sum to zero")
+
+
 def _check_emission(d: dict) -> None:
     start = _num("emission", d, "bonus_start", 0.0, 1.0)
     full = _num("emission", d, "bonus_full", 0.0, 1.0)
@@ -95,6 +116,7 @@ def _check_emission(d: dict) -> None:
     _num("emission", d, "ceiling", 0.0, 3.0)
     _int("emission", d, "n_min", 0, 1_000_000)
     _num("emission", d, "ema_alpha", 0.0, 1.0, lo_open=True)
+    _check_channel_weights(d)
 
 
 def _check_rations(d: dict) -> None:
