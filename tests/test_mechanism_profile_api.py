@@ -39,8 +39,9 @@ def test_a_valid_profile_passes():
 
 
 @pytest.mark.parametrize("section,key,bad", [
-    ("emission", "gain", 51.0),
-    ("emission", "ceiling", 3.5),
+    ("emission", "gain", 201.0),
+    ("emission", "ceiling", 20.5),
+    ("oracle", "keeper_weight", 100.5),
     ("settlement", "C", 0.0),
     ("oracle", "keyed_rate_pool", 1.5),
     ("controller", "max_step", 0.0),
@@ -51,6 +52,19 @@ def test_out_of_range_values_are_refused(section, key, bad):
     body[section][key] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(body)
+
+
+@pytest.mark.parametrize("section,key,edge", [
+    ("emission", "gain", 200.0),
+    ("emission", "ceiling", 20.0),
+    ("oracle", "keeper_weight", 100.0),
+])
+def test_values_at_the_bound_are_accepted(section, key, edge):
+    """The bound itself is publishable: a profile has to be able to express the
+    top of each range, or the widening does not reach the curve."""
+    body = valid()
+    body[section][key] = edge
+    assert mp.validate(body) is not None
 
 
 def test_a_missing_section_is_refused():
