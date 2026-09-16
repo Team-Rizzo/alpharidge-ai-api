@@ -144,6 +144,12 @@ def test_a_tampered_body_fails_verification():
                                      signature)
 
 
+def valid_13() -> dict:
+    raw = valid()
+    raw["schema_version"] = "1.3.0"
+    return raw
+
+
 def test_channel_weights_are_optional():
     raw = valid()
     assert "channel_weights" not in raw["emission"]
@@ -151,7 +157,7 @@ def test_channel_weights_are_optional():
 
 
 def test_named_channel_weights_pass():
-    raw = valid()
+    raw = valid_13()
     raw["emission"]["channel_weights"] = {"audit": 4.0, "legacy": 0.0}
     assert mp.validate(raw) is not None
 
@@ -164,14 +170,14 @@ def test_named_channel_weights_pass():
     [1, 2],
 ])
 def test_bad_channel_weights_are_refused(bad):
-    raw = valid()
+    raw = valid_13()
     raw["emission"]["channel_weights"] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(raw)
 
 
 def test_grader_model_scales_pass():
-    raw = valid()
+    raw = valid_13()
     raw["oracle"]["grader_models"][0]["scale"] = 0.8
     raw["oracle"]["grader_models"][1]["keeper_scale"] = 0.9
     assert mp.validate(raw) is not None
@@ -180,21 +186,43 @@ def test_grader_model_scales_pass():
 @pytest.mark.parametrize("field", ["scale", "keeper_scale"])
 @pytest.mark.parametrize("bad", [0.0, -0.1, 1.01, "x"])
 def test_bad_grader_model_scales_are_refused(field, bad):
-    raw = valid()
+    raw = valid_13()
     raw["oracle"]["grader_models"][0][field] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(raw)
 
 
 def test_channel_alphas_pass():
-    raw = valid()
+    raw = valid_13()
     raw["emission"]["channel_alphas"] = {"audit": 0.015}
     assert mp.validate(raw) is not None
 
 
 @pytest.mark.parametrize("bad", [{"nonsense": 0.1}, {"audit": 0.0}, {"audit": 1.5}, [0.1]])
 def test_bad_channel_alphas_are_refused(bad):
-    raw = valid()
+    raw = valid_13()
     raw["emission"]["channel_alphas"] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(raw)
+
+
+
+@pytest.mark.parametrize("path, field, value", [
+    ("emission", "channel_weights", {"audit": 3.0}),
+    ("emission", "channel_alphas", {"audit": 0.015}),
+    ("model", "scale", 0.9),
+    ("model", "keeper_scale", 0.9),
+])
+def test_new_fields_need_the_new_schema(path, field, value):
+    raw = valid()
+    target = raw["emission"] if path == "emission" else raw["oracle"]["grader_models"][0]
+    target[field] = value
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+    raw["schema_version"] = "1.3.0"
+    assert mp.validate(raw) is not None
+
+
+def test_a_plain_profile_passes_under_either_schema():
+    assert mp.validate(valid()) is not None
+    assert mp.validate(valid_13()) is not None

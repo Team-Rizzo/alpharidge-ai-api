@@ -15,7 +15,11 @@ from typing import Any, Dict, Optional
 
 from utils import attestation_crypto as ac
 
-SUPPORTED_SCHEMA_VERSIONS = ("1.2.0",)
+SUPPORTED_SCHEMA_VERSIONS = ("1.2.0", "1.3.0")
+
+# Must match FIELDS_SINCE_1_3 in alpharidge_ai/mechanism/profile.py.
+FIELDS_SINCE_1_3 = {"emission": ("channel_weights", "channel_alphas"),
+                    "oracle.grader_models": ("scale", "keeper_scale")}
 
 SECONDS_PER_BLOCK = 12
 DEFAULT_REFRESH_SECONDS = 3600
@@ -232,4 +236,18 @@ def validate(raw: dict, *, current_version: Optional[int] = None,
             raise ProfileError(f"{name} section missing")
         check(section)
 
+    if schema_version == "1.2.0":
+        _refuse_newer_fields(raw)
+
     return raw
+
+
+def _refuse_newer_fields(raw: dict) -> None:
+    for name in FIELDS_SINCE_1_3["emission"]:
+        if name in raw["emission"]:
+            raise ProfileError(f"emission.{name} requires schema_version 1.3.0")
+    for i, m in enumerate(raw["oracle"].get("grader_models") or ()):
+        for name in FIELDS_SINCE_1_3["oracle.grader_models"]:
+            if isinstance(m, dict) and name in m:
+                raise ProfileError(
+                    f"oracle.grader_models[{i}].{name} requires schema_version 1.3.0")
