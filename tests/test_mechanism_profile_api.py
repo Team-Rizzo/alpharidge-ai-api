@@ -226,3 +226,31 @@ def test_new_fields_need_the_new_schema(path, field, value):
 def test_a_plain_profile_passes_under_either_schema():
     assert mp.validate(valid()) is not None
     assert mp.validate(valid_13()) is not None
+
+
+def valid_14() -> dict:
+    raw = valid()
+    raw["schema_version"] = "1.4.0"
+    return raw
+
+
+def test_channel_defaults_need_schema_1_4():
+    for version in ("1.2.0", "1.3.0"):
+        raw = valid()
+        raw["schema_version"] = version
+        raw["emission"]["channel_defaults"] = {"audit": 0.34}
+        with pytest.raises(mp.ProfileError):
+            mp.validate(raw)
+    raw = valid_14()
+    raw["emission"]["channel_defaults"] = {"audit": 0.34, "triage": 0.97, "floor": 0.93}
+    raw["emission"]["channel_weights"] = {"audit": 3.0}
+    raw["oracle"]["grader_models"][0]["scale"] = 0.9
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [{"nonsense": 0.5}, {"audit": -0.1}, {"audit": 1.1}, [0.5]])
+def test_bad_channel_defaults_are_refused(bad):
+    raw = valid_14()
+    raw["emission"]["channel_defaults"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)

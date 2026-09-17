@@ -15,11 +15,14 @@ from typing import Any, Dict, Optional
 
 from utils import attestation_crypto as ac
 
-SUPPORTED_SCHEMA_VERSIONS = ("1.2.0", "1.3.0")
+SUPPORTED_SCHEMA_VERSIONS = ("1.2.0", "1.3.0", "1.4.0")
 
-# Must match FIELDS_SINCE_1_3 in alpharidge_ai/mechanism/profile.py.
-FIELDS_SINCE_1_3 = {"emission": ("channel_weights", "channel_alphas"),
-                    "oracle.grader_models": ("scale", "keeper_scale")}
+# Must match FIELDS_SINCE in alpharidge_ai/mechanism/profile.py.
+FIELDS_SINCE = {
+    "1.3.0": {"emission": ("channel_weights", "channel_alphas"),
+              "oracle.grader_models": ("scale", "keeper_scale")},
+    "1.4.0": {"emission": ("channel_defaults",)},
+}
 
 SECONDS_PER_BLOCK = 12
 DEFAULT_REFRESH_SECONDS = 3600
@@ -110,6 +113,18 @@ def _check_channel_weights(d: dict) -> None:
         raise ProfileError("emission.channel_weights sum to zero")
 
 
+def _check_channel_defaults(d: dict) -> None:
+    raw = d.get("channel_defaults")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ProfileError("emission.channel_defaults must be an object")
+    for name in raw:
+        if name not in REPUTATION_CHANNELS:
+            raise ProfileError(f"emission.channel_defaults has unknown channel {name!r}")
+        _num("emission.channel_defaults", raw, name, 0.0, 1.0)
+
+
 def _check_channel_alphas(d: dict) -> None:
     raw = d.get("channel_alphas")
     if raw is None:
@@ -134,6 +149,7 @@ def _check_emission(d: dict) -> None:
     _num("emission", d, "ema_alpha", 0.0, 1.0, lo_open=True)
     _check_channel_weights(d)
     _check_channel_alphas(d)
+    _check_channel_defaults(d)
 
 
 def _check_rations(d: dict) -> None:
@@ -236,18 +252,24 @@ def validate(raw: dict, *, current_version: Optional[int] = None,
             raise ProfileError(f"{name} section missing")
         check(section)
 
-    if schema_version == "1.2.0":
-        _refuse_newer_fields(raw)
+    _refuse_newer_fields(raw, schema_version)
 
     return raw
 
 
-def _refuse_newer_fields(raw: dict) -> None:
-    for name in FIELDS_SINCE_1_3["emission"]:
-        if name in raw["emission"]:
-            raise ProfileError(f"emission.{name} requires schema_version 1.3.0")
-    for i, m in enumerate(raw["oracle"].get("grader_models") or ()):
-        for name in FIELDS_SINCE_1_3["oracle.grader_models"]:
-            if isinstance(m, dict) and name in m:
-                raise ProfileError(
-                    f"oracle.grader_models[{i}].{name} requires schema_version 1.3.0")
+def _version(text: str):
+    return tuple(int(x) for x in text.split("."))
+
+
+def _refuse_newer_fields(raw: dict, schema_version: str) -> None:
+    for since, fields in FIELDS_SINCE.items():
+        if _version(schema_version) >= _version(since):
+            continue
+        for name in fields.get("emission", ()):
+            if name in raw["emission"]:
+                raise ProfileError(f"emission.{name} requires schema_version {since}")
+        for i, m in enumerate(raw["oracle"].get("grader_models") or ()):
+            for name in fields.get("oracle.grader_models", ()):
+                if isinstance(m, dict) and name in m:
+                    raise ProfileError(
+                        f"oracle.grader_models[{i}].{name} requires schema_version {since}")
