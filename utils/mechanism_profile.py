@@ -15,14 +15,19 @@ from typing import Any, Dict, Optional
 
 from utils import attestation_crypto as ac
 
-SUPPORTED_SCHEMA_VERSIONS = ("1.2.0", "1.3.0", "1.4.0")
+SUPPORTED_SCHEMA_VERSIONS = ("1.2.0", "1.3.0", "1.4.0", "1.5.0")
 
 # Must match FIELDS_SINCE in alpharidge_ai/mechanism/profile.py.
 FIELDS_SINCE = {
     "1.3.0": {"emission": ("channel_weights", "channel_alphas"),
               "oracle.grader_models": ("scale", "keeper_scale")},
     "1.4.0": {"emission": ("channel_defaults",)},
+    "1.5.0": {"oracle.grader_models": ("audit_v2_scale",)},
 }
+
+# Must match CHANNELS_SINCE in alpharidge_ai/mechanism/profile.py.
+CHANNELS_SINCE = {"audit_v2": "1.5.0"}
+_CHANNEL_MAPS = ("channel_weights", "channel_alphas", "channel_defaults")
 
 SECONDS_PER_BLOCK = 12
 DEFAULT_REFRESH_SECONDS = 3600
@@ -93,9 +98,10 @@ def _check_settlement(d: dict) -> None:
 
 
 # Must match alpharidge_ai/mechanism/channels.py.
-REPUTATION_CHANNELS = ("legacy", "triage", "floor", "audit", "keeper", "graded")
+REPUTATION_CHANNELS = ("legacy", "triage", "floor", "audit", "keeper", "graded",
+                       "audit_v2")
 DEFAULT_CHANNEL_WEIGHTS = {"legacy": 1.0, "triage": 1.0, "floor": 1.0,
-                           "audit": 2.0, "keeper": 0.5, "graded": 1.0}
+                           "audit": 2.0, "keeper": 0.5, "graded": 1.0, "audit_v2": 0.0}
 
 
 def _check_channel_weights(d: dict) -> None:
@@ -186,7 +192,7 @@ def _check_oracle(d: dict) -> None:
         if not isinstance(m.get("id"), str) or not m.get("id"):
             raise ProfileError(f"oracle.grader_models[{i}].id missing")
         total += _num(f"oracle.grader_models[{i}]", m, "weight", 0.0, 1e6)
-        for key in ("scale", "keeper_scale"):
+        for key in ("scale", "keeper_scale", "audit_v2_scale"):
             if key in m:
                 _num(f"oracle.grader_models[{i}]", m, key, 0.0, 1.0, lo_open=True)
     if total <= 0:
@@ -262,6 +268,14 @@ def _version(text: str):
 
 
 def _refuse_newer_fields(raw: dict, schema_version: str) -> None:
+    for name, since in CHANNELS_SINCE.items():
+        if _version(schema_version) >= _version(since):
+            continue
+        for field_name in _CHANNEL_MAPS:
+            table = raw["emission"].get(field_name)
+            if isinstance(table, dict) and name in table:
+                raise ProfileError(
+                    f"emission.{field_name}.{name} requires schema_version {since}")
     for since, fields in FIELDS_SINCE.items():
         if _version(schema_version) >= _version(since):
             continue
