@@ -97,6 +97,12 @@ def _get_prisma():
     return prisma
 
 
+def _gate(article_col: str) -> str:
+    """Downstream relevance gate condition for an article id column ("" when off)."""
+    from services.relevance_gate import downstream_sql
+    return downstream_sql(article_col)
+
+
 # Epoch <-> block-window mapping (A5). Must match the validator's formula
 # (validation_client.py: start = epoch*BLOCK_LENGTH, stop = (epoch+1)*BLOCK_LENGTH-1).
 # Env-overridable; default 100 mirrors the validator's config default. Do not hardcode.
@@ -175,6 +181,7 @@ def _build_item_analysis(row: dict) -> "ItemAnalysis":
         entities=entities,
         assets=assets,
         quote_count=len(data.get("quotes") or []),
+        economic_data_count=len(data.get("economic_data") or []),
         analyzed_by=row.get("miner_hotkey"),
     )
 
@@ -307,13 +314,14 @@ async def dashboard_stats():
         latest_analysis_at = latest_rows[0]["latest"] if latest_rows and latest_rows[0]["latest"] else None
 
         # --- sentiment distribution across all sources ---
-        sentiment_rows = await prisma.query_raw("""
+        sentiment_rows = await prisma.query_raw(f"""
             SELECT sentiment, SUM(cnt)::int AS total FROM (
                 SELECT sentiment, COUNT(*) AS cnt FROM tweet_analysis WHERE sentiment IS NOT NULL GROUP BY sentiment
                 UNION ALL
                 SELECT sentiment, COUNT(*) AS cnt FROM telegram_message_analysis WHERE sentiment IS NOT NULL GROUP BY sentiment
                 UNION ALL
-                SELECT sentiment, COUNT(*) AS cnt FROM news_article_analysis WHERE sentiment IS NOT NULL GROUP BY sentiment
+                SELECT sentiment, COUNT(*) AS cnt FROM news_article_analysis
+                WHERE sentiment IS NOT NULL{_gate("news_article_analysis.article_id")} GROUP BY sentiment
             ) sub
             GROUP BY sentiment
         """)
@@ -631,7 +639,7 @@ async def dashboard_preview(
                     NULL::text AS sender_username, NULL::text AS sender_name, NULL::text AS group_title,
                     na.title AS article_title, na.source AS article_source, na.url AS article_url, naa.sector_symbol
                 FROM news_articles na JOIN news_article_analysis naa ON naa.article_id = na.id
-                WHERE naa.id IS NOT NULL{_asset_filter("naa.sector_symbol")}
+                WHERE naa.id IS NOT NULL{_asset_filter("naa.sector_symbol")}{_gate("na.id")}
             """)
 
         if not parts:
@@ -696,7 +704,7 @@ async def dashboard_article_sources():
     """
     prisma = _get_prisma()
     try:
-        rows = await prisma.query_raw("""
+        rows = await prisma.query_raw(f"""
             SELECT
                 na.source,
                 COUNT(*)::int AS total_articles,
@@ -707,7 +715,7 @@ async def dashboard_article_sources():
                 COUNT(*) FILTER (WHERE naa.sentiment = 'bearish')::int AS bearish,
                 COUNT(*) FILTER (WHERE naa.sentiment = 'very_bearish')::int AS very_bearish
             FROM news_articles na
-            LEFT JOIN news_article_analysis naa ON naa.article_id = na.id
+            LEFT JOIN news_article_analysis naa ON naa.article_id = na.id{_gate("na.id")}
             GROUP BY na.source
             ORDER BY total_articles DESC
         """)
@@ -1150,7 +1158,8 @@ async def dashboard_sentiment(
             """)
 
         if source_types is None or "article" in source_types:
-            cond = f"naa.analyzed_at >= CURRENT_DATE - ({p_days} || ' days')::interval AND naa.sentiment IS NOT NULL"
+            cond = (f"naa.analyzed_at >= CURRENT_DATE - ({p_days} || ' days')::interval "
+                    f"AND naa.sentiment IS NOT NULL{_gate('naa.article_id')}")
             if asset:
                 p = _next_param(asset)
                 cond += f" AND naa.sector_symbol = {p}"
@@ -1914,7 +1923,7 @@ async def dashboard_assets():
     prisma = _get_prisma()
     try:
         rows = await prisma.query_raw(
-            """
+            f"""
             SELECT
                 asset_symbol,
                 COUNT(*) AS total_items,
@@ -1936,7 +1945,8 @@ async def dashboard_assets():
                 FROM telegram_message_analysis WHERE asset_symbol IS NOT NULL AND asset_symbol != 'NONE'
                 UNION ALL
                 SELECT sector_symbol AS asset_symbol, sentiment, analyzed_at, 'article' AS source
-                FROM news_article_analysis WHERE sector_symbol IS NOT NULL AND sector_symbol != 'OTHER'
+                FROM news_article_analysis
+                WHERE sector_symbol IS NOT NULL AND sector_symbol != 'OTHER'{_gate("news_article_analysis.article_id")}
             ) AS all_assets
             GROUP BY asset_symbol
             ORDER BY total_items DESC

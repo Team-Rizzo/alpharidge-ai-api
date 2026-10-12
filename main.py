@@ -107,6 +107,7 @@ from models import (
     MinerEventBulkCreate,
 )
 import dispatch_status_store
+from services import relevance_gate
 from utils import mechanism_profile as mprofile
 from utils.auth import (
     AuthRequest,
@@ -266,16 +267,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to start background jobs: {e}")
 
+    gate_task = None
+    if SUBNET_CONFIG["DOWNSTREAM_GATE_ENABLED"]:
+        gate_task = asyncio.create_task(relevance_gate.run_gate_loop(prisma, SUBNET_CONFIG))
+        logger.info("Downstream relevance gate started")
+
     yield
 
     # Shutdown
     logger.info("Shutting down Alpharidge AI API...")
-    if background_task and not background_task.done():
-        background_task.cancel()
-        try:
-            await background_task
-        except asyncio.CancelledError:
-            pass
+    for task in (background_task, gate_task):
+        if task and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
     
     if price_prisma is not None:
         await price_prisma.disconnect()
@@ -543,6 +550,14 @@ SUBNET_CONFIG = {
     # records nothing; the validator reads both keys from this payload.
     "AUDIT_SHADOW_ENABLED":        os.getenv("SUBNET_AUDIT_SHADOW_ENABLED", "false").lower() == "true",
     "AUDIT_MAX_PER_BATCH":         int(os.getenv("SUBNET_AUDIT_MAX_PER_BATCH", "4")),
+    # Downstream relevance gate (services/relevance_gate.py). Read by this API only;
+    # independent of miner pay. Off by default: apply the article_gate migration first.
+    "DOWNSTREAM_GATE_ENABLED":         os.getenv("SUBNET_DOWNSTREAM_GATE_ENABLED", "false").lower() == "true",
+    "DOWNSTREAM_GATE_FAIL_OPEN":       os.getenv("SUBNET_DOWNSTREAM_GATE_FAIL_OPEN", "false").lower() == "true",
+    "DOWNSTREAM_GATE_MIN_PROSE_CHARS": int(os.getenv("SUBNET_DOWNSTREAM_GATE_MIN_PROSE_CHARS", "80")),
+    "DOWNSTREAM_JUDGE_ENABLED":        os.getenv("SUBNET_DOWNSTREAM_JUDGE_ENABLED", "true").lower() == "true",
+    "DOWNSTREAM_JUDGE_MODEL":          os.getenv("SUBNET_DOWNSTREAM_JUDGE_MODEL", "deepseek/deepseek-v4-flash"),
+    "DOWNSTREAM_JUDGE_DAILY_CAP":      int(os.getenv("SUBNET_DOWNSTREAM_JUDGE_DAILY_CAP", "100000")),
 }
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.0.0")
@@ -2077,8 +2092,9 @@ async def submit_completed_articles(
             )
             updated_count += result
 
-            # V2: Event clustering + narrative matching (non-blocking)
-            if ad and isinstance(ad, dict):
+            # V2: Event clustering + narrative matching (non-blocking). With the
+            # downstream gate on, this runs from the gate loop once the article passes.
+            if ad and isinstance(ad, dict) and not relevance_gate.holds_clustering(SUBNET_CONFIG):
                 try:
                     from services.event_clustering import cluster_article
                     from services.narrative_matcher import match_article_narratives

@@ -533,6 +533,7 @@ model NewsArticle {
 
   scorings       NewsArticleScoring[]
   analysis       NewsArticleAnalysis?
+  gate           ArticleGate?
   eventLinks     EventArticle[]
   narrativeLinks NarrativeArticle[]
 
@@ -599,6 +600,26 @@ model NewsArticleAnalysis {
 }
 
 /// Scoring records for news article validation
+// Downstream relevance gate verdict, one per article (services/relevance_gate.py).
+model ArticleGate {
+  articleId     Int       @id @map("article_id")
+  eligible      Boolean
+  reason        String?
+  minerLabel    String?   @map("miner_label")
+  relevant      Boolean?
+  judgeModel    String?   @map("judge_model")
+  judgeAttempts Int       @default(0) @map("judge_attempts")
+  judgedAt      DateTime? @map("judged_at") @db.Timestamptz
+  clusteredAt   DateTime? @map("clustered_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  article       NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([judgedAt], name: "idx_article_gate_judged_at")
+  @@map("article_gate")
+}
+
 model NewsArticleScoring {
   id              Int          @id @default(autoincrement())
   articleId       Int          @map("article_id")

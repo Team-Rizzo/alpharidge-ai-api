@@ -384,6 +384,7 @@ class ItemAnalysis(BaseModel):
     entities: List[ItemEntity] = []
     assets: List[str] = []
     quote_count: int = 0
+    economic_data_count: int = 0
     analyzed_by: Optional[str] = None           # miner_hotkey on the analysis row (provenance)
 
 
