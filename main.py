@@ -507,6 +507,21 @@ SUBNET_CONFIG = {
     "CLONE_COSINE_THRESHOLD": float(os.getenv("SUBNET_CLONE_COSINE_THRESHOLD", "0.99")),
     "CLONE_DIFFERENTIAL_ENABLED": os.getenv("SUBNET_CLONE_DIFFERENTIAL_ENABLED", "false").lower() == "true",
     "CLONE_DIVERGENCE_MARGIN": float(os.getenv("SUBNET_CLONE_DIVERGENCE_MARGIN", "0.05")),
+    # Relevance judging (alpharidge-ai 3.9.13). Consensus keys on the validator: only served
+    # values apply. Shadow stays on until both validators are ready to enforce.
+    "TRIAGE_JUDGE_SHADOW": os.getenv("SUBNET_TRIAGE_JUDGE_SHADOW", "true").lower() == "true",
+    "TRIAGE_JUDGE_ALL": os.getenv("SUBNET_TRIAGE_JUDGE_ALL", "true").lower() == "true",
+    "TRIAGE_JUDGE_MODEL": os.getenv("SUBNET_TRIAGE_JUDGE_MODEL", "deepseek/deepseek-v4-flash"),
+    "TRIAGE_JUDGE_CONFIRM": os.getenv("SUBNET_TRIAGE_JUDGE_CONFIRM", "true").lower() == "true",
+    "TRIAGE_REPEAT_THRESHOLD": float(os.getenv("SUBNET_TRIAGE_REPEAT_THRESHOLD", "0.05")),
+    "TRIAGE_REPEAT_PRIOR_N": float(os.getenv("SUBNET_TRIAGE_REPEAT_PRIOR_N", "50")),
+    "TRIAGE_REPEAT_PRIOR_MULT": float(os.getenv("SUBNET_TRIAGE_REPEAT_PRIOR_MULT", "2.0")),
+    "TRIAGE_FP_HARD": os.getenv("SUBNET_TRIAGE_FP_HARD", "true").lower() == "true",
+    "TRIAGE_AUDIT_BORDERLINE": os.getenv("SUBNET_TRIAGE_AUDIT_BORDERLINE", "true").lower() == "true",
+    "TRIAGE_AUDIT_SKIP_GAZETTEER": os.getenv("SUBNET_TRIAGE_AUDIT_SKIP_GAZETTEER", "true").lower() == "true",
+    "PREMIUM_SELF_CONSISTENCY": os.getenv("SUBNET_PREMIUM_SELF_CONSISTENCY", "true").lower() == "true",
+    "PREMIUM_CONTENT_GATE": os.getenv("SUBNET_PREMIUM_CONTENT_GATE", "true").lower() == "true",
+    "BORDERLINE_VALUE_GROUNDED": os.getenv("SUBNET_BORDERLINE_VALUE_GROUNDED", "true").lower() == "true",
     # Weight window. These must stay in step with _REMOTE_CONFIG_KEYS on the
     # validator: a key present there but missing here is never applied, and the
     # rollout silently does nothing. Defaults reproduce the prior behaviour.
