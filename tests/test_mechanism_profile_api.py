@@ -39,8 +39,9 @@ def test_a_valid_profile_passes():
 
 
 @pytest.mark.parametrize("section,key,bad", [
-    ("emission", "gain", 51.0),
-    ("emission", "ceiling", 3.5),
+    ("emission", "gain", 201.0),
+    ("emission", "ceiling", 20.5),
+    ("oracle", "keeper_weight", 100.5),
     ("settlement", "C", 0.0),
     ("oracle", "keyed_rate_pool", 1.5),
     ("controller", "max_step", 0.0),
@@ -51,6 +52,19 @@ def test_out_of_range_values_are_refused(section, key, bad):
     body[section][key] = bad
     with pytest.raises(mp.ProfileError):
         mp.validate(body)
+
+
+@pytest.mark.parametrize("section,key,edge", [
+    ("emission", "gain", 200.0),
+    ("emission", "ceiling", 20.0),
+    ("oracle", "keeper_weight", 100.0),
+])
+def test_values_at_the_bound_are_accepted(section, key, edge):
+    """The bound itself is publishable: a profile has to be able to express the
+    top of each range, or the widening does not reach the curve."""
+    body = valid()
+    body[section][key] = edge
+    assert mp.validate(body) is not None
 
 
 def test_a_missing_section_is_refused():
@@ -128,3 +142,159 @@ def test_a_tampered_body_fails_verification():
     body["settlement"]["C"] = 999_999.0
     assert not ac.verify_attestation(keypair.ss58_address, mp.signing_payload(body),
                                      signature)
+
+
+def valid_13() -> dict:
+    raw = valid()
+    raw["schema_version"] = "1.3.0"
+    return raw
+
+
+def test_channel_weights_are_optional():
+    raw = valid()
+    assert "channel_weights" not in raw["emission"]
+    assert mp.validate(raw) is not None
+
+
+def test_named_channel_weights_pass():
+    raw = valid_13()
+    raw["emission"]["channel_weights"] = {"audit": 4.0, "legacy": 0.0}
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [
+    {"nonsense": 1.0},
+    {"audit": -1.0},
+    {"audit": 101.0},
+    {name: 0.0 for name in mp.REPUTATION_CHANNELS},
+    [1, 2],
+])
+def test_bad_channel_weights_are_refused(bad):
+    raw = valid_13()
+    raw["emission"]["channel_weights"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+def test_grader_model_scales_pass():
+    raw = valid_13()
+    raw["oracle"]["grader_models"][0]["scale"] = 0.8
+    raw["oracle"]["grader_models"][1]["keeper_scale"] = 0.9
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("field", ["scale", "keeper_scale"])
+@pytest.mark.parametrize("bad", [0.0, -0.1, 1.01, "x"])
+def test_bad_grader_model_scales_are_refused(field, bad):
+    raw = valid_13()
+    raw["oracle"]["grader_models"][0][field] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+def test_channel_alphas_pass():
+    raw = valid_13()
+    raw["emission"]["channel_alphas"] = {"audit": 0.015}
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [{"nonsense": 0.1}, {"audit": 0.0}, {"audit": 1.5}, [0.1]])
+def test_bad_channel_alphas_are_refused(bad):
+    raw = valid_13()
+    raw["emission"]["channel_alphas"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+
+@pytest.mark.parametrize("path, field, value", [
+    ("emission", "channel_weights", {"audit": 3.0}),
+    ("emission", "channel_alphas", {"audit": 0.015}),
+    ("model", "scale", 0.9),
+    ("model", "keeper_scale", 0.9),
+])
+def test_new_fields_need_the_new_schema(path, field, value):
+    raw = valid()
+    target = raw["emission"] if path == "emission" else raw["oracle"]["grader_models"][0]
+    target[field] = value
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+    raw["schema_version"] = "1.3.0"
+    assert mp.validate(raw) is not None
+
+
+def test_a_plain_profile_passes_under_either_schema():
+    assert mp.validate(valid()) is not None
+    assert mp.validate(valid_13()) is not None
+
+
+def valid_14() -> dict:
+    raw = valid()
+    raw["schema_version"] = "1.4.0"
+    return raw
+
+
+def test_channel_defaults_need_schema_1_4():
+    for version in ("1.2.0", "1.3.0"):
+        raw = valid()
+        raw["schema_version"] = version
+        raw["emission"]["channel_defaults"] = {"audit": 0.34}
+        with pytest.raises(mp.ProfileError):
+            mp.validate(raw)
+    raw = valid_14()
+    raw["emission"]["channel_defaults"] = {"audit": 0.34, "triage": 0.97, "floor": 0.93}
+    raw["emission"]["channel_weights"] = {"audit": 3.0}
+    raw["oracle"]["grader_models"][0]["scale"] = 0.9
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [{"nonsense": 0.5}, {"audit": -0.1}, {"audit": 1.1}, [0.5]])
+def test_bad_channel_defaults_are_refused(bad):
+    raw = valid_14()
+    raw["emission"]["channel_defaults"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+def valid_15() -> dict:
+    raw = valid()
+    raw["schema_version"] = "1.5.0"
+    return raw
+
+
+@pytest.mark.parametrize("field,value", [("channel_weights", 3.0), ("channel_alphas", 0.03),
+                                         ("channel_defaults", 0.4)])
+def test_the_audit_v2_channel_needs_schema_1_5(field, value):
+    raw = valid_14()
+    raw["emission"][field] = {"audit_v2": value}
+    with pytest.raises(mp.ProfileError, match="1.5.0"):
+        mp.validate(raw)
+    raw = valid_15()
+    raw["emission"][field] = {"audit_v2": value}
+    assert mp.validate(raw) is not None
+
+
+def test_the_audit_v2_scale_needs_schema_1_5():
+    raw = valid_14()
+    raw["oracle"]["grader_models"][0]["audit_v2_scale"] = 0.8
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+    raw["schema_version"] = "1.5.0"
+    assert mp.validate(raw) is not None
+
+
+@pytest.mark.parametrize("bad", [0.0, 1.5, -0.2])
+def test_a_bad_audit_v2_scale_is_refused(bad):
+    raw = valid_15()
+    raw["oracle"]["grader_models"][0]["audit_v2_scale"] = bad
+    with pytest.raises(mp.ProfileError):
+        mp.validate(raw)
+
+
+def test_schema_1_5_accepts_the_earlier_fields_and_the_swap():
+    raw = valid_15()
+    raw["emission"]["channel_weights"] = {"audit": 0.0, "audit_v2": 3.0, "triage": 1.0}
+    raw["emission"]["channel_defaults"] = {"audit_v2": 0.4, "triage": 0.97}
+    raw["oracle"]["grader_models"][0].update(scale=0.95, keeper_scale=1.0,
+                                             audit_v2_scale=0.83)
+    assert mp.validate(raw) is not None

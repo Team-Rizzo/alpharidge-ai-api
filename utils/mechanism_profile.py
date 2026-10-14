@@ -15,7 +15,19 @@ from typing import Any, Dict, Optional
 
 from utils import attestation_crypto as ac
 
-SUPPORTED_SCHEMA_VERSIONS = ("1.2.0",)
+SUPPORTED_SCHEMA_VERSIONS = ("1.2.0", "1.3.0", "1.4.0", "1.5.0")
+
+# Must match FIELDS_SINCE in alpharidge_ai/mechanism/profile.py.
+FIELDS_SINCE = {
+    "1.3.0": {"emission": ("channel_weights", "channel_alphas"),
+              "oracle.grader_models": ("scale", "keeper_scale")},
+    "1.4.0": {"emission": ("channel_defaults",)},
+    "1.5.0": {"oracle.grader_models": ("audit_v2_scale",)},
+}
+
+# Must match CHANNELS_SINCE in alpharidge_ai/mechanism/profile.py.
+CHANNELS_SINCE = {"audit_v2": "1.5.0"}
+_CHANNEL_MAPS = ("channel_weights", "channel_alphas", "channel_defaults")
 
 SECONDS_PER_BLOCK = 12
 DEFAULT_REFRESH_SECONDS = 3600
@@ -85,6 +97,52 @@ def _check_settlement(d: dict) -> None:
     _bool("settlement", d, "live")
 
 
+# Must match alpharidge_ai/mechanism/channels.py.
+REPUTATION_CHANNELS = ("legacy", "triage", "floor", "audit", "keeper", "graded",
+                       "audit_v2")
+DEFAULT_CHANNEL_WEIGHTS = {"legacy": 1.0, "triage": 1.0, "floor": 1.0,
+                           "audit": 2.0, "keeper": 0.5, "graded": 1.0, "audit_v2": 0.0}
+
+
+def _check_channel_weights(d: dict) -> None:
+    raw = d.get("channel_weights")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ProfileError("emission.channel_weights must be an object")
+    weights = dict(DEFAULT_CHANNEL_WEIGHTS)
+    for name in raw:
+        if name not in REPUTATION_CHANNELS:
+            raise ProfileError(f"emission.channel_weights has unknown channel {name!r}")
+        weights[name] = _num("emission.channel_weights", raw, name, 0.0, 100.0)
+    if sum(weights.values()) <= 0.0:
+        raise ProfileError("emission.channel_weights sum to zero")
+
+
+def _check_channel_defaults(d: dict) -> None:
+    raw = d.get("channel_defaults")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ProfileError("emission.channel_defaults must be an object")
+    for name in raw:
+        if name not in REPUTATION_CHANNELS:
+            raise ProfileError(f"emission.channel_defaults has unknown channel {name!r}")
+        _num("emission.channel_defaults", raw, name, 0.0, 1.0)
+
+
+def _check_channel_alphas(d: dict) -> None:
+    raw = d.get("channel_alphas")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ProfileError("emission.channel_alphas must be an object")
+    for name in raw:
+        if name not in REPUTATION_CHANNELS:
+            raise ProfileError(f"emission.channel_alphas has unknown channel {name!r}")
+        _num("emission.channel_alphas", raw, name, 0.0, 1.0, lo_open=True)
+
+
 def _check_emission(d: dict) -> None:
     start = _num("emission", d, "bonus_start", 0.0, 1.0)
     full = _num("emission", d, "bonus_full", 0.0, 1.0)
@@ -95,6 +153,9 @@ def _check_emission(d: dict) -> None:
     _num("emission", d, "ceiling", 0.0, 20.0)
     _int("emission", d, "n_min", 0, 1_000_000)
     _num("emission", d, "ema_alpha", 0.0, 1.0, lo_open=True)
+    _check_channel_weights(d)
+    _check_channel_alphas(d)
+    _check_channel_defaults(d)
 
 
 def _check_rations(d: dict) -> None:
@@ -131,6 +192,9 @@ def _check_oracle(d: dict) -> None:
         if not isinstance(m.get("id"), str) or not m.get("id"):
             raise ProfileError(f"oracle.grader_models[{i}].id missing")
         total += _num(f"oracle.grader_models[{i}]", m, "weight", 0.0, 1e6)
+        for key in ("scale", "keeper_scale", "audit_v2_scale"):
+            if key in m:
+                _num(f"oracle.grader_models[{i}]", m, key, 0.0, 1.0, lo_open=True)
     if total <= 0:
         raise ProfileError("oracle.grader_models weights sum to zero")
 
@@ -194,4 +258,32 @@ def validate(raw: dict, *, current_version: Optional[int] = None,
             raise ProfileError(f"{name} section missing")
         check(section)
 
+    _refuse_newer_fields(raw, schema_version)
+
     return raw
+
+
+def _version(text: str):
+    return tuple(int(x) for x in text.split("."))
+
+
+def _refuse_newer_fields(raw: dict, schema_version: str) -> None:
+    for name, since in CHANNELS_SINCE.items():
+        if _version(schema_version) >= _version(since):
+            continue
+        for field_name in _CHANNEL_MAPS:
+            table = raw["emission"].get(field_name)
+            if isinstance(table, dict) and name in table:
+                raise ProfileError(
+                    f"emission.{field_name}.{name} requires schema_version {since}")
+    for since, fields in FIELDS_SINCE.items():
+        if _version(schema_version) >= _version(since):
+            continue
+        for name in fields.get("emission", ()):
+            if name in raw["emission"]:
+                raise ProfileError(f"emission.{name} requires schema_version {since}")
+        for i, m in enumerate(raw["oracle"].get("grader_models") or ()):
+            for name in fields.get("oracle.grader_models", ()):
+                if isinstance(m, dict) and name in m:
+                    raise ProfileError(
+                        f"oracle.grader_models[{i}].{name} requires schema_version {since}")
