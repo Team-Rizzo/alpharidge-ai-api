@@ -22,3 +22,16 @@ def test_enforcement_is_one_served_flip(monkeypatch):
     import main
     importlib.reload(main)
     assert main.SUBNET_CONFIG["TRIAGE_JUDGE_SHADOW"] is False
+
+
+def test_reasoning_and_recycle_keys_are_served(monkeypatch):
+    for k in ("SUBNET_VALIDATOR_REASONING", "SUBNET_GRADER_REASONING", "SUBNET_TRIAGE_RECYCLE_CAP"):
+        monkeypatch.delenv(k, raising=False)
+    import main
+    importlib.reload(main)
+    cfg = main.SUBNET_CONFIG
+    assert cfg["VALIDATOR_REASONING"] == "off" and cfg["GRADER_REASONING"] == "off"
+    assert cfg["TRIAGE_RECYCLE_CAP"] == 3
+    monkeypatch.setenv("SUBNET_VALIDATOR_REASONING", "default")
+    importlib.reload(main)
+    assert main.SUBNET_CONFIG["VALIDATOR_REASONING"] == "default"

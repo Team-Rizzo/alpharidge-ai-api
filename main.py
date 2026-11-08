@@ -510,6 +510,9 @@ SUBNET_CONFIG = {
     # Relevance judging (alpharidge-ai 3.9.13). Consensus keys on the validator: only served
     # values apply. Shadow stays on until both validators are ready to enforce.
     "TRIAGE_JUDGE_SHADOW": os.getenv("SUBNET_TRIAGE_JUDGE_SHADOW", "true").lower() == "true",
+    "VALIDATOR_REASONING": os.getenv("SUBNET_VALIDATOR_REASONING", "off"),
+    "GRADER_REASONING": os.getenv("SUBNET_GRADER_REASONING", "off"),
+    "TRIAGE_RECYCLE_CAP": int(os.getenv("SUBNET_TRIAGE_RECYCLE_CAP", "3")),
     "TRIAGE_JUDGE_ALL": os.getenv("SUBNET_TRIAGE_JUDGE_ALL", "true").lower() == "true",
     "TRIAGE_JUDGE_MODEL": os.getenv("SUBNET_TRIAGE_JUDGE_MODEL", "deepseek/deepseek-v4-flash"),
     "TRIAGE_JUDGE_CONFIRM": os.getenv("SUBNET_TRIAGE_JUDGE_CONFIRM", "true").lower() == "true",
