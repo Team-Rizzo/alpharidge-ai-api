@@ -1,0 +1,63 @@
+{
+ "index": [
+  {
+   "kind": "event",
+   "headline": "Department of Labor awards $40 million grant to Northfield College",
+   "event_type": "funding",
+   "category": "finance",
+   "actors": [
+    {
+     "id_scheme": "wikidata",
+     "id": "Q628807",
+     "role": "issuer",
+     "name": "Department of Labor"
+    },
+    {
+     "id_scheme": "other",
+     "id": "northfield",
+     "role": "recipient",
+     "name": "Northfield College"
+    }
+   ],
+   "event_date": "2026-10-13",
+   "facts": [
+    {
+     "field": "amount",
+     "value": 40,
+     "unit": "usd_millions"
+    }
+   ],
+   "source_url": "https://www.example.gov/news/grants"
+  }
+ ],
+ "replay": {
+  "kind": "event",
+  "headline": "Labor Department grants $25 million to Lakeside Institute",
+  "event_type": "funding",
+  "category": "finance",
+  "actors": [
+   {
+    "id_scheme": "other",
+    "id": "lakeside",
+    "role": "recipient",
+    "name": "Lakeside Institute"
+   },
+   {
+    "id_scheme": "other",
+    "id": "dol",
+    "role": "issuer",
+    "name": "US Department of Labor"
+   }
+  ],
+  "event_date": "2026-10-13",
+  "facts": [
+   {
+    "field": "amount",
+    "value": 25,
+    "unit": "usd_millions"
+   }
+  ],
+  "source_url": "https://www.example.gov/news/grants"
+ },
+ "expect": "known"
+}

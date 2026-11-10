@@ -1,0 +1,65 @@
+{
+ "index": [
+  {
+   "kind": "event",
+   "headline": "Umbrella agrees to acquire Nimbus Games for $1.2 billion",
+   "event_type": "merger_acquisition",
+   "category": "finance",
+   "stage": "announced",
+   "actors": [
+    {
+     "id_scheme": "wikidata",
+     "id": "Q99999004",
+     "role": "acquirer",
+     "name": "Umbrella"
+    },
+    {
+     "id_scheme": "other",
+     "id": "nimbus-games",
+     "role": "target",
+     "name": "Nimbus Games"
+    }
+   ],
+   "event_date": "2026-10-13",
+   "facts": [
+    {
+     "field": "deal_value",
+     "value": 1.2,
+     "unit": "usd_billions"
+    }
+   ],
+   "source_url": "https://news.example.com/umbrella-nimbus"
+  }
+ ],
+ "replay": {
+  "kind": "event",
+  "headline": "Nimbus Games sold to Umbrella",
+  "event_type": "merger_acquisition",
+  "category": "finance",
+  "stage": "announced",
+  "actors": [
+   {
+    "id_scheme": "other",
+    "id": "nimbus-games",
+    "role": "acquirer",
+    "name": "Nimbus Games"
+   },
+   {
+    "id_scheme": "wikidata",
+    "id": "Q99999004",
+    "role": "target",
+    "name": "Umbrella"
+   }
+  ],
+  "event_date": "2026-10-13",
+  "facts": [
+   {
+    "field": "deal_value",
+    "value": 1.2,
+    "unit": "usd_billions"
+   }
+  ],
+  "source_url": "https://other.example.net/swap"
+ },
+ "expect": "known"
+}

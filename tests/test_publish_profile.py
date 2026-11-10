@@ -1,4 +1,4 @@
-"""The publish tool: the thing an operator is holding when economics change."""
+"""The publish tool: durations, the diff against the active profile and the capacity notice."""
 
 import importlib.util
 import sys
@@ -64,19 +64,17 @@ def test_a_day_is_the_expected_number_of_blocks():
 
 # ---- the diff ----------------------------------------------------------------------
 
-LIVE = {"settlement": {"C": 26697.0, "live": False},
-        "emission": {"gain": 100.0, "midpoint": 0.59},
-        "rations": {"dispatch": False}, "oracle": {"live": False}, "controller": {}}
+LIVE = {"settlement": {"C": 26697.0},
+        "ledger": {"judges": ["5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"], "window_epochs": 216}}
 
 
 def test_every_changed_value_is_listed():
-    new = {**LIVE, "settlement": {"C": 30000.0, "live": True},
-           "emission": {"gain": 15.0, "midpoint": 0.59}}
+    new = {"settlement": {"C": 30000.0},
+           "ledger": {"judges": ["5BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"], "window_epochs": 216}}
     lines = "\n".join(pp.describe_change(new, LIVE))
     assert "settlement.C" in lines and "+12.4%" in lines
-    assert "emission.gain" in lines
-    assert "settlement.live" in lines
-    assert "midpoint" not in lines          # unchanged values stay quiet
+    assert "ledger.judges" in lines
+    assert "window_epochs" not in lines          # unchanged values stay quiet
 
 
 def test_a_publish_that_changes_nothing_says_so():
@@ -88,17 +86,9 @@ def test_the_first_publish_is_labelled():
 
 
 def test_percentages_are_only_shown_where_they_mean_something():
-    new = {**LIVE, "oracle": {"live": True}}
-    line = [l for l in pp.describe_change(new, LIVE) if "oracle.live" in l][0]
-    assert "%" not in line          # a boolean has no percentage change
-
-
-# ---- the switches ------------------------------------------------------------------
-
-def test_the_pay_affecting_switches_are_the_ones_called_out():
-    assert set(pp.SWITCHES) == {
-        ("settlement", "live"), ("settlement", "floor_gating"),
-        ("rations", "dispatch"), ("oracle", "live")}
+    new = {**LIVE, "ledger": {"judges": ["5BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"], "window_epochs": 216}}
+    line = [l for l in pp.describe_change(new, LIVE) if "judges" in l][0]
+    assert "%" not in line          # a list has no percentage change
 
 
 # ---- the capacity notice -----------------------------------------------------------

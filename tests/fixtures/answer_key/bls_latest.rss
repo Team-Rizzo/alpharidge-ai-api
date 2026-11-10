@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xml:base="https://www.bls.gov/feeds" xmlns:dc="http://purl.org/dc/elements/1.1/">
+	<channel>
+		<title>Major Economic Indicators Latest Numbers</title>
+		<link>https://www.bls.gov/bls/</link>
+		<description>Latest Numbers for Major Economic Indicators, U.S. Bureau of Labor Statistics</description>
+		<language>en</language>
+		<item>
+			<title>Major Economic Indicators Latest Numbers</title>
+			<link>https://www.bls.gov/bls/</link>
+			<description><![CDATA[<p>Consumer Price Index (CPI):								<br>
+																					<strong><span title="All items, U.S. city average, all urban consumers, 1982-84=100, 1-month percent change, seasonally adjusted" class="data">+0.4%  in Aug 2026</span></strong><br>													<a href="https://www.bls.gov/news.release/cpi.toc.htm">News Release</a><br>		
+																										<a href="https://data.bls.gov/pdq/SurveyOutputServlet?data_tool=latest_numbers&amp;series_id=CUSR0000SA0&amp;output_view=pct_1mth">Historical Data</a>
+							</p><p>Unemployment Rate:								<br>
+																					<strong><span title="In percent, seasonally adjusted" class="data">4.2%  in Sep 2026</span></strong><br>													<a href="https://www.bls.gov/news.release/empsit.toc.htm">News Release</a><br>		
+																		<a href="https://data.bls.gov/pdq/SurveyOutputServlet?data_tool=latest_numbers&amp;series_id=LNS14000000">Historical Data</a>
+							</p><p>Payroll Employment:								<br>
+																					<strong><span title="Number of jobs, 1-month net change, seasonally adjusted" class="data">+29,000(p)  in Sep 2026</span></strong><br>													<a href="https://www.bls.gov/news.release/empsit.toc.htm">News Release</a><br>		
+																										<a href="https://data.bls.gov/pdq/SurveyOutputServlet?data_tool=latest_numbers&amp;series_id=CES0000000001&amp;output_view=net_1mth">Historical Data</a>
+							</p>]]></description>
+			<pubDate>Fri,  9 Oct 2026 10:00:29 -0400</pubDate>
+			<dc:creator>U.S. Bureau of Labor Statistics</dc:creator>
+		</item>
+	</channel>
+</rss>

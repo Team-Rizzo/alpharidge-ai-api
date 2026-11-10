@@ -1,15 +1,13 @@
 """Publish a mechanism profile.
 
-The only way any economic value changes. Validates the body, signs it with the
-attestation key validators already verify, and appends it. There is no edit path and no
-delete path: rolling back means publishing the previous body under a higher version, so
-the table is the complete record of what the mechanism has ever been.
+Validates the body, signs it with the attestation key validators already verify, and
+appends it. There is no edit or delete path: rolling back means publishing the previous
+body under a higher version, so the table is the complete record of the mechanism.
 
     python scripts/publish_profile.py --from profile.json --activate-in 7d --dry-run
     python scripts/publish_profile.py --from profile.json --activate-in 7d
 
-Shows what would change and what the fleet looks like before it writes anything. Run it
-dry first; the diff against what is live is the point.
+Before writing, it shows the changes from the live profile and the validator versions.
 """
 from __future__ import annotations
 
@@ -25,21 +23,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from prisma import Json, Prisma  # noqa: E402
 
-from utils import mechanism_profile as mp  # noqa: E402
+from app.utils import block as chain  # noqa: E402
+from app.utils import mechanism_profile as mp  # noqa: E402
 
 SECONDS_PER_BLOCK = mp.SECONDS_PER_BLOCK
 BLOCKS_PER_DAY = 86_400 // SECONDS_PER_BLOCK
 
-# §E14 asks for a week's notice on a capacity change. Warned, never enforced: rollback
-# is itself a publish, so a hard minimum would make a bad value uncorrectable for a week.
+# Capacity changes should get a week's notice.
 CAPACITY_NOTICE_DAYS = 7
 
-# The first validator release that resolves profiles. Anything older fetches nothing.
-_MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "3.6.0")
+# The first validator release that reads this profile schema.
+_MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "4.0.0")
 
 
 def _version_tuple(text: str):
-    """Compare versions as numbers. Lexicographically "3.10.0" sorts below "3.6.0"."""
+    """A version as a tuple of numbers, so "3.10.0" sorts above "3.6.0"."""
     parts = []
     for piece in str(text or "").strip().lstrip("vV").split("."):
         digits = "".join(c for c in piece if c.isdigit())
@@ -50,15 +48,12 @@ def _version_tuple(text: str):
 def _is_stale(reported: str, minimum: str) -> bool:
     return _version_tuple(reported) < _version_tuple(minimum)
 
-# Switches that change what miners are paid. Called out separately at publish time.
-SWITCHES = (("settlement", "live"), ("settlement", "floor_gating"),
-            ("rations", "dispatch"), ("oracle", "live"))
 
 _DURATION = re.compile(r"^(\d+(?:\.\d+)?)\s*([dhb])$", re.I)
 
 
 def parse_duration(text: str) -> int:
-    """`7d`, `12h` or a raw block count. Days, because nobody thinks in blocks."""
+    """`7d`, `12h` or a raw block count, as blocks."""
     m = _DURATION.match(str(text).strip())
     if not m:
         try:
@@ -75,36 +70,24 @@ def parse_duration(text: str) -> int:
 
 
 def chain_block() -> int | None:
-    """The current head, read rather than typed. A mistyped block sets the wrong
-    activation, and nothing downstream would notice."""
-    try:
-        import bittensor as bt
-        return int(bt.Subtensor(network=os.getenv("SUBTENSOR_NETWORK")
-                             or os.getenv("BT_NETWORK", "finney")).block)
-    except Exception as e:
-        print(f"could not read the chain head: {e}")
-        return None
+    """The current chain head."""
+    head = chain.get_current_block()
+    if head is None:
+        print("could not read the chain head")
+    return head
 
 
-async def fleet_readiness(prisma, min_version: str | None = None):
-    """What the validators are running, from their config polls.
-
-    A profile published to a fleet that cannot parse it is a silent no-op: those
-    validators carry on with whatever they had. `min_version` marks each row as stale
-    or not so the caller can warn without repeating the comparison.
+def fleet_readiness(min_version: str | None = None):
+    """What the validators are running, from their config polls. Validators that cannot
+    parse a profile keep the one they have. `min_version` marks each row as stale or not.
     """
+    path = Path(os.getenv("VALIDATOR_VERSIONS_PATH",
+                          Path(__file__).resolve().parent.parent / ".validator_versions.json"))
     try:
-        rows = await prisma.query_raw(
-            'SELECT validator_hotkey, version, last_seen FROM validator_versions')
+        data = json.loads(path.read_text())
     except Exception:
-        path = Path(os.getenv("VALIDATOR_VERSIONS_PATH",
-                              Path(__file__).resolve().parent.parent
-                              / ".validator_versions.json"))
-        try:
-            data = json.loads(path.read_text())
-        except Exception:
-            return None
-        rows = [{"validator_hotkey": k, **v} for k, v in data.items()]
+        return None
+    rows = [{"validator_hotkey": k, **v} for k, v in data.items()]
     if min_version:
         for row in rows:
             row["stale"] = _is_stale(row.get("version"), min_version)
@@ -117,7 +100,7 @@ def describe_change(body: dict, live: dict | None) -> list[str]:
         return ["  (nothing published yet — this is the first profile)"]
 
     lines = []
-    for section in ("settlement", "emission", "rations", "oracle", "controller"):
+    for section in ("settlement", "ledger"):
         for key, value in (body.get(section) or {}).items():
             was = (live.get(section) or {}).get(key)
             if was == value:
@@ -143,8 +126,7 @@ async def publish(path: Path, activate_in: int, published_by: str, dry_run: bool
     prisma = Prisma()
     await prisma.connect()
     try:
-        # Paged rather than capped: a run of pending publishes must not hide the row
-        # that is actually in force.
+        # Paged rather than capped, so pending publishes never hide the row in force.
         rows, cursor = [], None
         while True:
             page = await prisma.mechanismprofile.find_many(
@@ -157,9 +139,7 @@ async def publish(path: Path, activate_in: int, published_by: str, dry_run: bool
                 break
             cursor = page[-1].version
         latest_version = rows[0].version if rows else None
-        # What is in force now, not merely the newest row. With a publish already
-        # pending, the newest row is the future one, and diffing against it would
-        # describe changes nobody is running.
+        # The diff is against the profile in force, not the newest (possibly pending) row.
         activated = [r for r in rows if r.activationBlock <= int(block)]
         active = max(activated, key=lambda r: r.version) if activated else None
         live = (active.body or {}) if active else None
@@ -190,27 +170,17 @@ async def publish(path: Path, activate_in: int, published_by: str, dry_run: bool
         for line in describe_change(body, live):
             print(line)
 
-        on = [f"{s}.{k}" for s, k in SWITCHES if (body.get(s) or {}).get(k)]
-        was_on = [f"{s}.{k}" for s, k in SWITCHES
-                  if live and (live.get(s) or {}).get(k)]
-        if on or was_on:
-            print(f"\nswitches         {', '.join(on) if on else 'all off'}")
-            newly = [s for s in on if s not in was_on]
-            if newly:
-                print(f"  TURNING ON:    {', '.join(newly)}")
-                print("  These change what miners are paid at the activation block.")
-
-        # Warnings, not refusals. Each is a judgement the operator is entitled to make.
+        # Warnings, not refusals: the operator may publish anyway.
         warnings = []
         capacity_changed = (live and body["settlement"]["C"]
                             != (live.get("settlement") or {}).get("C"))
         if capacity_changed and lead_days < CAPACITY_NOTICE_DAYS:
             warnings.append(
-                f"capacity changes with {lead_days:.1f} days of notice; §E14 asks for "
-                f"{CAPACITY_NOTICE_DAYS}. Fine for a correction, thin for a step.")
+                f"capacity changes with {lead_days:.1f} days of notice; the recommended "
+                f"notice is {CAPACITY_NOTICE_DAYS} days.")
 
         required_validator = _MIN_VALIDATOR_VERSION
-        fleet = await fleet_readiness(prisma, required_validator)
+        fleet = fleet_readiness(required_validator)
         if fleet is None:
             warnings.append("could not read validator versions; publishing blind to "
                             "what the fleet is running.")
