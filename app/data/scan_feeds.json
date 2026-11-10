@@ -3669,10 +3669,6 @@
    "kind": "page"
   },
   {
-   "url": "https://www.esa.int/rss/news.rss",
-   "kind": "rss"
-  },
-  {
    "url": "https://www.ornl.gov/news",
    "kind": "page"
   },
@@ -3682,10 +3678,6 @@
   },
   {
    "url": "https://research.google/blog/rss/",
-   "kind": "rss"
-  },
-  {
-   "url": "https://openai.com/news/rss.xml",
    "kind": "rss"
   },
   {
@@ -3726,10 +3718,6 @@
   },
   {
    "url": "https://discordstatus.com/history.atom",
-   "kind": "rss"
-  },
-  {
-   "url": "https://status.atlassian.com/history.atom",
    "kind": "rss"
   },
   {
@@ -3793,11 +3781,27 @@
    "kind": "rss"
   },
   {
-   "url": "https://spectrum.ieee.org/feeds/feed.rss",
+   "url": "https://www.technologyreview.com/feed/",
    "kind": "rss"
   },
   {
-   "url": "https://www.technologyreview.com/feed/",
+   "url": "https://jira-software.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://confluence.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bitbucket.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://trello.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://jira-service-management.status.atlassian.com/history.rss",
    "kind": "rss"
   }
  ]

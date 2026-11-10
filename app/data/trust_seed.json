@@ -149,8 +149,7 @@
    ],
    "kind": "attorney_general",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -1300,7 +1299,7 @@
   {
    "host": "chromereleases.googleblog.com",
    "paths": [
-    "/20"
+    ""
    ],
    "kind": "vendor_advisory",
    "categories": [
@@ -1826,8 +1825,7 @@
    ],
    "kind": "attorney_general",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -1837,8 +1835,7 @@
    ],
    "kind": "attorney_general",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -2091,22 +2088,6 @@
    "categories": [
     "finance"
    ]
-  },
-  {
-   "host": "esa.int",
-   "paths": [
-    "/articles/"
-   ],
-   "kind": "space_agency",
-   "categories": [
-    "technology"
-   ],
-   "subject": {
-    "names": [
-     "ESA",
-     "European Space Agency"
-    ]
-   }
   },
   {
    "host": "esd.wa.gov",
@@ -2599,8 +2580,7 @@
    ],
    "kind": "privacy_regulator",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -2668,8 +2648,7 @@
    ],
    "kind": "privacy_regulator",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -2874,8 +2853,7 @@
    ],
    "kind": "attorney_general",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -3093,17 +3071,6 @@
     "/opa/pr/"
    ],
    "kind": "regulator",
-   "categories": [
-    "finance",
-    "technology"
-   ]
-  },
-  {
-   "host": "justice.oregon.gov",
-   "paths": [
-    "/consumer/DataBreach/"
-   ],
-   "kind": "attorney_general",
    "categories": [
     "finance",
     "technology"
@@ -3342,8 +3309,7 @@
    ],
    "kind": "attorney_general",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -3701,7 +3667,7 @@
   {
    "host": "news.berkeley.edu",
    "paths": [
-    "/20"
+    ""
    ],
    "kind": "university",
    "categories": [
@@ -3710,8 +3676,7 @@
    "subject": {
     "names": [
      "UC Berkeley",
-     "University of California, Berkeley",
-     "Berkeley"
+     "University of California, Berkeley"
     ]
    }
   },
@@ -4029,8 +3994,7 @@
    ],
    "kind": "privacy_regulator",
    "categories": [
-    "finance",
-    "technology"
+    "finance"
    ]
   },
   {
@@ -4139,21 +4103,6 @@
    "categories": [
     "finance"
    ]
-  },
-  {
-   "host": "openai.com",
-   "paths": [
-    "/index/"
-   ],
-   "kind": "company_blog",
-   "categories": [
-    "technology"
-   ],
-   "subject": {
-    "names": [
-     "OpenAI"
-    ]
-   }
   },
   {
    "host": "ornl.gov",
@@ -4805,8 +4754,7 @@
   {
    "host": "security.paloaltonetworks.com",
    "paths": [
-    "/CVE-",
-    "/PAN-SA-"
+    ""
    ],
    "kind": "vendor_advisory",
    "categories": [
@@ -4895,7 +4843,7 @@
   {
    "host": "slack-status.com",
    "paths": [
-    "/20"
+    ""
    ],
    "kind": "status_page",
    "categories": [
@@ -5069,7 +5017,7 @@
    ]
   },
   {
-   "host": "status.atlassian.com",
+   "host": "jira-software.status.atlassian.com",
    "paths": [
     "/incidents/"
    ],
@@ -5081,9 +5029,71 @@
     "names": [
      "Atlassian",
      "Jira",
-     "Confluence",
-     "Bitbucket",
+     "Jira Software"
+    ]
+   }
+  },
+  {
+   "host": "confluence.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Confluence"
+    ]
+   }
+  },
+  {
+   "host": "bitbucket.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Bitbucket"
+    ]
+   }
+  },
+  {
+   "host": "trello.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
      "Trello"
+    ]
+   }
+  },
+  {
+   "host": "jira-service-management.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Jira Service Management"
     ]
    }
   },
@@ -5116,8 +5126,7 @@
     "names": [
      "Google Cloud",
      "Google Cloud Platform",
-     "GCP",
-     "Google"
+     "GCP"
     ]
    }
   },
@@ -5181,7 +5190,7 @@
   {
    "host": "support.apple.com",
    "paths": [
-    "/en-us/1"
+    "/en-us/"
    ],
    "kind": "vendor_advisory",
    "categories": [
@@ -8836,6 +8845,11 @@
    "pattern": "channelnewsasia.com/commentary/*",
    "kind": "exclude",
    "reason": "opinion"
+  },
+  {
+   "pattern": "nature.com/articles/d42473-*",
+   "kind": "exclude",
+   "reason": "advertisement feature"
   }
  ]
 }

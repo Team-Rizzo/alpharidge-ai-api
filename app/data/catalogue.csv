@@ -5,10 +5,10 @@ abcnews.com,,politics
 africanews.com,,finance;politics
 aljazeera.com,,finance;technology;politics;sports
 ansa.it,/english/,finance
-apnews.com,,finance;technology;politics;sports
+apnews.com,,finance;politics;sports
 arabnews.com,,finance
 arstechnica.com,,finance;technology
-axios.com,,finance;technology
+axios.com,,finance
 bankingdive.com,,finance
 batimes.com.ar,/news/,finance
 bbc.co.uk,,finance;technology;politics;sports
@@ -44,7 +44,7 @@ cybersecuritydive.com,/news/,finance;technology
 dailymaverick.co.za,/article/,finance;politics
 dailysabah.com,/business/,finance
 darkreading.com,,finance;technology
-databreaches.net,,finance;technology
+databreaches.net,,finance
 datacenterdynamics.com,/en/news/,technology
 datacenterknowledge.com,,technology
 dawn.com,/news/,finance
@@ -130,11 +130,11 @@ nbcnews.com,,finance;technology;politics
 nbcsports.com,,sports
 ndtvprofit.com,,finance
 news.crunchbase.com,,finance;technology
-news.sky.com,/story/,finance;technology
+news.sky.com,/story/,finance
 news.un.org,/en/story/,politics
 nltimes.nl,,finance
 notesfrompoland.com,,finance
-npr.org,,finance;technology
+npr.org,,finance
 nypost.com,,finance;politics;sports
 nzherald.co.nz,,finance;politics;sports
 offshore-energy.biz,,finance
@@ -166,7 +166,6 @@ semafor.com,,finance;technology;politics
 siliconangle.com,,finance;technology
 siliconrepublic.com,,technology
 skysports.com,,sports
-spectrum.ieee.org,,technology
 sportingnews.com,,sports
 sportsnet.ca,,sports
 standard.co.uk,,politics;sports
@@ -203,7 +202,7 @@ tomshardware.com,,technology
 tsn.ca,,sports
 usatoday.com,,finance;technology;politics;sports
 utilitydive.com,,finance
-venturebeat.com,,finance;technology
+venturebeat.com,,finance
 wired.com,,technology
 zawya.com,/en/business/,finance
 zdnet.com,,finance;technology
