@@ -342,3 +342,21 @@ async def test_the_check_gives_the_same_result_in_the_parse_workers(base, monkey
         parse_pool.uninstall()
     assert aside == here and here.passed
     await v.fetcher.aclose()
+
+
+async def test_the_contrastive_match_is_the_same_in_the_parse_workers(monkeypatch):
+    from alpharidge_ai.verify import fetch
+    from app.services import novelty
+    from app.utils import parse_pool
+
+    ev = EventRecord("merger_acquisition", "finance", date(2026, 10, 13), "fp", id=7,
+                     subject_keys=("name:beta systems",))
+    args = (DEAL, [ev], [])
+    here = await verifier._aside(novelty.contrastive, *args)
+    monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
+    parse_pool.install(1)
+    try:
+        aside = await verifier._aside(novelty.contrastive, *args)
+    finally:
+        parse_pool.uninstall()
+    assert aside == here == 7

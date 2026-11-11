@@ -126,6 +126,15 @@ def fetch_config() -> FetchConfig:
         pace_max_wait_s=FETCH_PACE_MAX_WAIT_S)
 
 
+async def _aside(fn, *args, **kwargs):
+    """A pure CPU-bound call, in the page-parse workers when they run."""
+    pool = parse_pool.current()
+    if pool is None:
+        return fn(*args, **kwargs)
+    return await asyncio.get_running_loop().run_in_executor(
+        pool, functools.partial(fn, *args, **kwargs))
+
+
 def _utc(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 
@@ -234,13 +243,11 @@ class Verifier:
     async def check_aside(self, claim: Claim, page: FetchedPage, received: datetime,
                           scoop: bool = False) -> CheckResult:
         """`check`, in the page-parse workers when they run."""
-        pool = parse_pool.current()
-        if pool is None:
+        if parse_pool.current() is None:
             return self.check(claim, page, received, scoop)
         excluded = self.rules.page_excluded(page.final_url or page.url, page)
-        fn = check_scoop if scoop else check_claim
-        return await asyncio.get_running_loop().run_in_executor(
-            pool, functools.partial(fn, claim, page, received, excluded=excluded))
+        return await _aside(check_scoop if scoop else check_claim, claim, page, received,
+                            excluded=excluded)
 
     def index(self) -> EntityIndex:
         if self.entities is None:
@@ -390,8 +397,9 @@ class Verifier:
         contrastive = False
         if result.passed and row.route in PRIZE_ROUTES:
             near = await self._near(store, claim, row) if near is None else near
-            hit = novelty.contrastive(page.text, [e for e in near if e.id != row.event_id],
-                                     novelty.subject_names(claim, self.index()))
+            hit = await _aside(novelty.contrastive, page.text,
+                               [e for e in near if e.id != row.event_id],
+                               novelty.subject_names(claim, self.index()))
             ev = await store.get_event(hit) if hit is not None else None
             if ev is not None:
                 contrastive = True
