@@ -123,6 +123,59 @@ def _reset_tie() -> None:
             pass
 
 
+def compact(data: bytes, i: int) -> Tuple[int, int]:
+    """A SCALE compact integer at `i`, and the offset after it."""
+    mode = data[i] & 3
+    if mode == 0:
+        return data[i] >> 2, i + 1
+    if mode == 1:
+        return int.from_bytes(data[i:i + 2], "little") >> 2, i + 2
+    if mode == 2:
+        return int.from_bytes(data[i:i + 4], "little") >> 2, i + 4
+    n = (data[i] >> 2) + 4
+    return int.from_bytes(data[i + 1:i + 1 + n], "little"), i + 1 + n
+
+
+def inherent_calls(extrinsics) -> list:
+    """(pallet index, call index, first argument as a compact) of each unsigned extrinsic."""
+    out = []
+    for xt in extrinsics:
+        data = bytes.fromhex(str(xt)[2:] if str(xt).startswith("0x") else str(xt))
+        _, i = compact(data, 0)
+        if data[i] & 0x80 or (data[i] & 0x7F) not in (4, 5):
+            continue
+        try:
+            out.append((data[i + 1], data[i + 2], compact(data, i + 3)[0]))
+        except IndexError:
+            continue
+    return out
+
+
+# (pallet index, call index) of Timestamp.set, found on the head block.
+_set_call: Optional[Tuple[int, int]] = None
+
+
+def _body_stamp(sub, block_hash) -> int:
+    """A block's timestamp from its Timestamp.set inherent, read from the raw block body."""
+    global _set_call
+    if _set_call is None:
+        head = sub.get_chain_finalised_head()
+        now = int(sub.query("Timestamp", "Now", block_hash=head).value)
+        found = [(p, c) for p, c, v in inherent_calls(_raw_extrinsics(sub, head)) if v == now]
+        if len(found) != 1:
+            raise RuntimeError("Timestamp.set not found in the head block")
+        _set_call = found[0]
+    got = [v for p, c, v in inherent_calls(_raw_extrinsics(sub, block_hash))
+           if (p, c) == _set_call]
+    if len(got) != 1:
+        raise RuntimeError(f"Timestamp.set not found in block {block_hash}")
+    return got[0]
+
+
+def _raw_extrinsics(sub, block_hash) -> list:
+    return sub.rpc_request("chain_getBlock", [block_hash])["result"]["block"]["extrinsics"]
+
+
 def get_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
     """The first finalised block whose timestamp is at or after `after_ms`, as (number, hash);
     None until there is one."""
@@ -138,7 +191,15 @@ def get_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
                     if len(_stamps) >= TIE_STAMPS_MAX:
                         _stamps.clear()
                     h = sub.get_block_hash(n)
-                    _stamps[n] = (int(sub.query("Timestamp", "Now", block_hash=h).value), str(h))
+                    try:
+                        at = int(sub.query("Timestamp", "Now", block_hash=h).value)
+                    except Exception:
+                        at = 0
+                    if at <= 0:
+                        # A pruned node keeps old block bodies but not their state; some
+                        # answer the missing state with an error, some with 0.
+                        at = _body_stamp(sub, h)
+                    _stamps[n] = (at, str(h))
                 return _stamps[n][0]
 
             head, read_at = _tie_head
