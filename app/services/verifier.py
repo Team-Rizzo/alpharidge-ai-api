@@ -123,7 +123,7 @@ def fetch_config() -> FetchConfig:
         max_bytes=FETCH_MAX_BYTES, max_redirects=FETCH_MAX_REDIRECTS,
         retries=EVENT_LANE["FETCH_RETRY"], retry_delay_s=FETCH_RETRY_DELAY_S,
         domain_rps=EVENT_LANE["DOMAIN_RPS"], public_only=EVENT_LANE["FETCH_PUBLIC_ONLY"],
-        pace_max_wait_s=FETCH_PACE_MAX_WAIT_S)
+        pace_max_wait_s=FETCH_PACE_MAX_WAIT_S, host_rps=EVENT_LANE["HOST_RPS"])
 
 
 async def _aside(fn, *args, **kwargs):

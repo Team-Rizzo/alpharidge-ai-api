@@ -92,6 +92,9 @@ EVENT_LANE = {
     "FETCH_PUBLIC_ONLY": _el("FETCH_PUBLIC_ONLY", "true", _flag),
     "FETCH_RETRY": _el("FETCH_RETRY", 1, int),
     "DOMAIN_RPS": _el("DOMAIN_RPS", 1),
+    # Requests per second for particular hosts, "host=rate,host=rate"; others use DOMAIN_RPS.
+    "HOST_RPS": tuple((h.strip(), float(r)) for h, _, r in (
+        part.partition("=") for part in _csv("EL_HOST_RPS")) if h.strip() and r.strip()),
     # Fetch and re-check jobs run outside the worker tick, in a bounded pool.
     "FETCH_CONCURRENCY": _el("FETCH_CONCURRENCY", 16, int),
     "WORKER_INTERVAL_S": _el("WORKER_INTERVAL_S", 1),
