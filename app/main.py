@@ -157,6 +157,7 @@ async def lifespan(app: FastAPI):
         logger.info("Serving read routes only (API_ROLE=reader)")
     else:
         parse_pool.install(config.EVENT_LANE["PARSE_PROCESSES"])
+        parse_pool.install_checks(config.EVENT_LANE["CHECK_PROCESSES"])
         tasks += [asyncio.create_task(run_worker(claims.get_store())),
                   asyncio.create_task(run_daily(claims.get_store())),
                   asyncio.create_task(answer_key.run_forever(claims.get_store()))]

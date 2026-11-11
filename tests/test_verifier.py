@@ -335,7 +335,7 @@ async def test_the_check_gives_the_same_result_in_the_parse_workers(base, monkey
     at = datetime(2026, 10, 13, 12, 40, tzinfo=timezone.utc)
     here = await v.check_aside(claim, page, at)
     monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
-    parse_pool.install(1)
+    parse_pool.install_checks(1)
     try:
         aside = await v.check_aside(claim, page, at)
     finally:
@@ -354,7 +354,7 @@ async def test_the_contrastive_match_is_the_same_in_the_parse_workers(monkeypatc
     args = (DEAL, [ev], [])
     here = await verifier._aside(novelty.contrastive, *args)
     monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
-    parse_pool.install(1)
+    parse_pool.install_checks(1)
     try:
         aside = await verifier._aside(novelty.contrastive, *args)
     finally:

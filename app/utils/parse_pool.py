@@ -36,6 +36,9 @@ class ParsePool(Executor):
 
 
 _installed: Optional[ParsePool] = None
+# Pure CPU checks (fixed check, contrastive match) get their own workers, so they never queue
+# behind page parsing; without them the checks run in the API process.
+_checks: Optional[ParsePool] = None
 
 
 def install(workers: int) -> None:
@@ -48,12 +51,22 @@ def install(workers: int) -> None:
     logger.info(f"Parsing pages in {workers} processes")
 
 
+def install_checks(workers: int) -> None:
+    """Run the pure CPU checks in `workers` processes of their own."""
+    global _checks
+    if workers > 0 and _checks is None:
+        _checks = ParsePool(workers)
+        logger.info(f"Running page checks in {workers} processes")
+
+
 def current() -> Optional[ParsePool]:
-    return _installed
+    """The workers for the pure CPU checks, if any."""
+    return _checks
 
 
 def uninstall() -> None:
-    global _installed
-    if _installed is not None:
-        _installed.shutdown(wait=False, cancel_futures=True)
-        _installed = None
+    global _installed, _checks
+    for pool in (_installed, _checks):
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
+    _installed = _checks = None
