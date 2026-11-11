@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 
 import bittensor  # noqa: F401  loaded before _setup_logging; see there
@@ -118,6 +119,20 @@ async def _profile(seconds: float) -> None:
         logger.info(f"[PROFILE] {seconds:.0f} s\n{out.getvalue()}")
 
 
+_READER_PATHS = re.compile("|".join(f"(?:{p})" for p in config.READER_ROUTES))
+
+
+class ReaderOnly(BaseHTTPMiddleware):
+    """A reader answers only GET on the read routes; everything else belongs to the writer."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method not in ("GET", "HEAD") or not _READER_PATHS.fullmatch(
+                request.url.path):
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND,
+                                content={"detail": "writer_route"})
+        return await call_next(request)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.jobs import answer_key
@@ -137,11 +152,14 @@ async def lifespan(app: FastAPI):
     await hotkey_whitelist.sync_async()
     await db.connect()
 
-    parse_pool.install(config.EVENT_LANE["PARSE_PROCESSES"])
-    tasks = [asyncio.create_task(hotkey_whitelist.run_sync()),
-             asyncio.create_task(run_worker(claims.get_store())),
-             asyncio.create_task(run_daily(claims.get_store())),
-             asyncio.create_task(answer_key.run_forever(claims.get_store()))]
+    tasks = [asyncio.create_task(hotkey_whitelist.run_sync())]
+    if config.API_ROLE == "reader":
+        logger.info("Serving read routes only (API_ROLE=reader)")
+    else:
+        parse_pool.install(config.EVENT_LANE["PARSE_PROCESSES"])
+        tasks += [asyncio.create_task(run_worker(claims.get_store())),
+                  asyncio.create_task(run_daily(claims.get_store())),
+                  asyncio.create_task(answer_key.run_forever(claims.get_store()))]
     if config.EVENT_LANE["PROFILE_S"] > 0:
         tasks.append(asyncio.create_task(_profile(config.EVENT_LANE["PROFILE_S"])))
     yield
@@ -176,6 +194,8 @@ def create_app() -> FastAPI:
     )
     if config.BLOCKED_HOTKEYS:
         app.add_middleware(BlockedHotkeyMiddleware)
+    if config.API_ROLE == "reader":
+        app.add_middleware(ReaderOnly)
     app.add_middleware(FilteredAccessLogMiddleware)
     app.add_middleware(BodyLimit)
     # Outermost, so the receipt time is taken before any other work.

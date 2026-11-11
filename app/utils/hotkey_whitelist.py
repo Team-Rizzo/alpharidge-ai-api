@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, List
 
-from app import ROOT
+from app import ROOT, config
 from app.utils import block
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,8 @@ def sync() -> bool:
     _miners, _validators, _coldkeys, _synced_at = miners, validators, coldkeys, now
     logger.info(f"Whitelist synced: {len(miners)} miners, {len(validators)} validators "
                 f"(stake >= {STAKE_THRESHOLD})")
+    if config.API_ROLE == "reader":
+        return True
     _write_snapshot(_MINER_HOTKEYS_FILE, now, miners)
     _write_snapshot(_VALIDATOR_HOTKEYS_FILE, now, validators,
                     stake_threshold=STAKE_THRESHOLD,
