@@ -3,6 +3,7 @@ side runs with STORE_TEST_DATABASE_URL set to a scratch database (the local e2e 
 
 import os
 import uuid
+from dataclasses import replace
 
 import pytest
 
@@ -170,3 +171,27 @@ async def test_a_retried_job_keeps_its_attempts(store):
     (again,) = await store.take_jobs(["contract_retry"], 10, 60_000, T0 + 2)
     assert (again.id, again.attempts) == (job.id, 2)
     await store.finish_job(job.id)
+
+
+async def test_concurrent_receipts_link_in_one_sequence(store):
+    import asyncio
+
+    from alpharidge_ai.ledger import receipts as rc
+    from app.services import receipts
+
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    rows = [replace(claim(hk), received_ms=T0 + i) for i in range(12)]
+    made = await asyncio.gather(*[store.create_claim(r, receipt=receipts.builder(r))
+                                  for r in rows])
+    got = await store.receipts_for([m.id for m in made])
+    seqs = sorted(r["seq"] for r in got.values())
+    assert seqs == list(range(seqs[0], seqs[0] + 12))
+    by_seq = sorted(got.values(), key=lambda r: r["seq"])
+    assert all(b["prev"] == a["hash"] for a, b in zip(by_seq, by_seq[1:]))
+    assert all(rc.valid(r, rc_pubkey()) for r in by_seq)
+    assert await store.receipt_of(made[0].id) == got[made[0].id]
+
+
+def rc_pubkey():
+    from bittensor_wallet import Keypair
+    return Keypair.create_from_seed("0x" + os.environ["API_ATTESTATION_PRIVKEY"]).ss58_address

@@ -179,7 +179,9 @@ async def test_dashboard_shows_route_and_check(api, monkeypatch):
     assert item["route"] == "event" and item["status"] == "provisional"
     assert item["verification"] == "reported"
     assert (item["source_domain"], item["trust_band"]) == (None, None)
-    assert item["check"] is not None
+    assert item["check"] is not None and item["receipt"] is None
+    lane.store.receipt_rows.append({"seq": 1, "claim_id": item["id"], "hash": "h"})
+    assert client.get("/dashboard/items").json()["items"][0]["receipt"]["seq"] == 1
     (event,) = client.get("/events", headers=KEY).json()["items"]
     assert event["source_url"] is None and product.OPEN_AT not in event
     monkeypatch.setattr(config, "OPERATOR_HOTKEYS", {"op1"})

@@ -26,6 +26,8 @@ for _k, _v in {"RECHECK_SAMPLE_RATE": "0.37", "RECHECK_LOW_TRUST": "0.6", "RECHE
                "TRUST_SPIKE_BASE_DAYS": "20"
                }.items():
     os.environ.setdefault(f"EL_{_k}", _v)
+# A synthetic receipt-signing key; production sets its own.
+os.environ.setdefault("API_ATTESTATION_PRIVKEY", "7e" * 32)
 # Tests never reach a registry or a real chain.
 os.environ.setdefault("EL_REGISTRY", "off")
 os.environ.setdefault("SUBTENSOR_NETWORK", "mock")

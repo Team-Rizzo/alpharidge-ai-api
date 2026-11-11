@@ -229,6 +229,7 @@ async def dashboard_items(request: Request, hotkey: Optional[str] = None, route:
         counts[r.verdict] = counts.get(r.verdict, 0) + 1
     fetched = {f.claim_id: f for f in await store.fetches_for_claims(ids)}
     ties = await store.tie_seeds({c.bucket for c in page})
+    receipts = await store.receipts_for(ids)
     events: dict = {}
     stages: dict = {}
     items = []
@@ -250,6 +251,7 @@ async def dashboard_items(request: Request, hotkey: Optional[str] = None, route:
             **events.get(c.event_id, {"headline": None, "verification": None}),
             "received_at": iso(c.received_ms), "bucket": c.bucket,
             "tie_block": ties[c.bucket][0] if c.bucket in ties else None,
+            "receipt": receipts.get(c.id),
             "check": _check(f),
             "source_domain": trust.domain_of(url) if shown else None, "trust_band": c.trust_band if shown else None,
             "points": _points(paid.get(c.id, {})), "reverify": checks.get(c.id, {}),

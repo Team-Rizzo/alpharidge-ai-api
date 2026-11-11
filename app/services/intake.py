@@ -10,7 +10,7 @@ from alpharidge_ai.schema import (
     Claim, ClaimKind, canonical_body, category_of, has_required, text_problem,
 )
 from app.config import EVENT_LANE
-from app.services import budget
+from app.services import budget, receipts
 from app.services.store import ClaimRow, DuplicateClaim, Store
 from app.utils import hotkey_whitelist
 from app.utils.auth import AuthRequest, body_sha256
@@ -118,7 +118,8 @@ async def accept(store: Store, body: bytes, auth: AuthRequest,
         status="queued" if on else "rejected", reason=off,
         coldkey=coldkey if coldkey != hotkey else None)
     try:
-        return await store.create_claim(row, jobs=(FETCH_JOB,) if on else ()), True
+        return await store.create_claim(row, jobs=(FETCH_JOB,) if on else (),
+                                        receipt=receipts.builder(row)), True
     except DuplicateClaim:
         existing = await store.claim_by_body(hotkey, body_hash)
         if existing is None:

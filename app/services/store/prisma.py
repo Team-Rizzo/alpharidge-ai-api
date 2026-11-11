@@ -32,6 +32,18 @@ _CLAIM_FIELDS = {
 _CLAIM_TIMES = {"verified_ms": "verifiedAt", "judged_ms": "judgedAt", "settle_ms": "settleAt"}
 
 
+_RECEIPT_LOCK = 4545001
+_RECEIPT_SQL = ('SELECT seq, version, prev, claim_id, hotkey, body_sha256, received_ms, '
+                'hash, signature FROM "claim_receipt"')
+
+
+def _receipt_from(r) -> dict:
+    return {"v": int(r["version"]), "seq": int(r["seq"]), "prev": r["prev"],
+            "claim_id": str(r["claim_id"]), "hotkey": r["hotkey"],
+            "body_sha256": r["body_sha256"], "received_ms": int(r["received_ms"]),
+            "hash": r["hash"], "signature": r["signature"]}
+
+
 def _claim_from(m) -> ClaimRow:
     return ClaimRow(
         id=m.id, hotkey=m.hotkey, signature=m.signature, nonce=m.nonce, signed_at=m.signedAt,
@@ -103,7 +115,7 @@ class PrismaStore:
         m = await self.db.claim.find_first(where={"hotkey": hotkey, "bodyHash": body_hash})
         return _claim_from(m) if m else None
 
-    async def create_claim(self, row, jobs=()):
+    async def create_claim(self, row, jobs=(), receipt=None):
         from prisma import Json
         from prisma.errors import UniqueViolationError
 
@@ -117,12 +129,39 @@ class PrismaStore:
         }
         try:
             async with self.db.tx() as tx:
+                prev = None
+                if receipt is not None:
+                    # One receipt sequence: appends wait for each other until commit.
+                    await tx.query_raw(
+                        f"SELECT 1 AS ok FROM pg_advisory_xact_lock({_RECEIPT_LOCK})")
+                    rows = await tx.query_raw(_RECEIPT_SQL + " ORDER BY seq DESC LIMIT 1")
+                    prev = _receipt_from(rows[0]) if rows else None
                 m = await tx.claim.create(data=data)
                 for kind in jobs:
                     await tx.job.create(data={"kind": kind, "claimId": m.id})
+                if receipt is not None:
+                    r = receipt(int(m.id), prev)
+                    await tx.execute_raw(
+                        'INSERT INTO "claim_receipt" (seq, version, prev, claim_id, hotkey, '
+                        'body_sha256, received_ms, hash, signature) VALUES '
+                        '($1::bigint, $2::int, $3, $4::bigint, $5, $6, $7::bigint, $8, $9)',
+                        r["seq"], r["v"], r["prev"], int(r["claim_id"]), r["hotkey"],
+                        r["body_sha256"], r["received_ms"], r["hash"], r["signature"])
         except UniqueViolationError as e:
             raise DuplicateClaim(row.hotkey) from e
         return _claim_from(m)
+
+    async def receipt_of(self, claim_id):
+        rows = await self.db.query_raw(_RECEIPT_SQL + " WHERE claim_id = $1::bigint",
+                                       int(claim_id))
+        return _receipt_from(rows[0]) if rows else None
+
+    async def receipts_for(self, claim_ids):
+        ids = [int(i) for i in claim_ids]
+        if not ids:
+            return {}
+        rows = await self.db.query_raw(_RECEIPT_SQL + " WHERE claim_id = ANY($1::bigint[])", ids)
+        return {int(r["claim_id"]): _receipt_from(r) for r in rows}
 
     async def get_claim(self, claim_id):
         m = await self.db.claim.find_unique(where={"id": claim_id})

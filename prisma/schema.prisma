@@ -1264,6 +1264,22 @@ model TieSeed {
   @@map("tie_seed")
 }
 
+/// Signed claim receipts, one per stored claim: each names the previous receipt's hash.
+model ClaimReceipt {
+  seq        BigInt   @id
+  version    Int
+  prev       String
+  claimId    BigInt   @unique @map("claim_id")
+  hotkey     String
+  bodySha256 String   @map("body_sha256")
+  receivedMs BigInt   @map("received_ms")
+  hash       String   @unique
+  signature  String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("claim_receipt")
+}
+
 /// Append-only points ledger.
 model LedgerEntry {
   id            BigInt   @id @default(autoincrement())

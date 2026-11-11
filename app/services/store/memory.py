@@ -69,6 +69,7 @@ class MemoryStore:
     tie_rows: Dict[int, Tuple[int, str]] = field(default_factory=dict)
     entity_rows: Dict[str, EntityRecord] = field(default_factory=dict)
     candidate_rows: Dict[int, ScoopCandidateRow] = field(default_factory=dict)
+    receipt_rows: List[dict] = field(default_factory=list)
     _ids: itertools.count = field(default_factory=lambda: itertools.count(1))
     _locked: Dict[int, int] = field(default_factory=dict)
 
@@ -82,16 +83,27 @@ class MemoryStore:
         return next((c for c in self.claims.values()
                      if c.hotkey == hotkey and c.body_hash == body_hash), None)
 
-    async def create_claim(self, row, jobs=()):
+    async def create_claim(self, row, jobs=(), receipt=None):
         if any(c.hotkey == row.hotkey and (c.nonce == row.nonce or c.body_hash == row.body_hash)
                for c in self.claims.values()):
             raise DuplicateClaim(row.hotkey)
         row = replace(row, id=next(self._ids))
         self.claims[row.id] = row
+        if receipt is not None:
+            self.receipt_rows.append(
+                dict(receipt(row.id, self.receipt_rows[-1] if self.receipt_rows else None)))
         for kind in jobs:
             job_id = next(self._ids)
             self.jobs[job_id] = Job(id=job_id, kind=kind, claim_id=row.id)
         return replace(row)
+
+    async def receipt_of(self, claim_id):
+        return next((dict(r) for r in self.receipt_rows if r["claim_id"] == str(claim_id)),
+                    None)
+
+    async def receipts_for(self, claim_ids):
+        want = {str(i) for i in claim_ids}
+        return {int(r["claim_id"]): dict(r) for r in self.receipt_rows if r["claim_id"] in want}
 
     async def get_claim(self, claim_id):
         c = self.claims.get(claim_id)

@@ -57,7 +57,8 @@ async def post_claim(request: Request, store: Store = Depends(get_store)):
             return JSONResponse(status_code=e.status, headers={"Retry-After": str(e.retry_after)},
                                 content={"detail": e.detail, "retry_after": e.retry_after})
         raise HTTPException(status_code=e.status, detail=e.detail)
-    return JSONResponse(status_code=202 if created else 200, content=_receipt(claim))
+    return JSONResponse(status_code=202 if created else 200,
+                        content={**_receipt(claim), "receipt": await store.receipt_of(claim.id)})
 
 
 async def _event_shown(store: Store, claim: ClaimRow) -> Tuple[bool, Optional[str]]:
@@ -89,6 +90,7 @@ async def get_claim(claim_id: str, request: Request, store: Store = Depends(get_
               and fetch.reason == claim.reason else None)
     return {
         **_receipt(claim),
+        "receipt": await store.receipt_of(claim.id),
         "reason": claim.reason, "reason_detail": detail,
         "novelty": claim.novelty if shown else None,
         "route": claim.route,
