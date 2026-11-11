@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from app import config, db
+from app.config import EVENT_LANE
 from app.routers.auth import authenticate, no_query
 from app.services import intake, product
 from app.services.store import ClaimRow, PrismaStore, Store
@@ -41,9 +42,24 @@ def _unauthenticated() -> HTTPException:
                          detail="Missing authentication headers.")
 
 
+_in_flight = 0
+
+
 @router.post("/claims", status_code=status.HTTP_202_ACCEPTED)
 async def post_claim(request: Request, store: Store = Depends(get_store)):
+    global _in_flight
     no_query(request)
+    if _in_flight >= EVENT_LANE["CLAIMS_IN_FLIGHT"]:
+        return JSONResponse(status_code=503, headers={"Retry-After": "1"},
+                            content={"detail": "busy", "retry_after": 1})
+    _in_flight += 1
+    try:
+        return await _post_claim(request, store)
+    finally:
+        _in_flight -= 1
+
+
+async def _post_claim(request: Request, store: Store):
     body = await request.body()
     received = received_ns(request)
     try:

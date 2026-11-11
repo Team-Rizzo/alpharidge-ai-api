@@ -490,3 +490,13 @@ async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch)
     assert seen == []
     await worker.advance_queued(store, t0 + 3000)
     assert seen == [first.id, later.id]
+
+
+async def test_claims_past_the_in_flight_cap_get_503(client, store, monkeypatch):
+    monkeypatch.setattr(claims_router, "_in_flight", 16)
+    r = post(client, MINER, canonical_body(claim(headline="busy")))
+    assert r.status_code == 503 and r.json()["detail"] == "busy"
+    assert r.headers["Retry-After"] == "1" and not store.claims
+    monkeypatch.setattr(claims_router, "_in_flight", 0)
+    assert post(client, MINER, canonical_body(claim(headline="busy"))).status_code == 202
+    assert claims_router._in_flight == 0

@@ -92,6 +92,8 @@ EVENT_LANE = {
     "SETTLE_EVERY_S": _el("SETTLE_EVERY_S", 60),
     "SETTLE_DELAY_H": _el("SETTLE_DELAY_H", 72),
     "CHECK_BUDGET_BASE": _el("CHECK_BUDGET_BASE", 200, int),
+    # Claims taken in at once; past it POST /claims answers 503 busy at once.
+    "CLAIMS_IN_FLIGHT": _el("CLAIMS_IN_FLIGHT", 16, int),
     "PUBLISH_HOLD_S": _el("PUBLISH_HOLD_S", 120),
     # Answer key: official feeds, private, used for accuracy only.
     # Set but empty means none.

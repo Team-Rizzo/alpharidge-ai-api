@@ -54,9 +54,11 @@ def client_key(ip: Optional[str]) -> str:
         addr = ipaddress.ip_address(ip or "")
     except ValueError:
         return ip or "-"
-    if addr.version == 6 and addr.ipv4_mapped is None:
+    if addr.version == 4:
+        return str(addr)
+    if addr.ipv4_mapped is None:
         return str(ipaddress.ip_network(f"{addr}/64", strict=False))
-    return str(addr.ipv4_mapped or addr)
+    return str(addr.ipv4_mapped)
 
 
 def limit(name: str):
