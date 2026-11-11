@@ -287,6 +287,21 @@ async def test_ties_wait_for_the_tie_block_and_draw_on_its_hash(store, monkeypat
     assert not line.ready(alone, t0 + 600) and line.ready(alone, t0 + 750)
 
 
+async def test_tie_lookups_go_oldest_first_and_stop_at_the_first_gap(store, monkeypatch):
+    asked = []
+
+    async def tie_block(after_ms):
+        asked.append(after_ms)
+        return None if after_ms >= line.closes_ms(12) else (after_ms, f"0x{after_ms:x}")
+    monkeypatch.setattr(line.block, "tie_block", tie_block)
+    monkeypatch.setattr(line, "TIE_LOOKUPS_PER_TICK", 3)
+    got = await line.tie_seeds(store, {14, 10, 11, 12, 13})
+    assert sorted(got) == [10, 11] and asked == [line.closes_ms(b) for b in (10, 11, 12)]
+    asked.clear()
+    assert sorted(await line.tie_seeds(store, {10, 11, 12})) == [10, 11]
+    assert asked == [line.closes_ms(12)]
+
+
 async def test_over_budget_gets_429(client, store, monkeypatch):
     monkeypatch.setitem(budget.EVENT_LANE, "CHECK_BUDGET_BASE", 2)
     now = time.time_ns() // 1_000_000

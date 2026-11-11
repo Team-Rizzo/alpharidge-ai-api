@@ -7,7 +7,7 @@ import math
 import os
 import threading
 import time
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -86,19 +86,65 @@ def _mock_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
     return n, "0x" + hashlib.sha256(f"mock:{n}".encode()).hexdigest()
 
 
+# Tie lookups read block timestamps from the past, which a pruned node no longer holds; they
+# may use their own connection (EL_TIE_NETWORK, such as "archive") and lock.
+TIE_NETWORK = os.getenv("EL_TIE_NETWORK", "").strip()
+TIE_HEAD_CACHE_S = 6
+TIE_STAMPS_MAX = 100_000
+_tie_lock = threading.RLock() if TIE_NETWORK else chain_lock
+_tie_subtensor = None
+# Finalised block number -> (timestamp ms, hash).
+_stamps: Dict[int, Tuple[int, str]] = {}
+_tie_head: Tuple[int, float] = (0, 0.0)
+
+
+def _tie_substrate():
+    global _tie_subtensor
+    if not TIE_NETWORK:
+        return get_subtensor().substrate
+    if _tie_subtensor is None:
+        import bittensor as bt
+
+        _tie_subtensor = bt.Subtensor(network=TIE_NETWORK)
+        logger.info(f"Connected to subtensor for tie blocks (network={TIE_NETWORK})")
+    return _tie_subtensor.substrate
+
+
+def _reset_tie() -> None:
+    global _tie_subtensor
+    if not TIE_NETWORK:
+        reset_subtensor()
+        return
+    old, _tie_subtensor = _tie_subtensor, None
+    if old is not None:
+        try:
+            old.substrate.close()
+        except Exception:
+            pass
+
+
 def get_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
     """The first finalised block whose timestamp is at or after `after_ms`, as (number, hash);
     None until there is one."""
+    global _tie_head
     if is_mock():
         return _mock_tie_block(after_ms)
-    with chain_lock:
+    with _tie_lock:
         try:
-            sub = get_subtensor().substrate
+            sub = _tie_substrate()
 
             def stamp(n: int) -> int:
-                return int(sub.query("Timestamp", "Now", block_hash=sub.get_block_hash(n)).value)
+                if n not in _stamps:
+                    if len(_stamps) >= TIE_STAMPS_MAX:
+                        _stamps.clear()
+                    h = sub.get_block_hash(n)
+                    _stamps[n] = (int(sub.query("Timestamp", "Now", block_hash=h).value), str(h))
+                return _stamps[n][0]
 
-            head = int(sub.get_block_number(sub.get_chain_finalised_head()))
+            head, read_at = _tie_head
+            if time.monotonic() - read_at >= TIE_HEAD_CACHE_S:
+                head = int(sub.get_block_number(sub.get_chain_finalised_head()))
+                _tie_head = (head, time.monotonic())
             at = stamp(head)
             if at < after_ms:
                 return None
@@ -107,10 +153,11 @@ def get_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
                 n += 1
             while n > 1 and stamp(n - 1) >= after_ms:
                 n -= 1
-            return n, str(sub.get_block_hash(n))
+            stamp(n)
+            return n, _stamps[n][1]
         except Exception as e:
             logger.warning(f"Could not read the tie block: {e}")
-            reset_subtensor()
+            _reset_tie()
             return None
 
 
