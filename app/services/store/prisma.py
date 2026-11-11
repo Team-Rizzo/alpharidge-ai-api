@@ -562,10 +562,12 @@ class PrismaStore:
         return _event_from(rows[0])
 
     async def prize_docs(self, since_ms):
-        rows = await self.db.claim.find_many(where={
-            "docHash": {"not": None}, "route": {"in": list(PRIZE_ROUTES)},
-            "status": {"in": list(WON)}, "receivedAt": {"gte": _dt(since_ms)}})
-        return [m.docHash for m in rows]
+        rows = await self.db.query_raw(
+            'SELECT doc_hash FROM "claim" WHERE doc_hash IS NOT NULL '
+            "AND route = ANY(string_to_array($1, ',')) AND status = ANY(string_to_array($2, ',')) "
+            'AND received_at >= to_timestamp($3::double precision / 1000)',
+            ",".join(PRIZE_ROUTES), ",".join(WON), since_ms)
+        return [r["doc_hash"] for r in rows]
 
     async def add_source_fetch(self, row):
         fields = {k: getattr(row, k) for k in (*_FETCH_FIELDS, "spans", "published_ms",
