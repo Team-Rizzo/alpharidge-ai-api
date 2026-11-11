@@ -15,7 +15,7 @@ from app.routers.claims import _can_read, get_store
 from app.routers.product import get_entities, parse_time
 from app.services import budget, judge, ledger, line, ops, product, scoops, trust
 from app.services.entities import EntityIndex
-from app.services.store import INTAKE_REJECTS, ClaimRow, SourceFetchRow, Store
+from app.services.store import INTAKE_REJECTS, ClaimRow, MinerStats, SourceFetchRow, Store
 from app.utils import block
 from app.utils.auth import extract_auth_from_headers
 from app.utils.clock import iso, now_ms as _now_ms
@@ -41,15 +41,31 @@ def _points(kinds: dict) -> dict:
     return out
 
 
+async def _carried(store: Store, category: Optional[str]) -> Dict[str, float]:
+    """Debt carried forward into the last signed window, per hotkey, as a positive amount."""
+    last = await store.last_attestation_epoch(ledger.LEDGER_SIGNER)
+    if last is None:
+        return {}
+    out: Dict[str, float] = {}
+    for r in await store.ledger_rows(ledger.window(last)):
+        if r.kind == ledger.CARRY and category in (None, r.category):
+            out[r.hotkey] = out.get(r.hotkey, 0.0) - r.points
+    return out
+
+
 @router.get("/miners")
 async def dashboard_miners(window: str = "24h", category: Optional[str] = None,
                            limit: int = 256, store: Store = Depends(get_store)):
-    """Per-hotkey claims, outcomes, budget, points by route and accuracy, from the ledger."""
+    """Per-hotkey claims, outcomes, budget, points by route, debt carried into the signed window
+    and accuracy, from the ledger."""
     if window not in _WINDOWS_MS:
         raise HTTPException(status_code=400, detail="bad_window")
     now = _now_ms()
     until = now - product.hold_ms()
     stats = await store.miner_stats(until - _WINDOWS_MS[window], until, category)
+    carried = await _carried(store, category)
+    for hk in carried:
+        stats.setdefault(hk, MinerStats())
     hotkeys = sorted(stats)
     week = await store.hotkey_stats(now - _WINDOWS_MS["7d"], hotkeys)
     recent = await store.miner_stats(until - budget.window_ms(), until)
@@ -70,8 +86,10 @@ async def dashboard_miners(window: str = "24h", category: Optional[str] = None,
             "budget": {"used": used, "limit": budget.budget_from(week.get(hk)),
                        **({"scoops": scoops[hk]} if scoops is not None else {})},
             "points": points,
+            "carried": round(carried.get(hk, 0.0), 6),
             "total_points": round(sum(p["provisional"] + p["settled"] - p["clawed"] - p["debt"]
-                                      - p["penalty"] for p in points.values()), 6),
+                                      - p["penalty"] for p in points.values())
+                                  - carried.get(hk, 0.0), 6),
             "q": q.get(hk, {}),
         })
     miners.sort(key=lambda m: (-m["total_points"], m["hotkey"]))

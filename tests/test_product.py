@@ -201,6 +201,17 @@ async def test_dashboard_shows_route_and_check(api, monkeypatch):
     assert miner["points"]["event"]["penalty"] == 1.0
     assert miner["total_points"] == pytest.approx(paid - 1.0)
     lane.store.ledger.pop()
+    # Debt carried into the signed window counts, also for a hotkey with no recent claims.
+    epoch = lane.store.ledger[0].epoch
+    await lane.store.put_attestation(ledger.LEDGER_SIGNER, epoch, {"totalPoints": 0.0})
+    for hk in ("m1", "m9"):
+        lane.store.ledger.append(LedgerRow(hk, None, None, ledger.CARRY, -2.0, epoch,
+                                           route=ledger.CARRY))
+    miners = {m["hotkey"]: m for m in client.get("/dashboard/miners").json()["miners"]}
+    assert miners["m1"]["carried"] == 2.0
+    assert miners["m1"]["total_points"] == pytest.approx(paid - 2.0)
+    assert miners["m9"]["claims"] == 0 and miners["m9"]["total_points"] == -2.0
+    del lane.store.ledger[-2:]
     # Everyone sees the source once the claim settles.
     monkeypatch.setitem(EVENT_LANE, "PRODUCT_KEYS_REQUIRED", False)
     assert client.get("/events").json()["items"][0]["source_url"] is None
