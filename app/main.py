@@ -13,7 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app import config, db
 from app.routers import claims, dashboard, judge, ledger, mechanism, ops, product, scoops
 from app.routers import config as config_router
-from app.utils import auth, block, hotkey_whitelist
+from app.utils import auth, block, hotkey_whitelist, parse_pool
 from app.utils.body_limit import BodyLimit
 from app.utils.rate_limit import limit
 from app.utils.receipt import ReceiptClock
@@ -137,6 +137,7 @@ async def lifespan(app: FastAPI):
     await hotkey_whitelist.sync_async()
     await db.connect()
 
+    parse_pool.install(config.EVENT_LANE["PARSE_PROCESSES"])
     tasks = [asyncio.create_task(hotkey_whitelist.run_sync()),
              asyncio.create_task(run_worker(claims.get_store())),
              asyncio.create_task(run_daily(claims.get_store())),
@@ -148,6 +149,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down Alpharidge AI API...")
     for task in tasks:
         await _cancel(task)
+    parse_pool.uninstall()
     await db.disconnect()
 
 

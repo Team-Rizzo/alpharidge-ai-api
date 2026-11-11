@@ -96,6 +96,8 @@ EVENT_LANE = {
     "CLAIMS_IN_FLIGHT": _el("CLAIMS_IN_FLIGHT", 16, int),
     # Seconds a claim's status reply is reused before it is read again.
     "STATUS_CACHE_S": _el("STATUS_CACHE_S", 20),
+    # Processes that parse fetched pages; 0 parses them on one thread.
+    "PARSE_PROCESSES": _el("PARSE_PROCESSES", 0, int),
     # Operator diagnostics, off by default: log worker ticks slower than this many seconds,
     # and profile the process for this many seconds after start-up.
     "TICK_LOG_S": _el("TICK_LOG_S", 0),

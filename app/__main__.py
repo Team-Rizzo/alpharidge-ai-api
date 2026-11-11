@@ -1,12 +1,13 @@
 import os
 
-from alpharidge_ai.packages import repair_substrate_codec
-
-repair_substrate_codec()
-
-import uvicorn  # noqa: E402
-
 if __name__ == "__main__":
+    # Only in the server process: page-parse workers import this module too.
+    from alpharidge_ai.packages import repair_substrate_codec
+
+    repair_substrate_codec()
+
+    import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host=os.getenv("API_HOST", "0.0.0.0"),

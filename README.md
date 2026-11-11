@@ -95,6 +95,7 @@ Everything is read from the environment, with `.env` in the repo root loaded at 
 | `EL_RATE_LIMIT_ENABLED` | Per-IP rate limits (behind a reverse proxy, pass the client address through) |
 | `EL_FETCH_TIMEOUT_S`, `EL_FETCH_RETRY`, `EL_FETCH_PUBLIC_ONLY`, `EL_DOMAIN_RPS`, `EL_FETCH_CONCURRENCY`, `EL_USER_AGENT_CONTACT` | Fetching (15 s a request, 5 s to connect, as validators); the user agent is `AlphaRidgeBot/<version> (+<contact>)`. The contact is a URL or email the operator chooses |
 | `EL_SETTLE_DELAY_H`, `EL_SETTLE_EVERY_S`, `EL_WORKER_INTERVAL_S` | Settlement and worker timing (a signed profile's `ledger.settle_delay_h` overrides `EL_SETTLE_DELAY_H`) |
+| `EL_PARSE_PROCESSES` | Worker processes that parse fetched pages (default 0: one thread in the API process). Parsing is CPU-bound; a few processes take it off the API's event loop |
 | `EL_TIE_NETWORK` | Chain endpoint for tie-block lookups, such as `archive`; they read block timestamps from the past, which a pruned node no longer keeps. Unset uses the main connection |
 | `EL_STATUS_CACHE_S` | Seconds a claim's `GET /claims/{id}` reply is reused (default 20; 0 reads it fresh each time) |
 | `EL_TICK_LOG_S`, `EL_PROFILE_S` | Diagnostics, off by default: log worker ticks slower than this many seconds by step; profile the process for this many seconds after start-up and log the result |

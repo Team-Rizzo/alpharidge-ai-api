@@ -302,3 +302,24 @@ async def test_a_scoop_on_a_filing_its_subject_made_takes_the_event_route(monkey
     out = await v._filed_by_subject(store, row, Claim.model_validate(row.payload), RECEIVED_MS)
     assert out.route == route and (await store.get_claim(row.id)).route == route
     await v.fetcher.aclose()
+
+
+async def test_pages_parsed_in_worker_processes_are_the_same(base, monkeypatch):
+    from dataclasses import asdict
+
+    from alpharidge_ai.verify import fetch
+    from app.utils import parse_pool
+
+    cfg = FetchConfig(public_only=False, domain_rps=1000, retry_delay_s=0)
+    urls = [f"{base}{p}" for p in ("/supported", "/paywall", "/old")]
+    on_thread = [asdict(await Fetcher(cfg).fetch(u)) for u in urls]
+    monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
+    parse_pool.install(2)
+    try:
+        assert isinstance(fetch._PARSE, parse_pool.ParsePool)
+        in_workers = [asdict(await Fetcher(cfg).fetch(u)) for u in urls]
+    finally:
+        parse_pool.uninstall()
+    for a, b in zip(on_thread, in_workers):
+        a.pop("fetched_at", None), b.pop("fetched_at", None)
+    assert in_workers == on_thread and in_workers[0]["text"]
