@@ -323,3 +323,22 @@ async def test_pages_parsed_in_worker_processes_are_the_same(base, monkeypatch):
     for a, b in zip(on_thread, in_workers):
         a.pop("fetched_at", None), b.pop("fetched_at", None)
     assert in_workers == on_thread and in_workers[0]["text"]
+
+
+async def test_the_check_gives_the_same_result_in_the_parse_workers(base, monkeypatch):
+    from alpharidge_ai.verify import fetch
+    from app.utils import parse_pool
+
+    store, v = MemoryStore(), make()
+    page, _ = await v.fetch(store, await submit(store, f"{base}/supported"))
+    claim = Claim.model_validate(payload(f"{base}/supported"))
+    at = datetime(2026, 10, 13, 12, 40, tzinfo=timezone.utc)
+    here = await v.check_aside(claim, page, at)
+    monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
+    parse_pool.install(1)
+    try:
+        aside = await v.check_aside(claim, page, at)
+    finally:
+        parse_pool.uninstall()
+    assert aside == here and here.passed
+    await v.fetcher.aclose()

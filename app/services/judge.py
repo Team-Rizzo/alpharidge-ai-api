@@ -188,6 +188,11 @@ async def add_post(store: Store, validator: str, raw: bytes, signed_at: int, non
     got = await store.add_judge_post(JudgePostRow(
         item_id=item.id, validator=validator, body=raw.decode("utf-8"), signed_at=int(signed_at),
         nonce=nonce, signature=signature, posted_ms=now_ms))
+    if got and config.REVERIFY_VALIDATORS and config.REVERIFY_VALIDATORS <= {
+            p.validator for p in await store.judge_posts([item.id])}:
+        # Every listed validator has posted: the claim is looked at on the next pass.
+        from app.services import verifier
+        verifier.get_verifier().wake(item.claim_id)
     return "accepted" if got else "duplicate"
 
 

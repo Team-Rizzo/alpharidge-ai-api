@@ -241,3 +241,17 @@ async def test_an_item_no_validator_posts_on_waits_a_day_then_costs_the_miner_no
     await store.update_claim(row.id, "rejected", reason="judge_reject")
     assert await v.repeats(store, other, row.doc_hash, late) == 1
     await v.fetcher.aclose()
+
+
+@pytest.mark.usefixtures("listed")
+async def test_the_last_listed_post_brings_the_claim_back_on_the_next_pass(base, monkeypatch):
+    store, v = MemoryStore(), make()
+    v.panel = None
+    monkeypatch.setattr(verifier, "_default", v)
+    row = await run(v, store, await submit(store, f"{base}/supported"))
+    (item,) = await store.judge_items()
+    assert row.id in v._judge_wait
+    await post(store, item, "v1")
+    assert row.id in v._judge_wait
+    await post(store, item, "v2")
+    assert row.id not in v._judge_wait

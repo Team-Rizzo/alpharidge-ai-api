@@ -122,12 +122,19 @@ async def get_claim(claim_id: str, request: Request, store: Store = Depends(get_
     return reply
 
 
+# Statuses no ledger row is written in.
+_UNPAID = ("queued", "novelty", "fetched")
+
+
 async def _status_reply(store: Store, claim: ClaimRow) -> dict:
-    points = await store.claim_points(claim.id)
+    points = {} if claim.status in _UNPAID else await store.claim_points(claim.id)
     shown, verification = await _event_shown(store, claim)
-    fetch = next((f for f in reversed(await store.source_fetches(claim.id)) if f.check), None)
-    detail = (fetch.check.get("detail") if fetch and claim.status == "rejected"
-              and fetch.reason == claim.reason else None)
+    detail = None
+    if claim.status == "rejected":
+        fetch = next((f for f in reversed(await store.source_fetches(claim.id)) if f.check),
+                     None)
+        detail = (fetch.check.get("detail") if fetch and fetch.reason == claim.reason
+                  else None)
     return {
         **_receipt(claim),
         "receipt": await store.receipt_of(claim.id),

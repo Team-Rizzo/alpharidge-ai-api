@@ -48,6 +48,10 @@ def install(workers: int) -> None:
     logger.info(f"Parsing pages in {workers} processes")
 
 
+def current() -> Optional[ParsePool]:
+    return _installed
+
+
 def uninstall() -> None:
     global _installed
     if _installed is not None:

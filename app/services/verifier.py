@@ -7,6 +7,8 @@ URL cache window and never written to the database. Failed fetches are retried, 
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import logging
 import re
 import time
@@ -26,6 +28,7 @@ from app.services import (budget, intake, judge as judges, ledger, novelty, page
 from app.services.answer_key import releases
 from app.services.entities import EntityIndex, PlaceIndex, shared_index
 from app.services.store import PRIZE_ROUTES, ClaimRow, EventRecord, Job, SourceFetchRow, Store
+from app.utils import parse_pool
 from app.utils.clock import DAY_MS, ms as _ms, now_ms as _now_ms
 
 FETCH_MAX_BYTES = 2_000_000
@@ -228,6 +231,17 @@ class Verifier:
             return check_scoop(claim, page, received, excluded=excluded)
         return check_claim(claim, page, received, excluded=excluded)
 
+    async def check_aside(self, claim: Claim, page: FetchedPage, received: datetime,
+                          scoop: bool = False) -> CheckResult:
+        """`check`, in the page-parse workers when they run."""
+        pool = parse_pool.current()
+        if pool is None:
+            return self.check(claim, page, received, scoop)
+        excluded = self.rules.page_excluded(page.final_url or page.url, page)
+        fn = check_scoop if scoop else check_claim
+        return await asyncio.get_running_loop().run_in_executor(
+            pool, functools.partial(fn, claim, page, received, excluded=excluded))
+
     def index(self) -> EntityIndex:
         if self.entities is None:
             self.entities = shared_index()
@@ -272,6 +286,10 @@ class Verifier:
     async def _near(self, store: Store, claim: Claim, row: ClaimRow) -> List[EventRecord]:
         own = [i for i in (row.event_id,) if i is not None]
         return await novelty.near_events(store, claim, self.index(), self.places, own)
+
+    def wake(self, claim_id: int) -> None:
+        """A claim waiting for page verdicts is looked at again on the next pass."""
+        self._judge_wait.pop(claim_id, None)
 
     def looked(self, claim_id: int, now_ms: int) -> bool:
         """True while the claim's last fetch request is under FETCH_REQUEST_S old."""
@@ -366,7 +384,7 @@ class Verifier:
         url = (page.ok and page.final_url) or row.source_url
         source = await trust.resolve(store, url, now_ms)
         received = _utc(row.received_ms)
-        result = self.check(claim, page, received, scoop=row.route == "scoop")
+        result = await self.check_aside(claim, page, received, scoop=row.route == "scoop")
 
         fields = {"source_id": source.id}
         contrastive = False
