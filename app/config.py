@@ -109,6 +109,9 @@ EVENT_LANE = {
     "PARSE_PROCESSES": _el("PARSE_PROCESSES", 0, int),
     # Processes for the fixed check and contrastive match; 0 runs them in the API process.
     "CHECK_PROCESSES": _el("CHECK_PROCESSES", 0, int),
+    # Listed validators whose verdicts decide a page (0: all of them). With fewer than all,
+    # each page goes to one of them, and to the others once it has waited JUDGE_HANDOFF_S.
+    "JUDGES_PER_ITEM": _el("JUDGES_PER_ITEM", 0, int),
     # Operator diagnostics, off by default: log worker ticks slower than this many seconds,
     # and profile the process for this many seconds after start-up.
     "TICK_LOG_S": _el("TICK_LOG_S", 0),

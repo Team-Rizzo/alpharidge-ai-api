@@ -255,3 +255,44 @@ async def test_the_last_listed_post_brings_the_claim_back_on_the_next_pass(base,
     assert row.id in v._judge_wait
     await post(store, item, "v2")
     assert row.id not in v._judge_wait
+
+
+@pytest.mark.usefixtures("listed")
+async def test_with_one_judge_a_page_goes_to_one_validator_then_to_any(monkeypatch):
+    import time
+    from app.services.store import JudgeItemRow
+    monkeypatch.setitem(EVENT_LANE, "JUDGES_PER_ITEM", 1)
+    store, now = MemoryStore(), time.time_ns() // 1_000_000
+
+    async def queued(created_ms, tag):
+        out = []
+        for i in range(8):
+            row = await submit(store, f"https://a.example/{tag}{i}")
+            out.append(await store.add_judge_item(JudgeItemRow(
+                key=f"{tag}{i}", claim_id=row.id, kind="claim",
+                task={"kind": "claim", "claim_id": str(row.id)}, created_ms=created_ms)))
+        return out
+
+    fresh = await queued(now, "f")
+    one = {x["key"] for x in await judge.pending_for(store, "v1")}
+    two = {x["key"] for x in await judge.pending_for(store, "v2")}
+    assert one | two == {i.key for i in fresh} and not one & two and one and two
+
+    record = None
+    await post(store, fresh[0], judge.assigned(fresh[0]))
+    c = Claim.model_validate((await store.get_claim(fresh[0].claim_id)).payload)
+    record = await judge.combine(store, fresh[0], c, "h1", None, now)
+    assert record is not None and len(record["posts"]) == 1
+    other = "v2" if judge.assigned(fresh[0]) == "v1" else "v1"
+    assert fresh[0].key not in {x["key"] for x in await judge.pending_for(store, other)}
+
+    late = await queued(now - (judge.JUDGE_HANDOFF_S + 5) * 1000, "l")
+    for v in ("v1", "v2"):
+        assert {i.key for i in late} <= {x["key"] for x in await judge.pending_for(store, v)}
+
+
+@pytest.mark.usefixtures("listed")
+def test_every_listed_validator_judges_unless_set_otherwise(monkeypatch):
+    assert judge.needed() == 2
+    monkeypatch.setitem(EVENT_LANE, "JUDGES_PER_ITEM", 1)
+    assert judge.needed() == 1
