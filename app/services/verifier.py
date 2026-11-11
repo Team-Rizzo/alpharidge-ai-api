@@ -265,11 +265,9 @@ class Verifier:
         """The owner's (coldkey, else hotkey) non-pass judge outcomes today on this page and
         type."""
         day = now_ms - now_ms % DAY_MS
-        owner = row.coldkey or row.hotkey
-        return sum(1 for c in await store.claims_of_types(day - DAY_MS, [row.event_type])
-                   if c.id != row.id and (c.coldkey or c.hotkey) == owner
-                   and c.doc_hash == doc_hash and (c.judged_ms or 0) >= day
-                   and c.reason in ("judge_reject", "judge_unclear"))
+        return await store.judge_repeats(row.coldkey or row.hotkey, row.event_type, doc_hash,
+                                         day - DAY_MS, day, row.id,
+                                         ("judge_reject", "judge_unclear"))
 
     async def _near(self, store: Store, claim: Claim, row: ClaimRow) -> List[EventRecord]:
         own = [i for i in (row.event_id,) if i is not None]

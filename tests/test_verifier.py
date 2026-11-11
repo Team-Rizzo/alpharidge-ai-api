@@ -274,3 +274,17 @@ async def test_verify_ready_asks_for_one_fetch_per_claim_and_checks_cached_pages
     await verifier.verify_ready(store, now + 123_000)
     assert (await store.get_claim(row.id)).status == "fetched"
     await v.fetcher.aclose()
+
+
+async def test_fetch_jobs_go_oldest_claim_first_up_to_the_hotkey_cap():
+    from dataclasses import replace
+    store = MemoryStore()
+    order = []
+    for hotkey, bucket in (("a", 3), ("a", 1), ("b", 5), ("a", 2), ("c", 4)):
+        row = await submit(store, f"https://example.org/{hotkey}{bucket}")
+        store.claims[row.id] = replace(store.claims[row.id], hotkey=hotkey, bucket=bucket)
+        await store.add_job("fetch", row.id, 0)
+        order.append((hotkey, bucket, row.id))
+    ids = {(h, b): i for h, b, i in order}
+    got = [j.claim_id for j in await store.take_jobs(["fetch"], 10, 60_000, 1, per_hotkey=2)]
+    assert got == [ids[k] for k in (("a", 1), ("a", 2), ("c", 4), ("b", 5), ("a", 3))]

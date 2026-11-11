@@ -89,7 +89,7 @@ class JobPool:
             return 0
         busy = [hk for hk, n in self.running.items() if hk and n >= self.per_hotkey]
         jobs = await store.take_jobs(list(HANDLERS), free, JOB_LEASE_S * 1000,
-                                     now_ms, busy)
+                                     now_ms, busy, per_hotkey=self.per_hotkey)
         for job in jobs:
             if job.attempts > JOB_MAX_ATTEMPTS:
                 await self._give_up(store, job)
