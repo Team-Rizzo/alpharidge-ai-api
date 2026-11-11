@@ -1,0 +1,3808 @@
+{
+ "feeds": [
+  {
+   "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&count=100&output=atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://abs.gov.au/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://abs.gov.au/",
+   "kind": "page"
+  },
+  {
+   "url": "https://afm.nl/en/rss-feed/nieuws-professionals",
+   "kind": "rss"
+  },
+  {
+   "url": "https://afm.nl/nl-nl/rss-feed/nieuws-professionals",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ago.vermont.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://announcements.asx.com.au/",
+   "kind": "page"
+  },
+  {
+   "url": "https://apra.gov.au/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://arjoblink.arkansas.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://attorneygeneral.delaware.gov/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://attorneygeneral.delaware.gov/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://attorneygeneral.delaware.gov/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://azjobconnection.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://b3.com.br/en_us/",
+   "kind": "page"
+  },
+  {
+   "url": "https://b3.com.br/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://b3.com.br/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://bafin.de/EN/die-bafin/aktuelles-presse/presse-social-media/pressemitteilungen/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bafin.de/SharedDocs/Veroeffentlichungen/EN/Pressemitteilung/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bafin.de/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bancaditalia.it/media/comunicati/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bancaditalia.it/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bancaditalia.it/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bank.gov.ua/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://bank.gov.ua/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bankingsupervision.europa.eu/rss/press.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankingsupervision.europa.eu/rss/pub.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankingsupervision.europa.eu/rss/speeches.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankofcanada.ca/feed/?content_type=sparks-at-bank-article&post_type[0]=post&post_type[1]=page",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankofcanada.ca/feed/?content_type=regulatory-news&post_type[0]=post&post_type[1]=page",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankofcanada.ca/feed/?utility=news&post_type[0]=post&post_type[1]=page",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankofengland.co.uk/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bankruptcy.angeiongroup.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://banque-france.fr/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://banque-france.fr/",
+   "kind": "page"
+  },
+  {
+   "url": "https://banrep.gov.co/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.banxico.org.mx/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bb.org.bd/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://bb.org.bd/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://bb.org.bd/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://bcra.gob.ar/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://bcra.gob.ar/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bde.es/wbe/en/noticias-eventos/actualidad-banco-espana/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bde.es/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bea.gov/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bea.gov/news/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bfs.admin.ch/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://bfs.admin.ch/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bi.go.id/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://bi.go.id/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://bi.go.id/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bis.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bis.org/doclist/bis_fsi_publs.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bis.org/doclist/vacancies.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bis.org/doclist/mgmtspeeches.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bkam.ma/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bkam.ma/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bls.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://bls.gov/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://bls.gov/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://bmcgroup.com/restructuring/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bmv.com.mx/en/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bmv.com.mx/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bnm.gov.my/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bnm.gov.my/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bnr.ro/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://bnr.ro/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://bnr.ro/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bog.gov.gh/news/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bog.gov.gh/news/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.boj.or.jp/rss/whatsnew.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bolsasymercados.es/",
+   "kind": "page"
+  },
+  {
+   "url": "https://borsaistanbul.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bot.or.th/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bundesbank.de/service/rss/en/633292/feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bundesbank.de/service/rss/en/633306/feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bundesbank.de/service/rss/en/878806/feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bundeskartellamt.de/SharedDocs/Meldung/EN/Pressemitteilungen/",
+   "kind": "page"
+  },
+  {
+   "url": "https://bundeskartellamt.de/",
+   "kind": "page"
+  },
+  {
+   "url": "https://feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeEFtRWA==",
+   "kind": "rss"
+  },
+  {
+   "url": "https://cases.stretto.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cb.is/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.cbc.gov.tw/en/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.cbc.gov.tw/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.cbc.gov.tw/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://cbe.org.eg/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://cbe.org.eg/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://cbe.org.eg/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://cbn.gov.ng/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cboe.com/insights/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://cbr.ru/eng/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cbr.ru/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://cbr.ru/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.cbs.nl/nl-nl/sitemaps/newssitemap",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.cbs.nl/en-gb/sitemaps/newssitemap",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.cbsl.gov.lk/en/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://cci.gov.in/combination/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cci.gov.in/media-gallery/press-release",
+   "kind": "page"
+  },
+  {
+   "url": "https://cci.gov.in/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ccwd.hecc.oregon.gov/Layoff/WARN",
+   "kind": "page"
+  },
+  {
+   "url": "https://ccwd.hecc.oregon.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://census.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.centralbank.go.ke/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://centralbank.ie/news-media/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://centralbank.ie/news/article/",
+   "kind": "page"
+  },
+  {
+   "url": "https://centralbank.ie/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cftc.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://clerk.house.gov/Votes",
+   "kind": "page"
+  },
+  {
+   "url": "https://clerk.house.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cma.gov.sa/en/MediaCenter/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cma.gov.sa/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://cma.gov.sa/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://cnb.cz/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cnil.fr/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://cnil.fr/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://commerce.nc.gov/news/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://conference-board.org/rss/rss.cfm?type=press",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.consob.it/",
+   "kind": "page"
+  },
+  {
+   "url": "https://consumerfinance.gov/about-us/newsroom/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://cso.ie/",
+   "kind": "page"
+  },
+  {
+   "url": "https://cssf.lu/news/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://cssf.lu/news/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dam.assets.ohio.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dceo.illinois.gov/workforcedevelopment/warn.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://dceo.illinois.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://dceo.illinois.gov/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.deb.uscourts.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://deb.uscourts.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://destatis.de/",
+   "kind": "page"
+  },
+  {
+   "url": "https://deutsche-boerse.com/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://deutsche-boerse.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dew.sc.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://dew.sc.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dfm.ae/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://dfm.ae/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dfs.ny.gov/Newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://dfs.ny.gov/reports_and_publications/press_releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dfs.ny.gov/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.dfsa.ae/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dlr.sd.gov/workforce_services/businesses/warn_notices.aspx",
+   "kind": "page"
+  },
+  {
+   "url": "https://dlr.sd.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://dlr.sd.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dnb.nl/nl/rss/16451/6882",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dnb.nl/nl/rss/16451/6882/Achtergrond",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dnb.nl/nl/rss/16451/6882/Persbericht",
+   "kind": "rss"
+  },
+  {
+   "url": "https://does.dc.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dojmt.gov/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dojmt.gov/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dol.nebraska.gov/ReemploymentServices/LayoffServices/LayoffsAndDownsizingWARN",
+   "kind": "page"
+  },
+  {
+   "url": "https://dol.nebraska.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dol.ny.gov/legacy-warn-notices",
+   "kind": "page"
+  },
+  {
+   "url": "https://dol.ny.gov/warn-dashboard",
+   "kind": "page"
+  },
+  {
+   "url": "https://dol.ny.gov/warn-notices",
+   "kind": "page"
+  },
+  {
+   "url": "https://dolpublicdocumentlibrary.ct.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dos.fl.gov/communications/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dos.fl.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dosm.gov.my/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dst.dk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dwd.wisconsin.gov/dislocatedworker/warn/",
+   "kind": "page"
+  },
+  {
+   "url": "https://dwd.wisconsin.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://dwd.wisconsin.gov/press",
+   "kind": "page"
+  },
+  {
+   "url": "https://eac.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ecb.europa.eu/rss/press.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ecb.europa.eu/rss/blog.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ecb.europa.eu/rss/statpress.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://edd.ca.gov/en/jobs_and_training/Layoff_Services_WARN/",
+   "kind": "page"
+  },
+  {
+   "url": "https://edd.ca.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://egazette.gld.gov.hk/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://egazette.gld.gov.hk/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://egazette.gld.gov.hk/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://egazette.gov.sg/",
+   "kind": "page"
+  },
+  {
+   "url": "https://eia.gov/petroleum/supply/weekly/",
+   "kind": "page"
+  },
+  {
+   "url": "https://eia.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://elections.ca/",
+   "kind": "page"
+  },
+  {
+   "url": "https://elysee.fr/en/emmanuel-macron/",
+   "kind": "page"
+  },
+  {
+   "url": "https://en.www.inegi.org.mx/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://en.www.inegi.org.mx/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://en.www.inegi.org.mx/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://english.sse.com.cn/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.esri.cao.go.jp/rss-jp.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://euronext.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://euronext.com/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://euronext.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fca.org.uk/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fca.org.uk/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://fca.org.uk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fdic.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://fec.gov/updates/",
+   "kind": "page"
+  },
+  {
+   "url": "https://federalreserve.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fhfa.gov/news/news-release/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fhfa.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://fhfa.gov/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://find-and-update.company-information.service.gov.uk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://finra.org/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://fiscaldata.treasury.gov/datasets/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fiscaldata.treasury.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsa.go.jp/en/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsa.go.jp/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsa.go.jp/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fsb.org/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://fsb.org/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://fsb.org/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://fsc.go.kr/eng/pr010101/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fsc.go.kr/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsc.gov.tw/en/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsc.gov.tw/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsc.gov.tw/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsca.co.za/Latest-News/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsca.co.za/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fsca.co.za/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fsma.be/en/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://fsma.be/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://fsma.be/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://ftc.gov/news-events/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ftc.gov/news-events/news/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ftc.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://gov.br/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://gov.br/atom.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://gov.uk/cma-cases.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://gpw.pl/rss-press-releases",
+   "kind": "rss"
+  },
+  {
+   "url": "https://gpw.pl/rss-news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://gpw.pl/rss-communiques",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.hkex.com.hk/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.hkex.com.hk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.hkma.gov.hk/eng/news-and-media/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.hkma.gov.hk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://home.treasury.gov/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://home.treasury.gov/news/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://home.treasury.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://idahoworks.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ifo.de/en/pressreleases/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://illinoisworknet.com/LayoffRecovery/Pages/ArchivedWARNReports.aspx",
+   "kind": "page"
+  },
+  {
+   "url": "https://illinoisworknet.com/LayoffRecovery/Pages/IllinoisWARNData.aspx",
+   "kind": "page"
+  },
+  {
+   "url": "https://illinoisworknet.com/warndashboard",
+   "kind": "page"
+  },
+  {
+   "url": "https://in.gov/attorneygeneral/consumer-protection-division/id-theft-prevention/security-breaches/",
+   "kind": "page"
+  },
+  {
+   "url": "https://in.gov/dwd/warn-notices/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.indec.gob.ar/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.indec.gob.ar/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.indec.gob.ar/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://ine.es/",
+   "kind": "page"
+  },
+  {
+   "url": "https://insee.fr/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.gov.uk/government/organisations/insolvency-service.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.iowaattorneygeneral.gov/for-consumers/security-breach-notifications",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.iowaattorneygeneral.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.iowaattorneygeneral.gov/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://ised-isde.canada.ca/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://ised-isde.canada.ca/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://ised-isde.canada.ca/press",
+   "kind": "page"
+  },
+  {
+   "url": "https://ismworld.org/supply-management-news-and-reports/news-publications/press-room/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ismworld.org/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.istat.it/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://japan.kantei.go.jp/index-e2.rdf",
+   "kind": "rss"
+  },
+  {
+   "url": "https://jndla.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://joblink.delaware.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://joblink.maine.gov/warn_info",
+   "kind": "page"
+  },
+  {
+   "url": "https://joblink.maine.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://jobs.alaska.gov/RR/WARN_notices.htm",
+   "kind": "page"
+  },
+  {
+   "url": "https://jobs.alaska.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://jobs.utah.gov/employer/business/warnnotices.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://jobs.utah.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.jpx.co.jp/rss/markets_news.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.jpx.co.jp/rss/jpx-news.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.jpx.co.jp/rss/equities-suspended.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.jse.co.za/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://justice.gov/news/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://kansasworks.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://labor.hawaii.gov/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://labor.hawaii.gov/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://labor.hawaii.gov/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://labor.maryland.gov/employment/warn.shtml",
+   "kind": "page"
+  },
+  {
+   "url": "https://labor.maryland.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://legislation.gov.uk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://live.euronext.com/en/resources/notices-corporate-actions/cash-notices",
+   "kind": "page"
+  },
+  {
+   "url": "https://live.euronext.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://live.euronext.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://londonstockexchange.com/en/news/new-listings/",
+   "kind": "page"
+  },
+  {
+   "url": "https://londonstockexchange.com/en/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://londonstockexchange.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://lseg.com/en/ftse-russell",
+   "kind": "page"
+  },
+  {
+   "url": "https://lseg.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.mas.gov.sg/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.mas.gov.sg/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.mas.gov.sg/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://mdes.ms.gov/information-center/warn-information/",
+   "kind": "page"
+  },
+  {
+   "url": "https://mdes.ms.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://mdes.ms.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://mnb.hu/rss/11",
+   "kind": "rss"
+  },
+  {
+   "url": "https://mods.go.kr/",
+   "kind": "page"
+  },
+  {
+   "url": "https://msci.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://nar.realtor/newsroom/",
+   "kind": "page"
+  },
+  {
+   "url": "https://nar.realtor/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://nar.realtor/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://nasdaqtrader.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://nasdaqtrader.com/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://nasdaqtrader.com/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://nationalbanken.dk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.ncsbe.gov/news/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ncua.gov/news/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://ncua.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://ncua.gov/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://newyorkfed.org/markets/reference-rates/",
+   "kind": "page"
+  },
+  {
+   "url": "https://newyorkfed.org/newsevents/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://newyorkfed.org/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.niassembly.gov.uk/news-and-media/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.niassembly.gov.uk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://nj.gov/labor/business-services/layoffs-and-closing/file-warn-notice/",
+   "kind": "page"
+  },
+  {
+   "url": "https://nj.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.njb.uscourts.gov/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://norges-bank.no/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.nysb.uscourts.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://nyse.com/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://nyse.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://nzx.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oag.ca.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://oag.ca.gov/news/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://oag.maryland.gov/resources-info/Pages/security-breach-notices.aspx",
+   "kind": "page"
+  },
+  {
+   "url": "https://oag.maryland.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://oag.maryland.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oag.my.site.com/datasecuritybreachreport/apex/DataSecurityReportsPage",
+   "kind": "page"
+  },
+  {
+   "url": "https://oag.my.site.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oaic.gov.au/privacy/notifiable-data-breaches/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oaic.gov.au/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://oaic.gov.au/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://occ.gov/news-events/",
+   "kind": "page"
+  },
+  {
+   "url": "https://occ.gov/news-events/newsroom/",
+   "kind": "page"
+  },
+  {
+   "url": "https://occ.gov/news-issuances/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oenb.at/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oireachtas.ie/en/bills/",
+   "kind": "page"
+  },
+  {
+   "url": "https://oireachtas.ie/en/press-centre/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://ons.gov.uk/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://ons.gov.uk/",
+   "kind": "page"
+  },
+  {
+   "url": "https://osc.ca/en/news-events/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://osc.ca/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://osc.ca/",
+   "kind": "page"
+  },
+  {
+   "url": "https://otce.finra.org/otce/tradeHalts",
+   "kind": "page"
+  },
+  {
+   "url": "https://otce.finra.org/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://otce.finra.org/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://pa.gov/agencies/dli/programs-services/workforce-development-home/warn-requirements/warn-notices.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://pa.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.parliament.scot/about/news/news-listing/",
+   "kind": "page"
+  },
+  {
+   "url": "https://portal.ct.gov/dol/knowledge-base/articles/employment-and-training/rapid-response/warn",
+   "kind": "page"
+  },
+  {
+   "url": "https://portal.ct.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://portal.ct.gov/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://press.spglobal.com/index.php?s=2429&pagetemplate=rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.prnewswire.com/sitemap-news.xml?page=1",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.prnewswire.com/sitemap-news.xml?page=2",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.prnewswire.com/es/sitemap-news.xml?page=1",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://rba.gov.au/rss/rss-cb-exchange-rates.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rba.gov.au/rss/rss-cb-foi.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rba.gov.au/rss/rss-cb-media-releases.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rbi.org.in/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.resbank.co.za/",
+   "kind": "page"
+  },
+  {
+   "url": "https://riksbank.se/sv/rss/kalender/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://riksbank.se/sv/rss/tal/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://riksbank.se/sv/rss/nyheter/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://sbv.gov.vn/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://sbv.gov.vn/",
+   "kind": "page"
+  },
+  {
+   "url": "https://sc.com.my/resources/media/",
+   "kind": "page"
+  },
+  {
+   "url": "https://sc.com.my/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://sc.com.my/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.sca.isr.umich.edu/",
+   "kind": "page"
+  },
+  {
+   "url": "https://scb.se/feed/statistiknyheter",
+   "kind": "rss"
+  },
+  {
+   "url": "https://sebi.gov.in/media-and-notifications/press-releases/",
+   "kind": "page"
+  },
+  {
+   "url": "https://sebi.gov.in/sebiweb/home/HomeAction.do",
+   "kind": "page"
+  },
+  {
+   "url": "https://sebi.gov.in/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.sec.gov/enforcement-litigation/litigation-releases/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.sec.gov/enforcement-litigation/trading-suspensions/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://sec.gov/news/pressreleases.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://sencanada.ca/en/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://senedd.wales/senedd-now/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://set.or.th/en/about/mediacenter/",
+   "kind": "page"
+  },
+  {
+   "url": "https://set.or.th/en/market/news-and-alert/",
+   "kind": "page"
+  },
+  {
+   "url": "https://set.or.th/",
+   "kind": "page"
+  },
+  {
+   "url": "https://singstat.gov.sg/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://singstat.gov.sg/",
+   "kind": "page"
+  },
+  {
+   "url": "https://six-group.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://six-group.com/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://six-group.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://snb.ch/",
+   "kind": "page"
+  },
+  {
+   "url": "https://sos.ca.gov/administration/news-releases-and-advisories/",
+   "kind": "page"
+  },
+  {
+   "url": "https://srb.europa.eu/en/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ssb.no/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://stat.fi/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.stat.go.jp/whatsnew/news.rdf",
+   "kind": "rss"
+  },
+  {
+   "url": "https://stat.gov.pl/rss/pl/5438/8.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://stat.gov.pl/rss/pl/5463/11.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://statcan.gc.ca/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://statistik.at/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.stats.gov.cn/",
+   "kind": "page"
+  },
+  {
+   "url": "https://tcmb.gov.tr/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.tcsg.edu/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://tmx.com/en/newsroom/",
+   "kind": "page"
+  },
+  {
+   "url": "https://tmx.com/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://tmx.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://treasury.gov.au/media-release/",
+   "kind": "page"
+  },
+  {
+   "url": "https://treasury.gov.au/media",
+   "kind": "page"
+  },
+  {
+   "url": "https://treasury.gov.au/",
+   "kind": "page"
+  },
+  {
+   "url": "https://tsx.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://tsx.com/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://tsx.com/news-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://twc.texas.gov/data-reports/warn-notice",
+   "kind": "page"
+  },
+  {
+   "url": "https://twc.texas.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://twc.texas.gov/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.twse.com.tw/en/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.twse.com.tw/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.twse.com.tw/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.txs.uscourts.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ustr.gov/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://vermontjoblink.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://virginiaworks.gov/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.virginiaworks.gov/feed?post_type=warn-notice",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.wienerborse.at/en/news-1/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.wienerborse.at/en/news/vienna-stock-exchange-news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.wienerborse.at/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://workforce.alabama.gov/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://workforce.alabama.gov/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://workforce.alabama.gov/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://workforce.iowa.gov/employers/resources/warn/notices",
+   "kind": "page"
+  },
+  {
+   "url": "https://workforce.iowa.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://workforce.iowa.gov/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://workforcewv.org/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://workforcewv.org/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://worldbank.org/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://worldbank.org/",
+   "kind": "page"
+  },
+  {
+   "url": "https://wsd.dli.mt.gov/wioa/related-links/warn-notice-page",
+   "kind": "page"
+  },
+  {
+   "url": "https://wsd.dli.mt.gov/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www150.statcan.gc.ca/n1/dai-quo/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www150.statcan.gc.ca/",
+   "kind": "page"
+  },
+  {
+   "url": "https://zew.de/en/press/",
+   "kind": "page"
+  },
+  {
+   "url": "https://zew.de/presse/",
+   "kind": "page"
+  },
+  {
+   "url": "https://zew.de/",
+   "kind": "page"
+  },
+  {
+   "url": "https://aa.com.tr/en/rss/default?cat=live",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.abc.net.au/news/feed/51892/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.abc.net.au/news/feed/2942460/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://abcnews.com/xmlLatestStories",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://africanews.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://africanews.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ansa.it/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://arabnews.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.arabnews.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.arabnews.com/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://arstechnica.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://arstechnica.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://arstechnica.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.axios.com/feeds/feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bankingdive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://batimes.com.ar/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://batimes.com.ar/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bbc.co.uk/sitemaps/https-sitemap-uk-news-1.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bbc.co.uk/sitemaps/https-sitemap-uk-news-2.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bbc.com/sitemaps/https-sitemap-com-mundo-news-1.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bbc.com/sitemaps/https-sitemap-com-news-1.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bbc.com/sitemaps/https-sitemap-com-news-2.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bernama.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://bernama.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://betakit.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://betakit.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.biopharmadive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.biospace.com/index.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.biospace.com/news-sitemap-content.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.biospace.com/news-sitemap-latest.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bleepingcomputer.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bnnbloomberg.ca/arc/outboundfeeds/sitemap-news/latest/",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bnnbloomberg.ca/arc/outboundfeeds/sitemap-news/2026-11-02/",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://business.inquirer.net/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.businessdailyafrica.com/bd/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.businessdailyafrica.com/service/rss/bd/1939132/feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://businessday.ng/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://businessday.ng/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://businessday.ng/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.businesstimes.com.sg/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.businesstoday.in/rssfeeds/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://businesstoday.in/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.cbsnews.com/xml-sitemap/news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.cbsnews.com/xml-sitemap/video-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.cfodive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.channelnewsasia.com/api/v1/sitemap-news-feed?_format=xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.ciodive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cityam.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cnbc.com/sitemap_news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://cnbc.com/sitemap_news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.cnbctv18.com/commonfeeds/v1/cne/sitemap/google-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.constructiondive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.courthousenews.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.ctvnews.ca/arc/outboundfeeds/sitemap-news/latest/",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.ctvnews.ca/arc/outboundfeeds/sitemap-news/2026-11-02/",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://cyberscoop.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cybersecuritydive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.dailymaverick.co.za/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://dailymaverick.co.za/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://dailysabah.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dailysabah.com/rss/latest",
+   "kind": "rss"
+  },
+  {
+   "url": "https://darkreading.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://databreaches.net/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dutchnews.nl/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dutchnews.nl/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://dutchnews.nl/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rss.dw.com/rdf/rss-en-bus",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rss.dw.com/rdf/rss-en-all",
+   "kind": "rss"
+  },
+  {
+   "url": "https://e.vnexpress.net/rss/business.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://economictimes.indiatimes.com/etstatic/sitemaps/et/news/2026-November-1.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://economictimes.indiatimes.com/etstatic/sitemaps/et/news/sitemap-today.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://economictimes.indiatimes.com/etstatic/sitemaps/et/news/sitemap-yesterday.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://electrek.co/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://electrek.co/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://dronedj.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://en.mercopress.com/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://en.yna.co.kr/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.engadget.com/category/news/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.engadget.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://engadget.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.euronews.com/news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://finance.yahoo.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.financialexpress.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://financialexpress.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://focustaiwan.tw/GoogleNewsSitemap_fromRemote_cep2.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.fooddive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.foxbusiness.com/sitemap.xml?type=news",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://moxie.foxnews.com/google-publisher/latest.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.foxnews.com/sitemap.xml?type=news",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.france24.com/en/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.france24.com/sitemaps/fr/news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.france24.com/sitemaps/en/news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.freightwaves.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.freightwaves.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://freightwaves.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://geekwire.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://geekwire.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://globalnews.ca/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "http://globalnews.ca/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://globalnews.ca/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.grocerydive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://gulfnews.com/news_sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.healthcaredive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.hipaajournal.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.hoteldive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.hrdive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://independent.co.uk/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://independent.co.uk/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://independent.co.uk/news/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://independent.ie/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://infosecurity-magazine.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://insurancejournal.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://insurancejournal.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://insurancejournal.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://interest.co.nz/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://interest.co.nz/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://interest.co.nz/",
+   "kind": "page"
+  },
+  {
+   "url": "https://investmentnews.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://iol.co.za/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.irishtimes.com/arc/outboundfeeds/feed-business/?outputType=xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.irishtimes.com/arc/outboundfeeds/sitemap-news/?outputType=xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://itnews.com.au/rss/rss.ashx",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.itnews.com.au/sitemap_news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://itnews.com.au/sitemap_news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://jakartaglobe.id/business/",
+   "kind": "page"
+  },
+  {
+   "url": "https://jakartaglobe.id/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://jakartaglobe.id/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://japantimes.co.jp/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.khaleejtimes.com/api/v1/collections/top-section.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.khaleejtimes.com/api/v1/collections/uae.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.khaleejtimes.com/api/v1/collections/world.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.koreaherald.com/rss/newsAll",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.koreajoongangdaily.com/tag/korea/business/lifestyle/entertainment/sports/opinion/world/?lab_viewport=newssitemap",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://feed.koreatimes.co.kr/k/allnews.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://krebsonsecurity.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://krebsonsecurity.com/comments/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://legaldive.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://legaldive.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://legaldive.com/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://livemint.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.manufacturingdive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.medtechdive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://mexiconewsdaily.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.modernretail.co/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://digiday.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.glossy.co/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://nairametrics.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://nationthailand.com/business/",
+   "kind": "page"
+  },
+  {
+   "url": "https://nationthailand.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://nationthailand.com/newsroom",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.nbcnews.com/politics/election-results/sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.nbcnews.com/sitemap/nbcnews/sitemap-news",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://news.crunchbase.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.crunchbase.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.crunchbase.com/news/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.skynews.com/feeds/rss/business.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.skynews.com/feeds/rss/home.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://nltimes.nl/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://notesfrompoland.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.npr.org/1006/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.npr.org/1001/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://nypost.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://nypost.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.offshore-energy.biz/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://oilprice.com/rss/main",
+   "kind": "rss"
+  },
+  {
+   "url": "https://oilprice.com/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.paymentsdive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.pbs.org/newshour/sitemaps/news",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://philstar.com/rss/headlines",
+   "kind": "rss"
+  },
+  {
+   "url": "https://philstar.com/rss/opinion",
+   "kind": "rss"
+  },
+  {
+   "url": "https://philstar.com/rss/nation",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.politico.eu/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.politico.eu/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://politico.eu/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.premiumtimesng.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.premiumtimesng.com/comments/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.premiumtimesng.com/category/business/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.propublica.org/feeds/propublica/main",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.pymnts.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.pymnts.com/feed/atom/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.pymnts.com/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://qz.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://qz.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://qz.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.restaurantdive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.retaildive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.rigzone.com/news/rss/rigzone_latest.aspx",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rollcall.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.rte.ie/feeds/rss/?index=/news/business/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.rte.ie/feeds/rss/?index=/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://sbs.com.au/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://sbs.com.au/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.securityweek.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.feedburner.com/securityweek",
+   "kind": "rss"
+  },
+  {
+   "url": "https://seekingalpha.com/sitemap_news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.semafor.com/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://siliconangle.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://siliconangle.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://siliconangle.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.statnews.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://statnews.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.straitstimes.com/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.supplychaindive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.swissinfo.ch/eng/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.swissinfo.ch/ger/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.swissinfo.ch/fre/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.taipeitimes.com/xml/index.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.tbsnews.net/bangla/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.tbsnews.net/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://techcabal.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://techcrunch.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://techcrunch.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.texastribune.org/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.texastribune.org/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://texastribune.org/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.thedailystar.net/googlenews.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.theguardian.com/us/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "http://www.theguardian.com/sitemaps/news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://feeds.feedburner.com/TheHackersNews",
+   "kind": "rss"
+  },
+  {
+   "url": "https://thehackernews.com/feeds/posts/default",
+   "kind": "rss"
+  },
+  {
+   "url": "https://thehackernews.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.thehindubusinessline.com/feeder/default.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.thehindubusinessline.com/sitemap/googlenews/all/all.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.thenationalnews.com/arc/outboundfeeds/news-sitemap/?outputType=xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://therecord.media/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://thestar.com.my/business/",
+   "kind": "page"
+  },
+  {
+   "url": "https://thestar.com.my/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://thestar.com.my/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.dailymail.com/money/index.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.dailymail.com/money/articles.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.thisismoney.co.uk/newssitemap1.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.usatoday.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://usatoday.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.utilitydive.com/feeds/news/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://zawya.com/en/business/",
+   "kind": "page"
+  },
+  {
+   "url": "https://zawya.com/news/business",
+   "kind": "page"
+  },
+  {
+   "url": "https://zawya.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.zdnet.com/rss/all/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.zdnet.com/sitemap-google-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.zdnet.com/sitemaps/news/2026-1.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.apple.com/newsroom/rss-feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://blog.google/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://deepmind.google/blog/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://about.fb.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.microsoft.com/source/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://blogs.microsoft.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://nvidianews.nvidia.com/releases.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.anthropic.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.aboutamazon.com/news/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://aws.amazon.com/about-aws/whats-new/recent/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://aws.amazon.com/blogs/aws/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.intc.com/news-events/press-releases/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.intel.com/content/www/us/en/newsroom/home.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://ir.amd.com/news-events/press-releases/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://newsroom.ibm.com/announcements?pagetemplate=rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.salesforce.com/news/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://newsroom.cisco.com/c/services/i/servlets/newsroom/rssfeed.json?feed=all",
+   "kind": "rss"
+  },
+  {
+   "url": "https://newsroom.arm.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://github.blog/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://blog.cloudflare.com/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.lenovo.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://mistral.ai/news/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://stripe.com/blog/feed.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://stripe.com/newsroom/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://investors.delltechnologies.com/rss/news-releases.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://newsroom.spotify.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.prnewswire.com/rss/technology-latest-news/technology-latest-news-list.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://techcrunch.com/category/venture/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.arstechnica.com/arstechnica/index",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.wired.com/feed/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.zdnet.com/news/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.engadget.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.theguardian.com/uk/technology/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.semafor.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.tomshardware.com/feeds/all",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.heise.de/rss/heise-atom.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://technode.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.kedglobal.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://entrackr.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://tech.eu/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.calcalistech.com/ctechnews",
+   "kind": "page"
+  },
+  {
+   "url": "https://restofworld.org/feed/latest/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://thenextweb.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/nfl/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/nba/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/mlb/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/nhl/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/soccer/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com/espn/rss/ncf/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.co.uk/espn/rss/football/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.com.au/espn/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.espn.in/espn/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/football/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/cricket/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/formula1/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/tennis/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/rugby-union/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/sport/golf/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.skysports.com/rss/12040",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.skysports.com/rss/11095",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cbssports.com/rss/headlines/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.nbcsports.com/profootballtalk.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.theguardian.com/uk/sport/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.theguardian.com/football/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.foxsports.com/sitemap.xml?type=news",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.standard.co.uk/sport/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.rte.ie/feeds/rss/?index=/sport/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/sport/?outputType=xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.france24.com/en/sport/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.hindustantimes.com/feeds/rss/sports/rssfeed.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://timesofindia.indiatimes.com/rssfeeds/4719148.cms",
+   "kind": "rss"
+  },
+  {
+   "url": "https://indianexpress.com/section/sports/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://frontofficesports.com/rsslatest.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.abc.net.au/news/feed/45924/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.the-race.com/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.as.com/mrss-s/pages/as/site/en.as.com/portada/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.sportingnews.com/us/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.irishtimes.com/arc/outboundfeeds/feed-sport/?outputType=xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.tsn.ca/arc/outboundfeeds/sitemap-news/latest/",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.foxsports.com.au/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.planetrugby.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.rugbypass.com/feeds/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.aljazeera.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://goal.com/en/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.sbs.com.au/sport",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.tntsports.co.uk/football/",
+   "kind": "page"
+  },
+  {
+   "url": "https://pr.nba.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.nba.com/sitemap_news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.nfl.com/sitemap-fast-changing.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.nfl.com/injuries/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.mlb.com/feeds/news/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.mlb.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.nhl.com/sitemap/sitemap-stories.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.premierleague.com/en/sitemap/news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bundesliga.com/sitemaps/en/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.bundesliga-group.com/category/news/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.legaseriea.it/sitemap-article.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.uefa.com/sitemap/news/latest.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://aleagues.com.au/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.canadasoccer.com/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.fia.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.afl.com.au/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.ufc.com/news-sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.paralympic.org/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.liverpoolfc.com/sitemap-news.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.world.rugby/en/news/sitemap.xml",
+   "kind": "sitemap"
+  },
+  {
+   "url": "https://www.chiefs.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.dallascowboys.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.azcardinals.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.atlantafalcons.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.baltimoreravens.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.buffalobills.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.panthers.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.chicagobears.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bengals.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.clevelandbrowns.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.denverbroncos.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.detroitlions.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.packers.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.houstontexans.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.colts.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.jaguars.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.raiders.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.chargers.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.therams.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.miamidolphins.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.vikings.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.patriots.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.neworleanssaints.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.giants.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.newyorkjets.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.philadelphiaeagles.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.steelers.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.49ers.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.seahawks.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.buccaneers.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.tennesseetitans.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.commanders.com/rss/news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.laliga.com/en-GB/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.mlssoccer.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.wtatennis.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.pgatour.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.icc-cricket.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.ecb.co.uk/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.arsenal.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fcbarcelona.com/en/football/first-team/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.juventus.com/en/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.psg.fr/en/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.inter.it/en/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.newcastleunited.com/en/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.tottenhamhotspur.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.thefa.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.iplt20.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.bcci.tv/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.cricket.com.au/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.nrl.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.mercedesamgf1.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.formula1.com/en/latest",
+   "kind": "page"
+  },
+  {
+   "url": "https://inside.fifa.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.wnba.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://spfl.co.uk/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.scottishfa.co.uk/en/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.footballaustralia.com.au/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://super.rugby/superrugby/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fiba.basketball/en/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.worldaquatics.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.ussoccer.com/stories/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.lagalaxy.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.rolandgarros.com/en-us/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.concacaf.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.allblacks.com/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.irishrugby.ie/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.rugby.com.au/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.astonmartinf1.com/en-GB/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.independent.co.uk/sport",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.motogp.com/en/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.indycar.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.ncaa.com/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.cnbc.com/id/10000113/device/rss/rss.html",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.un.org/feed/subscribe/en/news/all/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.whitehouse.gov/presidential-actions/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.whitehouse.gov/news/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.govinfo.gov/rss/plaw.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.govinfo.gov/rss/bills-enr.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.htm",
+   "kind": "page"
+  },
+  {
+   "url": "https://ustr.gov/about-us/policy-offices/press-office/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.gov.uk/government/organisations/prime-ministers-office-10-downing-street.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.gov.uk/search/news-and-communications.atom?keywords=ministerial+appointments",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.gov.uk/government/organisations/foreign-commonwealth-development-office.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.gov.uk/government/organisations/office-of-financial-sanctions-implementation.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.gov.uk/search/news-and-communications.atom?keywords=sanctions",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.gov.uk/government/organisations/department-for-business-and-trade.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.legislation.gov.uk/ukpga/data.feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.legislation.gov.uk/new/data.feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://eur-lex.europa.eu/oj/daily-view/L-series/default.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://policy.trade.ec.europa.eu/news_en",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.pm.gc.ca/en/news.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.parl.ca/legisinfo/en/bills/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentfinance&sort=publishedDate&orderBy=desc&pick=50&format=atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.governo.it/en/notizie-chigi-en",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.lamoncloa.gob.es/lang/en/presidente/news/Paginas/index.aspx",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.fec.gov/updates/",
+   "kind": "page"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.theguardian.com/politics/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.theguardian.com/us-news/us-politics/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.theguardian.com/world/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://abcnews.go.com/abcnews/politicsheadlines",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cbsnews.com/latest/rss/politics",
+   "kind": "rss"
+  },
+  {
+   "url": "https://feeds.nbcnews.com/nbcnews/public/politics",
+   "kind": "rss"
+  },
+  {
+   "url": "https://moxie.foxnews.com/google-publisher/politics.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.pbs.org/newshour/feeds/rss/politics",
+   "kind": "rss"
+  },
+  {
+   "url": "https://thehill.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://rollcall.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.texastribune.org/feeds/main/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://globalnews.ca/politics/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.abc.net.au/news/feed/51120/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.rte.ie/feeds/rss/?index=/news/politics/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.irishtimes.com/arc/outboundfeeds/feed-politics/?from=0&size=50",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.euronews.com/rss?level=theme&name=news",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.lemonde.fr/en/rss/une.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.aljazeera.com/xml/rss/all.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://kyivindependent.com/news-archive/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://en.yna.co.kr/RSS/news.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.japantimes.co.jp/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.straitstimes.com/news/world/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://indianexpress.com/section/political-pulse/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.livemint.com/rss/politics",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.dailymaverick.co.za/dmrss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.africanews.com/feed/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.thenationalnews.com/arc/outboundfeeds/rss/?outputType=xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.nature.com/nature.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.caltech.edu/about/news/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://news.berkeley.edu/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ethz.ch/en/news-and-events/eth-news/news.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.nist.gov/news-events/news/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.nasa.gov/news-release/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://science.nasa.gov/news/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.ornl.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.llnl.gov/news",
+   "kind": "page"
+  },
+  {
+   "url": "https://research.google/blog/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://ai.meta.com/blog/",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.microsoft.com/en-us/research/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://research.ibm.com/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://blogs.nvidia.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cloudflarestatus.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.githubstatus.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://status.cloud.google.com/en/feed.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://slack-status.com/feed/rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.zoomstatus.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://discordstatus.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://status.claude.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.akamaistatus.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://status.digitalocean.com/history.atom",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.cisa.gov/news-events/cybersecurity-advisories",
+   "kind": "page"
+  },
+  {
+   "url": "https://chromereleases.googleblog.com/",
+   "kind": "page"
+  },
+  {
+   "url": "https://filestore.fortinet.com/fortiguard/rss/ir.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://security.paloaltonetworks.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.bundeskartellamt.de/EN/Home/home_node.html",
+   "kind": "page"
+  },
+  {
+   "url": "https://www.dataprotection.ie/en/news-media/press-releases",
+   "kind": "page"
+  },
+  {
+   "url": "https://therecord.media/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.darkreading.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.datacenterdynamics.com/en/rss/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.datacenterknowledge.com/rss.xml",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.sciencenews.org/feed",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.quantamagazine.org/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://www.technologyreview.com/feed/",
+   "kind": "rss"
+  },
+  {
+   "url": "https://jira-software.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://confluence.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://bitbucket.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://trello.status.atlassian.com/history.rss",
+   "kind": "rss"
+  },
+  {
+   "url": "https://jira-service-management.status.atlassian.com/history.rss",
+   "kind": "rss"
+  }
+ ]
+}

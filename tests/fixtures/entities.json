@@ -1,0 +1,26 @@
+{
+ "_note": "Fictional companies with placeholder ids, for tests.",
+ "entities": [
+  {
+   "scheme": "wikidata",
+   "id": "Q99999002",
+   "name": "Globex Corporation",
+   "kind": "company",
+   "aliases": [],
+   "xrefs": [
+    "cik:0000999902"
+   ]
+  },
+  {
+   "scheme": "wikidata",
+   "id": "Q99999004",
+   "name": "Umbrella Corporation",
+   "kind": "company",
+   "aliases": [],
+   "xrefs": [
+    "ticker:UMBR",
+    "cik:0000999904"
+   ]
+  }
+ ]
+}

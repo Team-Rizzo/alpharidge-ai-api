@@ -1,0 +1,65 @@
+{
+ "index": [
+  {
+   "kind": "event",
+   "headline": "US consumer prices rose 0.3% in September",
+   "event_type": "economic_data",
+   "category": "finance",
+   "actors": [
+    {
+     "id_scheme": "wikidata",
+     "id": "Q2928428",
+     "name": "Bureau of Labor Statistics"
+    }
+   ],
+   "place": {
+    "iso2": "US"
+   },
+   "event_date": "2026-10-13",
+   "facts": [
+    {
+     "field": "indicator",
+     "value": "cpi"
+    },
+    {
+     "field": "actual",
+     "value": 0.3,
+     "unit": "pct"
+    }
+   ],
+   "source_url": "https://news.example.com/cpi"
+  }
+ ],
+ "replay": {
+  "kind": "event",
+  "headline": "BLS: inflation up 0.3 percent, Washington release shows",
+  "event_type": "economic_data",
+  "category": "finance",
+  "actors": [
+   {
+    "id_scheme": "other",
+    "id": "bls",
+    "name": "BLS"
+   }
+  ],
+  "place": {
+   "iso2": "US",
+   "admin1": "DC",
+   "geonames": 4140963
+  },
+  "event_date": "2026-10-13",
+  "facts": [
+   {
+    "field": "indicator",
+    "value": "consumer price index"
+   },
+   {
+    "field": "actual",
+    "value": 0.3,
+    "unit": "pct"
+   }
+  ],
+  "source_url": "https://other.example.net/cpi"
+ },
+ "expect": "known"
+}

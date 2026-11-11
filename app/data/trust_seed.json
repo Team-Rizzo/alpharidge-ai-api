@@ -1,0 +1,8855 @@
+{
+ "_note": "Hand-made seed, reviewed by the operator. Official sources start at the official base trust in the listed categories only, on the listed host and paths; the rest of each host starts at the base for other sources.",
+ "official": [
+  {
+   "host": "49ers.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "San Francisco 49ers",
+     "49ers"
+    ]
+   }
+  },
+  {
+   "host": "about.fb.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Meta",
+     "Meta Platforms",
+     "Facebook",
+     "Instagram",
+     "WhatsApp"
+    ]
+   }
+  },
+  {
+   "host": "aboutamazon.com",
+   "paths": [
+    "/news/company-news/",
+    "/news/aws/",
+    "/news/devices/",
+    "/news/amazon-ai/",
+    "/news/innovation-at-amazon/",
+    "/news/amazon-leo/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Amazon",
+     "Amazon.com",
+     "Amazon Web Services",
+     "AWS"
+    ]
+   }
+  },
+  {
+   "host": "abs.gov.au",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "adpemploymentreport.com",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "adx.ae",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "aec.gov.au",
+   "paths": [
+    "/media/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "afl.com.au",
+   "paths": [
+    "/news/",
+    "/aflw/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "afm.nl",
+   "paths": [
+    "/en/sector/actueel/",
+    "/nl-nl/sector/actueel/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "agenciadenoticias.ibge.gov.br",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ago.vermont.gov",
+   "paths": [
+    "/categories/security-breach-notices"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "agportal-s3bucket.s3.amazonaws.com",
+   "paths": [
+    "/databreach/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ai.meta.com",
+   "paths": [
+    "/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Meta",
+     "Meta AI",
+     "Meta Platforms"
+    ]
+   }
+  },
+  {
+   "host": "akamaistatus.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Akamai",
+     "Akamai Technologies"
+    ]
+   }
+  },
+  {
+   "host": "aleagues.com.au",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "allblacks.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "All Blacks",
+     "New Zealand",
+     "Black Ferns",
+     "New Zealand Rugby"
+    ]
+   }
+  },
+  {
+   "host": "announcements.asx.com.au",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "anthropic.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Anthropic"
+    ]
+   }
+  },
+  {
+   "host": "apple.com",
+   "paths": [
+    "/newsroom/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Apple"
+    ]
+   }
+  },
+  {
+   "host": "apra.gov.au",
+   "paths": [
+    "/news-and-publications/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "arjoblink.arkansas.gov",
+   "paths": [
+    "/search/warn_lookups"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "arsenal.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Arsenal"
+    ]
+   }
+  },
+  {
+   "host": "astonmartinf1.com",
+   "paths": [
+    "/en-GB/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Aston Martin",
+     "Aston Martin Aramco",
+     "Aston Martin F1"
+    ]
+   }
+  },
+  {
+   "host": "atg.wa.gov",
+   "paths": [
+    "/data-breach-notifications"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "atlantafalcons.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Atlanta Falcons",
+     "Falcons"
+    ]
+   }
+  },
+  {
+   "host": "atptour.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "attorneygeneral.delaware.gov",
+   "paths": [
+    "/fraud/cpu/securitybreachnotification/database/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "aws.amazon.com",
+   "paths": [
+    "/about-aws/whats-new/",
+    "/blogs/aws/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Amazon Web Services",
+     "AWS",
+     "Amazon",
+     "Amazon.com"
+    ]
+   }
+  },
+  {
+   "host": "azcardinals.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Arizona Cardinals",
+     "Cardinals"
+    ]
+   }
+  },
+  {
+   "host": "azjobconnection.gov",
+   "paths": [
+    "/search/warn_lookups"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "b3.com.br",
+   "paths": [
+    "/en_us/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bafin.de",
+   "paths": [
+    "/SharedDocs/Veroeffentlichungen/EN/Pressemitteilung/",
+    "/EN/die-bafin/aktuelles-presse/presse-social-media/pressemitteilungen/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "baltimoreravens.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Baltimore Ravens",
+     "Ravens"
+    ]
+   }
+  },
+  {
+   "host": "bancaditalia.it",
+   "paths": [
+    "/media/comunicati/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bank.gov.ua",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bankingsupervision.europa.eu",
+   "paths": [
+    "/press/pr/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bankofcanada.ca",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bankofengland.co.uk",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bankofgreece.gr",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bankruptcy.angeiongroup.com",
+   "paths": [
+    "/Clients/"
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "banque-france.fr",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "banrep.gov.co",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "banxico.org.mx",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bb.org.bd",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bcb.gov.br",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bcci.tv",
+   "paths": [
+    "/news"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "bcentral.cl",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bcra.gob.ar",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bcrp.gob.pe",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bde.es",
+   "paths": [
+    "/wbe/en/noticias-eventos/actualidad-banco-espana/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bea.gov",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bengals.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Cincinnati Bengals",
+     "Bengals"
+    ]
+   }
+  },
+  {
+   "host": "bfs.admin.ch",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bi.go.id",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bills.parliament.uk",
+   "paths": [
+    ""
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "bis.gov",
+   "paths": [
+    "/press-release/"
+   ],
+   "kind": "sanctions",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "bis.org",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bkam.ma",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "blog.cloudflare.com",
+   "paths": [
+    ""
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Cloudflare"
+    ]
+   }
+  },
+  {
+   "host": "blog.google",
+   "paths": [
+    "/innovation-and-ai/",
+    "/products-and-platforms/",
+    "/company-news/inside-google/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Google",
+     "Alphabet",
+     "Google Cloud",
+     "Google DeepMind",
+     "YouTube"
+    ]
+   }
+  },
+  {
+   "host": "blogs.microsoft.com",
+   "paths": [
+    "/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Microsoft",
+     "LinkedIn",
+     "GitHub",
+     "Xbox"
+    ]
+   }
+  },
+  {
+   "host": "blogs.nvidia.com",
+   "paths": [
+    "/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "NVIDIA",
+     "Nvidia"
+    ]
+   }
+  },
+  {
+   "host": "bls.gov",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bmcgroup.com",
+   "paths": [
+    "/restructuring/"
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bmv.com.mx",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bnm.gov.my",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bnr.ro",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bog.gov.gh",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "boi.org.il",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "boj.or.jp",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bok.or.kr",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bolsasymercados.es",
+   "paths": [
+    "/en/media/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "borsaistanbul.com",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bot.or.th",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bportugal.pt",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bps.go.id",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bsp.gov.ph",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "buccaneers.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Tampa Bay Buccaneers",
+     "Buccaneers",
+     "Bucs"
+    ]
+   }
+  },
+  {
+   "host": "buffalobills.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Buffalo Bills",
+     "Bills"
+    ]
+   }
+  },
+  {
+   "host": "bundesbank.de",
+   "paths": [
+    "/en/press/press-releases/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "bundeskartellamt.de",
+   "paths": [
+    "/SharedDocs/Meldung/EN/Pressemitteilungen/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "bundesliga-group.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "bundesliga.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "bursamalaysia.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "businesswire.com",
+   "paths": [
+    "/news/home/"
+   ],
+   "kind": "wire",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "caltech.edu",
+   "paths": [
+    "/about/news/"
+   ],
+   "kind": "university",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Caltech",
+     "California Institute of Technology"
+    ]
+   }
+  },
+  {
+   "host": "canada.ca",
+   "paths": [
+    "/en/department-finance/news/",
+    "/en/global-affairs/news/"
+   ],
+   "kind": "government",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "casedocs.omniagentsolutions.com",
+   "paths": [
+    "/cmsvol2/"
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cases.omniagentsolutions.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cases.primeclerk.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cases.ra.kroll.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cases.stretto.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cb.is",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cbc.gov.tw",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cbe.org.eg",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cbn.gov.ng",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cboe.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cbr.ru",
+   "paths": [
+    "/eng/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cbs.nl",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cbsl.gov.lk",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cci.gov.in",
+   "paths": [
+    "/media-gallery/press-release",
+    "/combination/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ccwd.hecc.oregon.gov",
+   "paths": [
+    "/Layoff/WARN"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cdle.colorado.gov",
+   "paths": [
+    "/employers/layoff-separations/layoff-warn-list"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "census.gov",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "centralbank.ae",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "centralbank.go.ke",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "centralbank.ie",
+   "paths": [
+    "/news-media/press-releases/",
+    "/news/article/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cftc.gov",
+   "paths": [
+    "/PressRoom/",
+    "/PressRoom/PressReleases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "chargers.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Los Angeles Chargers",
+     "Chargers"
+    ]
+   }
+  },
+  {
+   "host": "chicagobears.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Chicago Bears",
+     "Bears"
+    ]
+   }
+  },
+  {
+   "host": "chiefs.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Kansas City Chiefs",
+     "Chiefs"
+    ]
+   }
+  },
+  {
+   "host": "chromereleases.googleblog.com",
+   "paths": [
+    ""
+   ],
+   "kind": "vendor_advisory",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Google",
+     "Google Chrome",
+     "Chrome"
+    ]
+   }
+  },
+  {
+   "host": "cisa.gov",
+   "paths": [
+    "/news-events/cybersecurity-advisories",
+    "/news-events/alerts/",
+    "/news-events/news/"
+   ],
+   "kind": "cyber_agency",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "clerk.house.gov",
+   "paths": [
+    "/Votes"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "clevelandbrowns.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Cleveland Browns",
+     "Browns"
+    ]
+   }
+  },
+  {
+   "host": "cloudflarestatus.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Cloudflare"
+    ]
+   }
+  },
+  {
+   "host": "cma.gov.sa",
+   "paths": [
+    "/en/MediaCenter/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cnb.cz",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cnil.fr",
+   "paths": [
+    "/fr/les-sanctions-prononcees-par-la-cnil",
+    "/fr/sanctions"
+   ],
+   "kind": "privacy_regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "cnmv.es",
+   "paths": [
+    "/portal/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "colts.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Indianapolis Colts",
+     "Colts"
+    ]
+   }
+  },
+  {
+   "host": "commanders.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Washington Commanders",
+     "Commanders"
+    ]
+   }
+  },
+  {
+   "host": "commerce.nc.gov",
+   "paths": [
+    "/data-tools-reports/labor-market-data-tools/workforce-warn-reports/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "concacaf.com",
+   "paths": [
+    "/competitions/",
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "conference-board.org",
+   "paths": [
+    "/press/",
+    "/topics/consumer-confidence",
+    "/topics/us-leading-indicators"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "congress.gov",
+   "paths": [
+    "/bill/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "consilium.europa.eu",
+   "paths": [
+    "/en/press/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "consob.it",
+   "paths": [
+    "/web/consob-and-its-activities/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "consumerfinance.gov",
+   "paths": [
+    "/about-us/newsroom/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cricket.com.au",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "cso.ie",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "cssf.lu",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dallascowboys.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Dallas Cowboys",
+     "Cowboys"
+    ]
+   }
+  },
+  {
+   "host": "dam.assets.ohio.gov",
+   "paths": [
+    "/image/upload/jfs.ohio.gov/warn/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "databricks.com",
+   "paths": [
+    "/company/newsroom/press-releases/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Databricks"
+    ]
+   }
+  },
+  {
+   "host": "dataprotection.ie",
+   "paths": [
+    "/en/news-media/latest-news/",
+    "/en/news-media/press-releases/"
+   ],
+   "kind": "privacy_regulator",
+   "categories": [
+    "technology"
+   ]
+  },
+  {
+   "host": "dceo.illinois.gov",
+   "paths": [
+    "/workforcedevelopment/warn.html"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "deb.uscourts.gov",
+   "paths": [
+    "/claims-agents-and-assignments",
+    "/claims-agency-list",
+    "/recently-filed-chapter-1115s",
+    "/claims-information"
+   ],
+   "kind": "court",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "deepmind.google",
+   "paths": [
+    "/blog/",
+    "/discover/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Google DeepMind",
+     "DeepMind",
+     "Google",
+     "Alphabet"
+    ]
+   }
+  },
+  {
+   "host": "denverbroncos.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Denver Broncos",
+     "Broncos"
+    ]
+   }
+  },
+  {
+   "host": "destatis.de",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "detr.nv.gov",
+   "paths": [
+    "/Page/WARN"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "detroitlions.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Detroit Lions",
+     "Lions"
+    ]
+   }
+  },
+  {
+   "host": "deutsche-boerse.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dew.sc.gov",
+   "paths": [
+    "/sites/dew/files/Documents/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dfm.ae",
+   "paths": [
+    "/the-exchange/news-disclosures/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dfs.ny.gov",
+   "paths": [
+    "/reports_and_publications/press_releases/",
+    "/Newsroom"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dfsa.ae",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "discordstatus.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Discord"
+    ]
+   }
+  },
+  {
+   "host": "dlr.sd.gov",
+   "paths": [
+    "/workforce_services/businesses/warn_notices.aspx",
+    "/workforce_services/businesses/warn_notices/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dlt.ri.gov",
+   "paths": [
+    "/wds/warn/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dm.epiq11.com",
+   "paths": [
+    "/case/"
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dnb.nl",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "document.epiq11.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "does.dc.gov",
+   "paths": [
+    "/page/industry-closings-and-layoffs-warn-notifications"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "doj.nh.gov",
+   "paths": [
+    "/consumer/security-breaches/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dojmt.gov",
+   "paths": [
+    "/consumer/databreach/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dol.nebraska.gov",
+   "paths": [
+    "/ReemploymentServices/LayoffServices/LayoffsAndDownsizingWARN"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dol.ny.gov",
+   "paths": [
+    "/warn-notices",
+    "/legacy-warn-notices",
+    "/warn-dashboard"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dolpublicdocumentlibrary.ct.gov",
+   "paths": [
+    "/CsblrCategory"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dos.fl.gov",
+   "paths": [
+    "/communications/press-releases/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "dosm.gov.my",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dr201.s3.amazonaws.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dst.dk",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "dwd.wisconsin.gov",
+   "paths": [
+    "/dislocatedworker/warn/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "eac.gov",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "ec.europa.eu",
+   "paths": [
+    "/commission/presscorner/",
+    "/commission/presscorner/detail/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "technology",
+    "politics"
+   ]
+  },
+  {
+   "host": "ec.europa.eu",
+   "paths": [
+    "/eurostat/news/",
+    "/eurostat/web/products-euro-indicators/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ecb.co.uk",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ecb.europa.eu",
+   "paths": [
+    "/press/",
+    "/press/govcdec/",
+    "/press/pr/",
+    "/press/press_conference/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "edd.ca.gov",
+   "paths": [
+    "/en/jobs_and_training/Layoff_Services_WARN/",
+    "/siteassets/files/jobs_and_training/warn/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "efl.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "egazette.gld.gov.hk",
+   "paths": [
+    ""
+   ],
+   "kind": "registry",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "egazette.gov.sg",
+   "paths": [
+    ""
+   ],
+   "kind": "registry",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "eia.gov",
+   "paths": [
+    "/pressroom/releases/",
+    "/petroleum/supply/weekly/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "elections.ca",
+   "paths": [
+    "/content.aspx"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "elections.nz",
+   "paths": [
+    "/media-and-news/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "electoralcommission.org.uk",
+   "paths": [
+    ""
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "elysee.fr",
+   "paths": [
+    "/en/emmanuel-macron/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "en.www.inegi.org.mx",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "english.sse.com.cn",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "esd.wa.gov",
+   "paths": [
+    "/employer-requirements/layoffs-and-employee-notifications/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "esri.cao.go.jp",
+   "paths": [
+    "/en/sna/",
+    "/jp/sna/",
+    "/en/stat/",
+    "/jp/stat/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ethz.ch",
+   "paths": [
+    "/en/news-and-events/eth-news/news/"
+   ],
+   "kind": "university",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "ETH Zurich",
+     "ETH Zürich"
+    ]
+   }
+  },
+  {
+   "host": "eur-lex.europa.eu",
+   "paths": [
+    "/legal-content/EN/TXT/"
+   ],
+   "kind": "gazette",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "euronext.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fca.org.uk",
+   "paths": [
+    "/news/",
+    "/news/news-stories/",
+    "/news/press-releases/",
+    "/news/statements/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fcbarcelona.com",
+   "paths": [
+    "/en/football/first-team/news/",
+    "/en/club/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "FC Barcelona",
+     "Barcelona",
+     "Barca",
+     "Barça"
+    ]
+   }
+  },
+  {
+   "host": "fdic.gov",
+   "paths": [
+    "/bank-failures/",
+    "/news/",
+    "/news/press-releases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fec.gov",
+   "paths": [
+    "/updates/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "federalregister.gov",
+   "paths": [
+    "/documents/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "federalreserve.gov",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fhfa.gov",
+   "paths": [
+    "/news/news-release/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fia.com",
+   "paths": [
+    "/news",
+    "/documents/championships/",
+    "/system/files/decision-document/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "fiba.basketball",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "fifa.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "files.nc.gov",
+   "paths": [
+    "/commerce/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "find-and-update.company-information.service.gov.uk",
+   "paths": [
+    "/company/"
+   ],
+   "kind": "registry",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "finra.org",
+   "paths": [
+    "/media-center/",
+    "/media-center/newsreleases/",
+    "/rules-guidance/notices/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fiscaldata.treasury.gov",
+   "paths": [
+    "/datasets/"
+   ],
+   "kind": "data_api",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "footballaustralia.com.au",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "formula1.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "fortiguard.fortinet.com",
+   "paths": [
+    "/psirt/"
+   ],
+   "kind": "vendor_advisory",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Fortinet"
+    ]
+   }
+  },
+  {
+   "host": "fortress.wa.gov",
+   "paths": [
+    "/esd/file/WARN/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fsa.go.jp",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fsb.org",
+   "paths": [
+    "/press/",
+    "/2025/",
+    "/2026/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fsc.go.kr",
+   "paths": [
+    "/eng/pr010101/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fsc.gov.tw",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fsca.co.za",
+   "paths": [
+    "/Latest-News/",
+    "/_api/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fsma.be",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "fss.or.kr",
+   "paths": [
+    "/eng/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ftc.gov",
+   "paths": [
+    "/news-events/news/",
+    "/news-events/news/press-releases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "giants.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "New York Giants"
+    ]
+   }
+  },
+  {
+   "host": "github.blog",
+   "paths": [
+    "/news-insights/company-news/",
+    "/changelog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "GitHub",
+     "Microsoft"
+    ]
+   }
+  },
+  {
+   "host": "githubstatus.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "GitHub"
+    ]
+   }
+  },
+  {
+   "host": "global.krx.co.kr",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "globenewswire.com",
+   "paths": [
+    "/news-release/",
+    "/en/news-release/"
+   ],
+   "kind": "wire",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "gov.br",
+   "paths": [
+    "/cvm/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "gov.uk",
+   "paths": [
+    "/cma-cases/",
+    "/government/organisations/insolvency-service"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "gov.uk",
+   "paths": [
+    "/government/ministers/",
+    "/government/news/",
+    "/government/publications/",
+    "/government/speeches/"
+   ],
+   "kind": "government",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "governo.it",
+   "paths": [
+    "/en/articolo/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "govinfo.gov",
+   "paths": [
+    "/app/details/"
+   ],
+   "kind": "gazette",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "gpw.pl",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "hhs.gov",
+   "paths": [
+    "/hipaa/for-professionals/compliance-enforcement/agreements/"
+   ],
+   "kind": "privacy_regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "hkex.com.hk",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "hkma.gov.hk",
+   "paths": [
+    "/eng/news-and-media/press-releases/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "home.treasury.gov",
+   "paths": [
+    "/news/",
+    "/news/press-releases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "houstontexans.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Houston Texans",
+     "Texans"
+    ]
+   }
+  },
+  {
+   "host": "icc-cricket.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ico.org.uk",
+   "paths": [
+    "/action-weve-taken/enforcement/"
+   ],
+   "kind": "privacy_regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "idahoworks.gov",
+   "paths": [
+    "/search/warn_lookups"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "idx.co.id",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ifo.de",
+   "paths": [
+    "/en/press-release/",
+    "/en/press"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "illinoisworknet.com",
+   "paths": [
+    "/LayoffRecovery/Pages/IllinoisWARNData.aspx",
+    "/LayoffRecovery/Pages/ArchivedWARNReports.aspx",
+    "/warndashboard",
+    "/DownloadPrint/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "imf.org",
+   "paths": [
+    "/en/News/",
+    "/en/News/Articles/",
+    "/en/news/articles/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "in.gov",
+   "paths": [
+    "/attorneygeneral/consumer-protection-division/id-theft-prevention/files/",
+    "/attorneygeneral/consumer-protection-division/id-theft-prevention/security-breaches/",
+    "/dwd/warn-notices/",
+    "/dwd/files/warnnotices/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "indec.gob.ar",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "indycar.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ine.es",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "insee.fr",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "inside.fifa.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "insolvencydirect.bis.gov.uk",
+   "paths": [
+    "/eiir/"
+   ],
+   "kind": "registry",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "intc.com",
+   "paths": [
+    "/news-events/press-releases/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "finance",
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Intel"
+    ]
+   }
+  },
+  {
+   "host": "intel.com",
+   "paths": [
+    "/content/www/us/en/newsroom/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Intel"
+    ]
+   }
+  },
+  {
+   "host": "inter.it",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Inter Milan",
+     "Inter",
+     "Internazionale",
+     "FC Internazionale Milano"
+    ]
+   }
+  },
+  {
+   "host": "investors.delltechnologies.com",
+   "paths": [
+    "/news-events/press-releases/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "finance",
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Dell",
+     "Dell Technologies"
+    ]
+   }
+  },
+  {
+   "host": "iowaattorneygeneral.gov",
+   "paths": [
+    "/for-consumers/security-breach-notifications"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "iplt20.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ir.amd.com",
+   "paths": [
+    "/news-events/press-releases/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "finance",
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "AMD",
+     "Advanced Micro Devices"
+    ]
+   }
+  },
+  {
+   "host": "irishrugby.ie",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ised-isde.canada.ca",
+   "paths": [
+    "/site/office-superintendent-bankruptcy/en/"
+   ],
+   "kind": "registry",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ismworld.org",
+   "paths": [
+    "/supply-management-news-and-reports/reports/ism-pmi-reports/",
+    "/supply-management-news-and-reports/news-publications/press-room/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "istat.it",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ita.sport",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "itia.tennis",
+   "paths": [
+    "/news/sanctions/",
+    "/news/itia-news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "jaguars.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Jacksonville Jaguars",
+     "Jaguars"
+    ]
+   }
+  },
+  {
+   "host": "japan.kantei.go.jp",
+   "paths": [
+    "/news/",
+    "/105/actions/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "jftc.go.jp",
+   "paths": [
+    "/en/pressreleases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jndla.com",
+   "paths": [
+    "/cases/"
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "joblink.delaware.gov",
+   "paths": [
+    "/search/warn_lookups"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "joblink.maine.gov",
+   "paths": [
+    "/search/warn_lookups",
+    "/warn_info"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jobs.alaska.gov",
+   "paths": [
+    "/RR/WARN_notices.htm",
+    "/RR/notices/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jobs.mo.gov",
+   "paths": [
+    "/warn"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jobs.utah.gov",
+   "paths": [
+    "/employer/business/warnnotices.html"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jpx.co.jp",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jse.co.za",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "justice.gov",
+   "paths": [
+    "/opa/",
+    "/opa/pr/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "juventus.com",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Juventus",
+     "Juve"
+    ]
+   }
+  },
+  {
+   "host": "kansasworks.com",
+   "paths": [
+    "/search/warn_lookups"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "kind.krx.co.kr",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "labor.hawaii.gov",
+   "paths": [
+    "/wdc/real-time-warn-updates/",
+    "/wdc/2026-warn-notices/",
+    "/wdc/2025-warn-notices/",
+    "/wdd/warn-notices/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "labor.maryland.gov",
+   "paths": [
+    "/employment/warn.shtml",
+    "/employment/pdf/warn-log-2026.pdf"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "lagalaxy.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "LA Galaxy",
+     "Los Angeles Galaxy",
+     "Galaxy"
+    ]
+   }
+  },
+  {
+   "host": "laliga.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "lamoncloa.gob.es",
+   "paths": [
+    "/lang/en/presidente/news/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "legaseriea.it",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "legislation.gov.au",
+   "paths": [
+    ""
+   ],
+   "kind": "gazette",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "legislation.gov.uk",
+   "paths": [
+    ""
+   ],
+   "kind": "gazette",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "lg.com",
+   "paths": [
+    "/global/newsroom/news/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "LG Electronics",
+     "LG"
+    ]
+   }
+  },
+  {
+   "host": "ligue1.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "live.euronext.com",
+   "paths": [
+    "/en/resources/notices-corporate-actions/cash-notices"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "liverpoolfc.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Liverpool",
+     "Liverpool FC"
+    ]
+   }
+  },
+  {
+   "host": "llnl.gov",
+   "paths": [
+    "/article/"
+   ],
+   "kind": "research_institute",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Lawrence Livermore National Laboratory",
+     "LLNL"
+    ]
+   }
+  },
+  {
+   "host": "londonstockexchange.com",
+   "paths": [
+    "/en/press-releases/",
+    "/en/news/new-listings/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "lpga.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "lseg.com",
+   "paths": [
+    "/en/ftse-russell"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "maine.gov",
+   "paths": [
+    "/agviewer/content/ag/985235c7-cb95-4be2-8792-a1252b4f8318/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mas.gov.sg",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mass.gov",
+   "paths": [
+    "/info-details/worker-adjustment-and-retraining-act-warn-weekly-report",
+    "/lists/data-breach-reports",
+    "/service-details/worker-adjustment-and-retraining-act-warn-weekly-report"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mdes.ms.gov",
+   "paths": [
+    "/information-center/warn-information/",
+    "/media/528077/",
+    "/media/518448/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mercedesamgf1.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Mercedes",
+     "Mercedes-AMG",
+     "Mercedes-AMG Petronas",
+     "Mercedes AMG F1"
+    ]
+   }
+  },
+  {
+   "host": "miamidolphins.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Miami Dolphins",
+     "Dolphins"
+    ]
+   }
+  },
+  {
+   "host": "michigan.gov",
+   "paths": [
+    "/leo/bureaus-agencies/wd/data-public-notices/warn-notices"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "microsoft.com",
+   "paths": [
+    "/en-us/research/blog/",
+    "/en-us/msrc/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Microsoft",
+     "Microsoft Research"
+    ]
+   }
+  },
+  {
+   "host": "mistral.ai",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Mistral AI",
+     "Mistral"
+    ]
+   }
+  },
+  {
+   "host": "mlb.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "mlssoccer.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "mn.gov",
+   "paths": [
+    "/deed/programs-services/dislocated-worker/reports/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mnb.hu",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mods.go.kr",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "mospi.gov.in",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "motogp.com",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "msci.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nar.realtor",
+   "paths": [
+    "/newsroom/",
+    "/press-releases"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nasa.gov",
+   "paths": [
+    "/news-release/",
+    "/missions/"
+   ],
+   "kind": "space_agency",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "NASA"
+    ]
+   }
+  },
+  {
+   "host": "nasdaq.com",
+   "paths": [
+    "/market-activity/stocks/issuers-pending-suspension-delisting",
+    "/market-activity/ipos"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nasdaqtrader.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nationalbanken.dk",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nature.com",
+   "paths": [
+    "/articles/"
+   ],
+   "kind": "journal",
+   "categories": [
+    "technology"
+   ]
+  },
+  {
+   "host": "nba.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "nbp.pl",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ncaa.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ncaa.org",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ncsbe.gov",
+   "paths": [
+    "/news/press-releases"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "ncua.gov",
+   "paths": [
+    "/newsroom/press-release/",
+    "/news/press-releases"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "newcastleunited.com",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Newcastle United",
+     "Newcastle"
+    ]
+   }
+  },
+  {
+   "host": "neworleanssaints.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "New Orleans Saints",
+     "Saints"
+    ]
+   }
+  },
+  {
+   "host": "news.berkeley.edu",
+   "paths": [
+    ""
+   ],
+   "kind": "university",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "UC Berkeley",
+     "University of California, Berkeley"
+    ]
+   }
+  },
+  {
+   "host": "news.canadasoccer.com",
+   "paths": [
+    "/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "news.lenovo.com",
+   "paths": [
+    ""
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Lenovo",
+     "Motorola",
+     "Motorola Mobility"
+    ]
+   }
+  },
+  {
+   "host": "news.microsoft.com",
+   "paths": [
+    "/source/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Microsoft",
+     "LinkedIn",
+     "GitHub",
+     "Xbox"
+    ]
+   }
+  },
+  {
+   "host": "newsroom.arm.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Arm",
+     "Arm Holdings"
+    ]
+   }
+  },
+  {
+   "host": "newsroom.cisco.com",
+   "paths": [
+    ""
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Cisco",
+     "Cisco Systems",
+     "Splunk"
+    ]
+   }
+  },
+  {
+   "host": "newsroom.ibm.com",
+   "paths": [
+    ""
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "IBM",
+     "International Business Machines",
+     "Red Hat"
+    ]
+   }
+  },
+  {
+   "host": "newsroom.spotify.com",
+   "paths": [
+    ""
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Spotify"
+    ]
+   }
+  },
+  {
+   "host": "newyorkfed.org",
+   "paths": [
+    "/newsevents/news/",
+    "/markets/reference-rates/"
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "newyorkjets.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "New York Jets",
+     "Jets"
+    ]
+   }
+  },
+  {
+   "host": "nfl.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "nhl.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "niassembly.gov.uk",
+   "paths": [
+    "/news-and-media/press-releases/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "nist.gov",
+   "paths": [
+    "/news-events/news/"
+   ],
+   "kind": "research_institute",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "NIST",
+     "National Institute of Standards and Technology"
+    ]
+   }
+  },
+  {
+   "host": "nj.gov",
+   "paths": [
+    "/labor/business-services/layoffs-and-closing/file-warn-notice/",
+    "/labor/assets/PDFs/WARN/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "njb.uscourts.gov",
+   "paths": [
+    "/content/complex-chapter-11-cases",
+    "/claim-agent-cases-and-protocols"
+   ],
+   "kind": "court",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "norges-bank.no",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nrl.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "nvidianews.nvidia.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "NVIDIA"
+    ]
+   }
+  },
+  {
+   "host": "nysb.uscourts.gov",
+   "paths": [
+    "/megaCases",
+    "/claims-agents"
+   ],
+   "kind": "court",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nyse.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "nzx.com",
+   "paths": [
+    "/announcements/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "oag.ca.gov",
+   "paths": [
+    "/privacy/databreach/list",
+    "/ecrime/databreach/reports/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "oag.maryland.gov",
+   "paths": [
+    "/resources-info/Pages/security-breach-notices.aspx",
+    "/resources-info/SBN%20Documents/",
+    "/resources-info/SBN Documents/"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "oag.my.site.com",
+   "paths": [
+    "/datasecuritybreachreport/apex/DataSecurityReportsPage"
+   ],
+   "kind": "attorney_general",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "oaic.gov.au",
+   "paths": [
+    "/privacy/notifiable-data-breaches/"
+   ],
+   "kind": "privacy_regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "occ.gov",
+   "paths": [
+    "/news-events/",
+    "/news-events/newsroom/",
+    "/news-issuances/",
+    "/news-issuances/news-releases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ocrportal.hhs.gov",
+   "paths": [
+    "/ocr/breach/"
+   ],
+   "kind": "privacy_regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "oenb.at",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ofac.treasury.gov",
+   "paths": [
+    "/recent-actions/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "official.nba.com",
+   "paths": [
+    "/nba-injury-report-2026-27-season/",
+    "/"
+   ],
+   "kind": "injury_report",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "oireachtas.ie",
+   "paths": [
+    "/en/press-centre/press-releases/",
+    "/en/bills/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "ojk.go.id",
+   "paths": [
+    "/en/berita-dan-kegiatan/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "olympics.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "omniagentsolutions.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ons.gov.uk",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ornl.gov",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "research_institute",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Oak Ridge National Laboratory",
+     "ORNL"
+    ]
+   }
+  },
+  {
+   "host": "osc.ca",
+   "paths": [
+    "/en/news-events/news/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "osfi-bsif.gc.ca",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "otce.finra.org",
+   "paths": [
+    "/otce/tradeHalts"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "otcmarkets.com",
+   "paths": [
+    "/market-activity/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "pa.gov",
+   "paths": [
+    "/agencies/dli/programs-services/workforce-development-home/warn-requirements/warn-notices.html"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "packers.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Green Bay Packers",
+     "Packers"
+    ]
+   }
+  },
+  {
+   "host": "panthers.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Carolina Panthers",
+     "Panthers"
+    ]
+   }
+  },
+  {
+   "host": "paralympic.org",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "parl.ca",
+   "paths": [
+    "/legisinfo/en/bill/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "parliament.scot",
+   "paths": [
+    "/about/news/news-listing/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "patriots.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "New England Patriots",
+     "Patriots"
+    ]
+   }
+  },
+  {
+   "host": "pbc.gov.cn",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "pgatour.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "philadelphiaeagles.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Philadelphia Eagles",
+     "Eagles"
+    ]
+   }
+  },
+  {
+   "host": "pm.gc.ca",
+   "paths": [
+    "/en/news/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "pmi.spglobal.com",
+   "paths": [
+    "/Public/Release/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "policy.trade.ec.europa.eu",
+   "paths": [
+    "/news"
+   ],
+   "kind": "government",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "portal.ct.gov",
+   "paths": [
+    "/dol/knowledge-base/articles/employment-and-training/rapid-response/warn"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "pr.nba.com",
+   "paths": [
+    "/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "premierleague.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "press.spglobal.com",
+   "paths": [
+    "/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "press.un.org",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "prnewswire.com",
+   "paths": [
+    "/news-releases/"
+   ],
+   "kind": "wire",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "psa.gov.ph",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "psg.fr",
+   "paths": [
+    "/en/news",
+    "/en/content/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Paris Saint-Germain",
+     "PSG",
+     "Paris SG"
+    ]
+   }
+  },
+  {
+   "host": "publishednotices.asic.gov.au",
+   "paths": [
+    "/browsesearch-notices/"
+   ],
+   "kind": "registry",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "raiders.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Las Vegas Raiders",
+     "Raiders"
+    ]
+   }
+  },
+  {
+   "host": "rba.gov.au",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "rbi.org.in",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "rbnz.govt.nz",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "reactwarn.floridajobs.org",
+   "paths": [
+    "/WarnList/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "redbullracing.com",
+   "paths": [
+    "/int-en/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Red Bull Racing",
+     "Red Bull",
+     "Oracle Red Bull Racing"
+    ]
+   }
+  },
+  {
+   "host": "resbank.co.za",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "research.google",
+   "paths": [
+    "/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Google",
+     "Google Research",
+     "Alphabet"
+    ]
+   }
+  },
+  {
+   "host": "research.ibm.com",
+   "paths": [
+    "/blog/"
+   ],
+   "kind": "company_blog",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "IBM",
+     "IBM Research"
+    ]
+   }
+  },
+  {
+   "host": "restructuring.ra.kroll.com",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "riksbank.se",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "rolandgarros.com",
+   "paths": [
+    "/en-us/article/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "rugby-league.com",
+   "paths": [
+    "/article/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "salesforce.com",
+   "paths": [
+    "/news/press-releases/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Salesforce",
+     "Slack",
+     "Tableau"
+    ]
+   }
+  },
+  {
+   "host": "sama.gov.sa",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "saudiexchange.sa",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sbp.org.pk",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sbv.gov.vn",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sc.com.my",
+   "paths": [
+    "/resources/media/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sca.isr.umich.edu",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "scb.se",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "science.nasa.gov",
+   "paths": [
+    "/missions/",
+    "/blog/",
+    "/earth/",
+    "/universe/",
+    "/solar-system/"
+   ],
+   "kind": "space_agency",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "NASA"
+    ]
+   }
+  },
+  {
+   "host": "scottishfa.co.uk",
+   "paths": [
+    "/en/news"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "seahawks.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Seattle Seahawks",
+     "Seahawks"
+    ]
+   }
+  },
+  {
+   "host": "sebi.gov.in",
+   "paths": [
+    "/media-and-notifications/press-releases/",
+    "/sebiweb/home/HomeAction.do"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sec.gov",
+   "paths": [
+    "/enforcement-litigation/",
+    "/enforcement-litigation/administrative-proceedings/",
+    "/enforcement-litigation/litigation-releases/",
+    "/enforcement-litigation/trading-suspensions/",
+    "/litigation/",
+    "/news/",
+    "/newsroom/",
+    "/newsroom/press-releases/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance",
+    "technology"
+   ]
+  },
+  {
+   "host": "sec.gov.ph",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sec.or.th",
+   "paths": [
+    "/EN/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "security.paloaltonetworks.com",
+   "paths": [
+    ""
+   ],
+   "kind": "vendor_advisory",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Palo Alto Networks"
+    ]
+   }
+  },
+  {
+   "host": "senate.gov",
+   "paths": [
+    "/legislative/",
+    "/legislative/LIS/roll_call_lists/",
+    "/legislative/LIS/roll_call_votes/",
+    "/legislative/votes_new.htm"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "sencanada.ca",
+   "paths": [
+    "/en/newsroom/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "senedd.wales",
+   "paths": [
+    "/senedd-now/news/"
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "set.or.th",
+   "paths": [
+    "/en/market/news-and-alert/",
+    "/en/about/mediacenter/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "singstat.gov.sg",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "six-group.com",
+   "paths": [
+    "/en/newsroom/media-releases/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sixnationsrugby.com",
+   "paths": [
+    "/en/m6n/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "slack-status.com",
+   "paths": [
+    ""
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Slack"
+    ]
+   }
+  },
+  {
+   "host": "snb.ch",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sos.ca.gov",
+   "paths": [
+    "/administration/news-releases-and-advisories/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "sos.state.tx.us",
+   "paths": [
+    "/about/newsreleases/"
+   ],
+   "kind": "election_authority",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "spfl.co.uk",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "spglobal.com",
+   "paths": [
+    "/spdji"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "sportintegrity.ca",
+   "paths": [
+    "/news"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "srb.europa.eu",
+   "paths": [
+    "/en/news/",
+    "/en/content/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "ssb.no",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "stat.fi",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "stat.go.jp",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "stat.gov.pl",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "statcan.gc.ca",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "statistik.at",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "stats.gov.cn",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "stats.govt.nz",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "statssa.gov.za",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "jira-software.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Jira",
+     "Jira Software"
+    ]
+   }
+  },
+  {
+   "host": "confluence.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Confluence"
+    ]
+   }
+  },
+  {
+   "host": "bitbucket.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Bitbucket"
+    ]
+   }
+  },
+  {
+   "host": "trello.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Trello"
+    ]
+   }
+  },
+  {
+   "host": "jira-service-management.status.atlassian.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Atlassian",
+     "Jira Service Management"
+    ]
+   }
+  },
+  {
+   "host": "status.claude.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Anthropic",
+     "Claude"
+    ]
+   }
+  },
+  {
+   "host": "status.cloud.google.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Google Cloud",
+     "Google Cloud Platform",
+     "GCP"
+    ]
+   }
+  },
+  {
+   "host": "status.digitalocean.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "DigitalOcean"
+    ]
+   }
+  },
+  {
+   "host": "steelers.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Pittsburgh Steelers",
+     "Steelers"
+    ]
+   }
+  },
+  {
+   "host": "stripe.com",
+   "paths": [
+    "/newsroom/news/",
+    "/blog/"
+   ],
+   "kind": "company_newsroom",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Stripe"
+    ]
+   }
+  },
+  {
+   "host": "super.rugby",
+   "paths": [
+    "/superrugby/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "support.apple.com",
+   "paths": [
+    "/en-us/"
+   ],
+   "kind": "vendor_advisory",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Apple"
+    ]
+   }
+  },
+  {
+   "host": "tas-cas.org",
+   "paths": [
+    "/en/news/",
+    "/en/media/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "tase.co.il",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "tcmb.gov.tr",
+   "paths": [
+    ""
+   ],
+   "kind": "central_bank",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "tcsg.edu",
+   "paths": [
+    "/warn-public-view/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "tennesseetitans.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Tennessee Titans",
+     "Titans"
+    ]
+   }
+  },
+  {
+   "host": "thefa.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "thegazette.co.uk",
+   "paths": [
+    "/all-notices/notice",
+    "/insolvency/notice",
+    "/notice/"
+   ],
+   "kind": "gazette",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "therams.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Los Angeles Rams",
+     "Rams"
+    ]
+   }
+  },
+  {
+   "host": "tmx.com",
+   "paths": [
+    "/en/newsroom/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "tn.gov",
+   "paths": [
+    "/workforce/employers/staffing-redirect/layoffs---unemployment/warn-notices.html",
+    "/content/dam/tn/workforce/documents/majorpublications/reports-02/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "tottenhamhotspur.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Tottenham Hotspur",
+     "Tottenham",
+     "Spurs"
+    ]
+   }
+  },
+  {
+   "host": "treasury.gov.au",
+   "paths": [
+    "/media-release/"
+   ],
+   "kind": "government",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "tsx.com",
+   "paths": [
+    ""
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "twc.texas.gov",
+   "paths": [
+    "/data-reports/warn-notice",
+    "/sites/default/files/oei/docs/warn-act-listings-2026-twc.xlsx",
+    "/sites/default/files/oei/docs/warn-act-listings-2025-twc.xlsx"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "twse.com.tw",
+   "paths": [
+    "/en/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "txs.uscourts.gov",
+   "paths": [
+    "/page/bankruptcy-court",
+    "/page/chapter-11-bankruptcy-information"
+   ],
+   "kind": "court",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "uefa.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ufc.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ukad.org.uk",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "usada.org",
+   "paths": [
+    "/sanction/",
+    "/announcement/",
+    "/results/sanctions/",
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ussoccer.com",
+   "paths": [
+    "/stories/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "ustr.gov",
+   "paths": [
+    "/about-us/policy-offices/press-office/",
+    "/about-us/policy-offices/press-office/press-releases/",
+    "/about/policy-offices/press-office/press-releases/"
+   ],
+   "kind": "government",
+   "categories": [
+    "finance",
+    "politics"
+   ]
+  },
+  {
+   "host": "veriportali.tuik.gov.tr",
+   "paths": [
+    ""
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "veritaglobal.net",
+   "paths": [
+    ""
+   ],
+   "kind": "claims_agent",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "vermontjoblink.com",
+   "paths": [
+    "/search/warn_lookups"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "vikings.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "club",
+   "categories": [
+    "sports"
+   ],
+   "subject": {
+    "names": [
+     "Minnesota Vikings",
+     "Vikings"
+    ]
+   }
+  },
+  {
+   "host": "virginiaworks.gov",
+   "paths": [
+    "/im-an-employer/retain-and-grow/warn-notices/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "votes.parliament.uk",
+   "paths": [
+    ""
+   ],
+   "kind": "legislature",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "whitehouse.gov",
+   "paths": [
+    "/presidential-actions/",
+    "/briefings-statements/",
+    "/releases/",
+    "/fact-sheets/"
+   ],
+   "kind": "government",
+   "categories": [
+    "politics"
+   ]
+  },
+  {
+   "host": "wienerborse.at",
+   "paths": [
+    "/en/news-1/",
+    "/en/news/vienna-stock-exchange-news/"
+   ],
+   "kind": "exchange",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "wimbledon.com",
+   "paths": [
+    "/en_GB/news/"
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "wnba.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "workforce.alabama.gov",
+   "paths": [
+    "/warn-list/",
+    "/documents/warn-list/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "workforce.iowa.gov",
+   "paths": [
+    "/employers/resources/warn/notices",
+    "/media/3250/",
+    "/media/3260/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "workforcewv.org",
+   "paths": [
+    "/businesses/layoffs-downsizing/warn-listing/"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "world.rugby",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "worldaquatics.com",
+   "paths": [
+    "/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "worldathletics.org",
+   "paths": [
+    "/news/press-releases",
+    "/news/news/"
+   ],
+   "kind": "governing_body",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "worldbank.org",
+   "paths": [
+    "/en/news/press-release/",
+    "/en/news/statement/"
+   ],
+   "kind": "regulator",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "wsd.dli.mt.gov",
+   "paths": [
+    "/wioa/related-links/warn-notice-page",
+    "/_docs/wioa/warn_notices_july_2026.xlsx"
+   ],
+   "kind": "labor_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "wtatennis.com",
+   "paths": [
+    ""
+   ],
+   "kind": "league",
+   "categories": [
+    "sports"
+   ]
+  },
+  {
+   "host": "www150.statcan.gc.ca",
+   "paths": [
+    "/n1/dai-quo/",
+    "/n1/daily-quotidien/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "zew.de",
+   "paths": [
+    "/en/press/",
+    "/presse/"
+   ],
+   "kind": "statistics_agency",
+   "categories": [
+    "finance"
+   ]
+  },
+  {
+   "host": "zoomstatus.com",
+   "paths": [
+    "/incidents/"
+   ],
+   "kind": "status_page",
+   "categories": [
+    "technology"
+   ],
+   "subject": {
+    "names": [
+     "Zoom",
+     "Zoom Video Communications"
+    ]
+   }
+  }
+ ],
+ "page_rules": [
+  {
+   "pattern": "*/tag/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/tags/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/topic/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/topics/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/category/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/author/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/authors/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/search*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/archive/*",
+   "kind": "exclude",
+   "reason": "index page"
+  },
+  {
+   "pattern": "*/jobs/*",
+   "kind": "exclude",
+   "reason": "job ad"
+  },
+  {
+   "pattern": "*/careers/*",
+   "kind": "exclude",
+   "reason": "job ad"
+  },
+  {
+   "pattern": "*/forum/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "*/forums/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "*/community/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "*/comments/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "medium.com/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "substack.com/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "reddit.com/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "quora.com/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "forbes.com/sites/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "seekingalpha.com/article/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "*/contributors/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "*/sponsored/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "*/partner-content/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "einpresswire.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "prlog.org/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "openpr.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "prweb.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "newswire.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "regulations.gov/comment/*",
+   "kind": "exclude",
+   "reason": "comment docket"
+  },
+  {
+   "pattern": "regulations.gov/docket/*",
+   "kind": "exclude",
+   "reason": "comment docket"
+  },
+  {
+   "pattern": "nasdaqtrader.com/trader.aspx*",
+   "kind": "listing",
+   "reason": "halts list"
+  },
+  {
+   "pattern": "comments.cftc.gov/*",
+   "kind": "exclude",
+   "reason": "comment docket"
+  },
+  {
+   "pattern": "*/public-comments/*",
+   "kind": "exclude",
+   "reason": "comment docket"
+  },
+  {
+   "pattern": "*/publiccomments/*",
+   "kind": "exclude",
+   "reason": "comment docket"
+  },
+  {
+   "pattern": "*/noticecomment/*",
+   "kind": "exclude",
+   "reason": "comment docket"
+  },
+  {
+   "pattern": "futurium.ec.europa.eu/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "joinup.ec.europa.eu/*",
+   "kind": "exclude",
+   "reason": "user content"
+  },
+  {
+   "pattern": "forbes.com/councils/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "*/press-release/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "*/press-releases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "*/pressreleases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "morningstar.com/news/business-wire/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "morningstar.com/news/pr-newswire/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "morningstar.com/news/globe-newswire/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "morningstar.com/news/accesswire/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "*/advertorial/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/brandstudio/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/brand-studio/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/newswire-announcements/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "*/advertiser-content/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/branded-content/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/partnercontent/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/branded-content-series/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/paid-press-releases/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/spons/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "sec.gov/newsroom/speeches-statements/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "sec.gov/*/newsroom/speeches-statements/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "cftc.gov/PressRoom/SpeechesTestimony/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "cftc.gov/*/PressRoom/SpeechesTestimony/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "finra.org/media-center/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "finra.org/*/media-center/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "finra.org/finra-unscripted/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "finra.org/*/finra-unscripted/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "consumerfinance.gov/about-us/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "consumerfinance.gov/*/about-us/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ftc.gov/business-guidance/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ftc.gov/*/business-guidance/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ftc.gov/consumer-alerts/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "ftc.gov/*/consumer-alerts/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "federalreserve.gov/apps/proposals/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "federalreserve.gov/*/apps/proposals/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "federalreserve.gov/newsevents/speech/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "federalreserve.gov/*/newsevents/speech/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "newyorkfed.org/research/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "newyorkfed.org/*/research/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "newyorkfed.org/medialibrary/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "newyorkfed.org/*/medialibrary/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bea.gov/news/blog*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bea.gov/*/news/blog*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "eia.gov/todayinenergy/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "eia.gov/*/todayinenergy/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "press.spglobal.com/*Out-of-*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "press.spglobal.com/*-survey-*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "fca.org.uk/news/speeches/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "fca.org.uk/*/news/speeches/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "fca.org.uk/insight/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "fca.org.uk/*/insight/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankofengland.co.uk/bank-overground/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankofengland.co.uk/*/bank-overground/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankofengland.co.uk/speech/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankofengland.co.uk/*/speech/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankofengland.co.uk/knowledgebank/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankofengland.co.uk/*/knowledgebank/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "ecb.europa.eu/press/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ecb.europa.eu/*/press/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ecb.europa.eu/press/key/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "ecb.europa.eu/*/press/key/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "ecb.europa.eu/press/inter/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "ecb.europa.eu/*/press/inter/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankingsupervision.europa.eu/press/speeches/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankingsupervision.europa.eu/*/press/speeches/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankingsupervision.europa.eu/press/interviews/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankingsupervision.europa.eu/*/press/interviews/*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "bankingsupervision.europa.eu/press/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bankingsupervision.europa.eu/*/press/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ec.europa.eu/presscorner/detail/*/speech_*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "ec.europa.eu/*/presscorner/detail/*/speech_*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "ec.europa.eu/presscorner/detail/*/ac_*",
+   "kind": "exclude",
+   "reason": "daily news digest, not a decision"
+  },
+  {
+   "pattern": "ec.europa.eu/*/presscorner/detail/*/ac_*",
+   "kind": "exclude",
+   "reason": "daily news digest, not a decision"
+  },
+  {
+   "pattern": "centralbank.ie/news/article/speech-*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "centralbank.ie/*/news/article/speech-*",
+   "kind": "exclude",
+   "reason": "speech, not a decision"
+  },
+  {
+   "pattern": "en.yna.co.kr/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "en.yna.co.kr/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cnbc.com/select/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/*/select/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/pro/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/*/pro/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/investingclub/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/*/investingclub/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/personal-finance/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/*/personal-finance/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cnbc.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cnbc.com/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cnbc.com/podcast/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cnbc.com/*/podcast/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cbsnews.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cbsnews.com/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cbsnews.com/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cbsnews.com/*/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "cbsnews.com/essentials/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cbsnews.com/*/essentials/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "foxbusiness.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "foxbusiness.com/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "foxbusiness.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "foxbusiness.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "foxbusiness.com/fbntv/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "foxbusiness.com/*/fbntv/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "foxbusiness.com/personal-finance/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "foxbusiness.com/*/personal-finance/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "semafor.com/newsletters/*",
+   "kind": "exclude",
+   "reason": "newsletter"
+  },
+  {
+   "pattern": "semafor.com/*/newsletters/*",
+   "kind": "exclude",
+   "reason": "newsletter"
+  },
+  {
+   "pattern": "semafor.com/hub/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "semafor.com/*/hub/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "techcrunch.com/events/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "techcrunch.com/*/events/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "techcrunch.com/podcasts/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "techcrunch.com/*/podcasts/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "techcrunch.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "techcrunch.com/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "news.crunchbase.com/sections/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "news.crunchbase.com/*/sections/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "news.crunchbase.com/data/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "news.crunchbase.com/*/data/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "pymnts.com/newswire/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "pymnts.com/*/newswire/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "pymnts.com/partnerships/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "pymnts.com/*/partnerships/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "pymnts.com/report/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "pymnts.com/*/report/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "seekingalpha.com/*/article/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "seekingalpha.com/instablog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "seekingalpha.com/*/instablog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "seekingalpha.com/pr/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "seekingalpha.com/*/pr/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "seekingalpha.com/symbol/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/*/symbol/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/samw/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/*/samw/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/screeners/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/*/screeners/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/marketplace/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "seekingalpha.com/*/marketplace/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "insurancejournal.com/services/newswire/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "insurancejournal.com/*/services/newswire/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "insurancejournal.com/blogs/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "insurancejournal.com/*/blogs/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "insurancejournal.com/magazines/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "insurancejournal.com/*/magazines/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "insurancejournal.com/research/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "insurancejournal.com/*/research/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "investmentnews.com/premium-content/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "investmentnews.com/*/premium-content/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "investmentnews.com/external-contributors/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "investmentnews.com/*/external-contributors/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "investmentnews.com/white-papers/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "investmentnews.com/*/white-papers/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "investmentnews.com/webinars/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "investmentnews.com/*/webinars/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "investmentnews.com/videos/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "investmentnews.com/*/videos/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "investmentnews.com/guides*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "investmentnews.com/*/guides*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "bbc.co.uk/news/videos/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/*/news/videos/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/reel/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/*/reel/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/audio/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/*/audio/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/travel/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bbc.co.uk/*/travel/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bbc.co.uk/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/*/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "theguardian.com/commentisfree/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "theguardian.com/*/commentisfree/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "theguardian.com/business/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "theguardian.com/*/business/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "theguardian.com/guardian-labs*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "theguardian.com/*/guardian-labs*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "theguardian.com/info/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "theguardian.com/*/info/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "theguardian.com/money/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "theguardian.com/*/money/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "theguardian.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "theguardian.com/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "theguardian.com/podcasts/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "theguardian.com/*/podcasts/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "independent.co.uk/voices/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "independent.co.uk/*/voices/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "independent.co.uk/deals/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "independent.co.uk/*/deals/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "independent.co.uk/extras/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "independent.co.uk/*/extras/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "independent.co.uk/money/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "independent.co.uk/*/money/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cityam.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "cityam.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "cityam.com/personal-finance/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cityam.com/*/personal-finance/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "cityam.com/people-and-organizations/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "cityam.com/*/people-and-organizations/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/investing/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/investing/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/diyinvesting/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/diyinvesting/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/investingshow/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/investingshow/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/saving/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/saving/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/cardsloans/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/cardsloans/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/mortgageshome/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/mortgageshome/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/pensions/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/pensions/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/bills/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/bills/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/money/cars/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "thisismoney.co.uk/*/money/cars/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "rte.ie/brainstorm/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "rte.ie/*/brainstorm/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "rte.ie/radio/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "rte.ie/*/radio/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "rte.ie/player/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "rte.ie/*/player/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "globalnews.ca/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "globalnews.ca/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "globalnews.ca/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "globalnews.ca/*/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "globalnews.ca/pages/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "globalnews.ca/*/pages/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/investing/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/*/investing/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/pf/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/*/pf/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/investing/personal-finance*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/*/investing/personal-finance*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/sponsored*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/*/sponsored*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/press-releases*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "bnnbloomberg.ca/*/press-releases*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "ctvnews.ca/shopping-trends/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "ctvnews.ca/*/shopping-trends/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "ctvnews.ca/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "ctvnews.ca/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "abc.net.au/news/analysis-and-opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "abc.net.au/*/news/analysis-and-opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "abc.net.au/listen/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "abc.net.au/*/listen/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "abc.net.au/news/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "abc.net.au/*/news/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "euronews.com/programs/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "euronews.com/*/programs/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "euronews.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "euronews.com/*/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "euronews.com/special/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "euronews.com/*/special/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "dw.com/en/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/*/en/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/en/audio/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/*/en/audio/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/en/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "dw.com/*/en/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "france24.com/en/sponsored-content/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "france24.com/*/en/sponsored-content/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "france24.com/en/tv-shows/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "france24.com/*/en/tv-shows/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "france24.com/en/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "france24.com/*/en/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "france24.com/en/partnerships/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "france24.com/*/en/partnerships/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "channelnewsasia.com/events-partnerships/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "channelnewsasia.com/*/events-partnerships/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "channelnewsasia.com/watch/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "channelnewsasia.com/*/watch/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "channelnewsasia.com/listen/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "channelnewsasia.com/*/listen/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "channelnewsasia.com/cna-insider/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "channelnewsasia.com/*/cna-insider/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "straitstimes.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "straitstimes.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bankingdive.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bankingdive.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "bankingdive.com/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankingdive.com/*/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankingdive.com/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bankingdive.com/*/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "paymentsdive.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "paymentsdive.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "paymentsdive.com/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "paymentsdive.com/*/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "paymentsdive.com/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "paymentsdive.com/*/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "utilitydive.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "utilitydive.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "utilitydive.com/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "utilitydive.com/*/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "utilitydive.com/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "utilitydive.com/*/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "cfodive.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "cfodive.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "cfodive.com/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "cfodive.com/*/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "cfodive.com/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "cfodive.com/*/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "retaildive.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "retaildive.com/*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "retaildive.com/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "retaildive.com/*/selfservice/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "retaildive.com/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "retaildive.com/*/trendline/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "rigzone.com/insights/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "rigzone.com/*/insights/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "rigzone.com/recruiters/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "rigzone.com/*/recruiters/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "rigzone.com/profile/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "rigzone.com/*/profile/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "fec.gov/legal/*advisory-opinions/*requests*",
+   "kind": "exclude",
+   "reason": "advisory opinion requests, not decisions"
+  },
+  {
+   "pattern": "fec.gov/*/legal/*advisory-opinions/*requests*",
+   "kind": "exclude",
+   "reason": "advisory opinion requests, not decisions"
+  },
+  {
+   "pattern": "whitehouse.gov/*?s=*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "gov.uk/print",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "gov.uk/*/print",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "sencanada.ca/sencaplus/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "sencanada.ca/*/sencaplus/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "pm.gc.ca/news/media-advisories/*",
+   "kind": "exclude",
+   "reason": "itinerary, not news"
+  },
+  {
+   "pattern": "pm.gc.ca/*/news/media-advisories/*",
+   "kind": "exclude",
+   "reason": "itinerary, not news"
+  },
+  {
+   "pattern": "aec.gov.au/media/mediafeed/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "en.yna.co.kr/editorials/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "en.yna.co.kr/k-biz/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bbc.co.uk/sounds/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.co.uk/editorialguidelines/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "bbc.co.uk/*/editorialguidelines/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "bbc.com/news/videos/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.com/*/news/videos/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "bbc.com/travel/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bbc.com/culture/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "theguardian.com/tone/letters/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "theguardian.com/*/live/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "independent.co.uk/tv/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "politico.eu/section/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "politico.eu/politico-studio/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "politico.eu/sponsored-content/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "politico.eu/podcast/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "politico.eu/newsletter/*",
+   "kind": "exclude",
+   "reason": "newsletter"
+  },
+  {
+   "pattern": "rte.ie/news/analysis-and-comment/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "pbs.org/newshour/show/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "pbs.org/newshour/arts/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "rollcall.com/section/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "rollcall.com/factbase/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "rollcall.com/podcasts/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "nbcnews.com/think/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "nbcnews.com/select/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "nbcnews.com/meet-the-press/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "nbcnews.com/*/meet-the-press/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "nbcnews.com/news/nbcblk/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "abcnews.com/538/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "abcnews.com/Politics/*Interactive*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "abcnews.com/*/Politics/*Interactive*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "abcnews.com/GMA/Shop/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "usatoday.com/story/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "usatoday.com/shopping/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "usatoday.com/story/sponsor-story/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "foxnews.com/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "foxnews.com/deals/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "foxnews.com/video/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "foxnews.com/wires/*",
+   "kind": "exclude",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "semafor.com/newsletter/*",
+   "kind": "exclude",
+   "reason": "newsletter"
+  },
+  {
+   "pattern": "semafor.com/events/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "propublica.org/people/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "propublica.org/article/about-us/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "propublica.org/series/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "texastribune.org/events/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "globalnews.ca/commentary/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "ctvnews.ca/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "sbs.com.au/news/live-blog/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "sbs.com.au/language/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "sbs.com.au/ondemand/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/en/*/video-*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/en/*/audio-*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "dw.com/en/*/g-*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "france24.com/fr/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "france24.com/es/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "france24.com/ar/*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "euronews.com/nocomment/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "nfl.com/news/series/*",
+   "kind": "exclude",
+   "reason": "opinion or analysis series"
+  },
+  {
+   "pattern": "nfl.com/fantasy/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nfl.com/*/fantasy/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nfl.com/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nfl.com/*/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nba.com/api/*",
+   "kind": "exclude",
+   "reason": "API path (robots-disallowed)"
+  },
+  {
+   "pattern": "nba.com/video/partners/*",
+   "kind": "exclude",
+   "reason": "partner video (robots-disallowed)"
+  },
+  {
+   "pattern": "mlb.com/en/*",
+   "kind": "exclude",
+   "reason": "robots-disallowed path"
+  },
+  {
+   "pattern": "mlb.com/api/*",
+   "kind": "exclude",
+   "reason": "API path (robots-disallowed)"
+  },
+  {
+   "pattern": "mlb.com/news/*-odds*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "mlb.com/*/news/*-odds*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "pgatour.com/article/news/betting-dfs/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "pgatour.com/article/news/horses-for-courses/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "pgatour.com/news/horses-for-courses*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "formula1.com/en/latest/article/*bet-builder*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "formula1.com/en/latest/article/f1-fantasy*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "mercedesamgf1.com/news/*partners-with*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "mercedesamgf1.com/*/news/*partners-with*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "premierleague.com/en/fantasy-news*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "ussoccer.com/stories/spotlight-series-presented-by-*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "spfl.co.uk/news/*tv-guide*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "spfl.co.uk/news/fantasy-*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nrl.com/news/*signings-tracker*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "nrl.com/news/*casualty-ward*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "iplt20.com/news?*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "cricket.com.au/news/*live-blog*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "fiba.basketball/en/news/*power-rankings*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "liverpoolfc.com/news/listing/media-watch*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "liverpoolfc.com/news/listing/ticket-news*",
+   "kind": "exclude",
+   "reason": "index, tool or non-English page"
+  },
+  {
+   "pattern": "lagalaxy.com/news/*presented-by*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "espn.com/sports-betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "espn.com/espn/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "espn.com/fantasy/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "espn.co.uk/football/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "espn.co.uk/fantasy/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "bbc.co.uk/sport/football/gossip*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "bbc.com/sport/football/gossip*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "skysports.com/transfer-centre*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "skysports.com/football/live-blog/12476234/*",
+   "kind": "exclude",
+   "reason": "video, audio or live page"
+  },
+  {
+   "pattern": "skysports.com/*-paper-talk",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "cbssports.com/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "cbssports.com/fantasy/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "picks.cbssports.com/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nbcsports.com/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "nbcsports.com/fantasy/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "theguardian.com/football/series/rumourmill*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "theguardian.com/football/*/football-transfer-rumours-*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "theguardian.com/sport/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "theguardian.com/football/blog/*",
+   "kind": "exclude",
+   "reason": "opinion or contributor"
+  },
+  {
+   "pattern": "foxsports.com/betting*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "foxsports.com/stories/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "independent.co.uk/sport/football/transfers*",
+   "kind": "exclude",
+   "reason": "rumour or tracker page"
+  },
+  {
+   "pattern": "standard.co.uk/sport/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "tntsports.co.uk/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "eurosport.com/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "goal.com/*/lists/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "goal.com/*/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "goal.com/*/originals/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "nzherald.co.nz/*/premium/*",
+   "kind": "exclude",
+   "reason": "consumer, premium or tool page"
+  },
+  {
+   "pattern": "sportingnews.com/*/betting/*",
+   "kind": "exclude",
+   "reason": "betting or fantasy"
+  },
+  {
+   "pattern": "businesswire.com/news/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "globenewswire.com/news-release/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "globenewswire.com/*/news-release/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "prnewswire.com/news-releases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "prnewswire.com/*/news-releases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "prnewswire.co.uk/news-releases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "newswire.ca/news-releases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "en.prnasia.com/releases/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "en.prnasia.com/story/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "accessnewswire.com/newsroom/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "accesswire.com/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "newsfilecorp.com/release/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "eqs-news.com/news/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "news.cision.com/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "presseportal.de/pm/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "ots.at/presseaussendung/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "prtimes.jp/main/html/rd/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "londonstockexchange.com/news-article/*",
+   "kind": "wire",
+   "reason": "issuer-submitted RNS"
+  },
+  {
+   "pattern": "londonstockexchange.com/en/news/article/*",
+   "kind": "wire",
+   "reason": "issuer-submitted RNS"
+  },
+  {
+   "pattern": "stocktitan.net/news/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "mynewsdesk.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "24-7pressrelease.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "issuewire.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "pr.com/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "prfire.co.uk/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "pressat.co.uk/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "tmcnet.com/usubmit/*",
+   "kind": "exclude",
+   "reason": "self-serve wire"
+  },
+  {
+   "pattern": "*/business-wire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/businesswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/business_wire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/pr-newswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/prnewswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/pr_newswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/globe-newswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/globenewswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/accesswire/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/newsfile/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "japantimes.co.jp/press/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "ansa.it/pressrelease/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "ansa.it/*/pressrelease/*",
+   "kind": "wire",
+   "reason": "paid release"
+  },
+  {
+   "pattern": "biospace.com/press-releases/*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "finance.yahoo.com/news/*-prnewswire-*",
+   "kind": "wire",
+   "reason": "republished release"
+  },
+  {
+   "pattern": "*/paid-content/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/paidpost/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/brandvoice/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "france24.com/en/sponsored-contents/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "khaleejtimes.com/business-technology-review/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "thehackernews.com/expert-insights/*",
+   "kind": "exclude",
+   "reason": "contributor"
+  },
+  {
+   "pattern": "thehackernews.com/p/*",
+   "kind": "exclude",
+   "reason": "site page"
+  },
+  {
+   "pattern": "*/opinion/*",
+   "kind": "exclude",
+   "reason": "opinion"
+  },
+  {
+   "pattern": "*/opinions/*",
+   "kind": "exclude",
+   "reason": "opinion"
+  },
+  {
+   "pattern": "dailymaverick.co.za/opinionista/*",
+   "kind": "exclude",
+   "reason": "opinion"
+  },
+  {
+   "pattern": "finance.yahoo.com/personal-finance/*",
+   "kind": "exclude",
+   "reason": "affiliate"
+  },
+  {
+   "pattern": "biospace.com/employer/*",
+   "kind": "exclude",
+   "reason": "job ad"
+  },
+  {
+   "pattern": "biospace.com/job-trends/*",
+   "kind": "exclude",
+   "reason": "job ad"
+  },
+  {
+   "pattern": "bleepingcomputer.com/tutorials/*",
+   "kind": "exclude",
+   "reason": "not news"
+  },
+  {
+   "pattern": "bleepingcomputer.com/vpn/*",
+   "kind": "exclude",
+   "reason": "affiliate"
+  },
+  {
+   "pattern": "economictimes.indiatimes.com/prime/*",
+   "kind": "exclude",
+   "reason": "paywall"
+  },
+  {
+   "pattern": "businessday.ng/pro/*",
+   "kind": "exclude",
+   "reason": "paywall"
+  },
+  {
+   "pattern": "livemint.com/premium/*",
+   "kind": "exclude",
+   "reason": "paywall"
+  },
+  {
+   "pattern": "*/live-updates*",
+   "kind": "exclude",
+   "reason": "live blog"
+  },
+  {
+   "pattern": "nasdaq.com/articles/*",
+   "kind": "exclude",
+   "reason": "syndicated partner copy"
+  },
+  {
+   "pattern": "nasdaq.com/market-activity/stocks/issuers-pending-suspension-delisting*",
+   "kind": "listing",
+   "reason": "delisting list"
+  },
+  {
+   "pattern": "nasdaq.com/market-activity/ipos*",
+   "kind": "listing",
+   "reason": "IPO calendar"
+  },
+  {
+   "pattern": "nyse.com/trade/trading-halts*",
+   "kind": "listing",
+   "reason": "halts list"
+  },
+  {
+   "pattern": "nyse.com/regulation/delistings*",
+   "kind": "listing",
+   "reason": "delisting list"
+  },
+  {
+   "pattern": "otce.finra.org/otce/tradeHalts*",
+   "kind": "listing",
+   "reason": "halts list"
+  },
+  {
+   "pattern": "fdic.gov/bank-failures/failed-bank-list*",
+   "kind": "listing",
+   "reason": "bank failure list"
+  },
+  {
+   "pattern": "set.or.th/en/market/news-and-alert/trading-halt-suspension-pause*",
+   "kind": "listing",
+   "reason": "halts list"
+  },
+  {
+   "pattern": "live.euronext.com/en/resources/notices-corporate-actions/*",
+   "kind": "listing",
+   "reason": "notices list"
+  },
+  {
+   "pattern": "jpx.co.jp/english/listing/stocks/new/*",
+   "kind": "listing",
+   "reason": "new listings list"
+  },
+  {
+   "pattern": "edd.ca.gov/en/jobs_and_training/Layoff_Services_WARN*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dol.ny.gov/warn-notices*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "twc.texas.gov/data-reports/warn-notice*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "illinoisworknet.com/LayoffRecovery/Pages/IllinoisWARNData.aspx*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "nj.gov/labor/business-services/layoffs-and-closing/file-warn-notice*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "reactwarn.floridajobs.org/WarnList/Records*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "pa.gov/agencies/dli/programs-services/workforce-development-home/warn-requirements/warn-notices.html*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "michigan.gov/leo/bureaus-agencies/wd/data-public-notices/warn-notices*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "tcsg.edu/warn-public-view*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "commerce.nc.gov/data-tools-reports/labor-market-data-tools/workforce-warn-reports*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "virginiaworks.gov/im-an-employer/retain-and-grow/warn-notices*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "mass.gov/info-details/worker-adjustment-and-retraining-act-warn-weekly-report*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "cdle.colorado.gov/employers/layoff-separations/layoff-warn-list*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "labor.maryland.gov/employment/warn.shtml*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dwd.wisconsin.gov/dislocatedworker/warn*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "azjobconnection.gov/search/warn_lookups",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "tn.gov/workforce/employers/staffing-redirect/layoffs---unemployment/warn-notices.html*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "in.gov/dwd/warn-notices/current-warn-notices*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "jobs.mo.gov/warn/*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dolpublicdocumentlibrary.ct.gov/CsblrCategory*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "jobs.utah.gov/employer/business/warnnotices.html*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "workforce.alabama.gov/warn-list*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "workforce.iowa.gov/employers/resources/warn/notices*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "labor.hawaii.gov/wdc/real-time-warn-updates*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "does.dc.gov/page/industry-closings-and-layoffs-warn-notifications*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dol.nebraska.gov/ReemploymentServices/LayoffServices/LayoffsAndDownsizingWARN*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "kansasworks.com/search/warn_lookups",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "joblink.delaware.gov/search/warn_lookups",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "joblink.maine.gov/warn_info*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "idahoworks.gov/search/warn_lookups",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "arjoblink.arkansas.gov/search/warn_lookups",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "jobs.alaska.gov/RR/WARN_notices.htm*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dlr.sd.gov/workforce_services/businesses/warn_notices.aspx*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dew.sc.gov/sites/dew/files/Documents/WARN%20Report%2005%2022%202026.pdf*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "detr.nv.gov/Page/WARN*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "dlt.ri.gov/wds/warn*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "wsd.dli.mt.gov/wioa/related-links/warn-notice-page*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "workforcewv.org/businesses/layoffs-downsizing/warn-listing*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "mdes.ms.gov/media/499859/warn-py2025-qtr-1-jul-sep-2025.pdf*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "oag.ca.gov/privacy/databreach/list*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "atg.wa.gov/data-breach-notifications*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "justice.oregon.gov/consumer/DataBreach*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "attorneygeneral.delaware.gov/fraud/cpu/securitybreachnotification/database*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "ago.vermont.gov/categories/security-breach-notices*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "in.gov/attorneygeneral/consumer-protection-division/id-theft-prevention/security-breaches*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "oag.maryland.gov/resources-info/Pages/security-breach-notices.aspx*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "maine.gov/agviewer/content/ag/985235c7-cb95-4be2-8792-a1252b4f8318/558113e2-5f95-4f04-ae80-27f404d3ac47.html*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "doj.nh.gov/consumer/security-breaches/a.htm*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "dojmt.gov/consumer/databreach*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "iowaattorneygeneral.gov/for-consumers/security-breach-notifications*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "mass.gov/lists/data-breach-reports*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "ocrportal.hhs.gov/ocr/breach/breach_report.jsf*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "hhs.gov/hipaa/for-professionals/compliance-enforcement/agreements/index.html*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "cisa.gov/news-events/cybersecurity-advisories*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "ico.org.uk/action-weve-taken/enforcement*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "cnil.fr/fr/les-sanctions-prononcees-par-la-cnil*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "deb.uscourts.gov/claims-agents-and-assignments*",
+   "kind": "listing",
+   "reason": "case list"
+  },
+  {
+   "pattern": "njb.uscourts.gov/content/complex-chapter-11-cases*",
+   "kind": "listing",
+   "reason": "case list"
+  },
+  {
+   "pattern": "nysb.uscourts.gov/megaCases*",
+   "kind": "listing",
+   "reason": "case list"
+  },
+  {
+   "pattern": "thegazette.co.uk/insolvency/notice*",
+   "kind": "listing",
+   "reason": "case list"
+  },
+  {
+   "pattern": "gov.uk/government/organisations/insolvency-service*",
+   "kind": "listing",
+   "reason": "case list"
+  },
+  {
+   "pattern": "ised-isde.canada.ca/site/office-superintendent-bankruptcy/en/ccaa-records-2021-to-present*",
+   "kind": "listing",
+   "reason": "case list"
+  },
+  {
+   "pattern": "twc.texas.gov/sites/default/files/oei/docs/warn-act-listings-*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "labor.maryland.gov/employment/pdf/warn-log-*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "detr.nv.gov/content/media/warn_and_nonwarn_master*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "wsd.dli.mt.gov/_docs/wioa/warn_notices_*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "illinoisworknet.com/downloadprint/*warn*",
+   "kind": "listing",
+   "reason": "WARN notice list"
+  },
+  {
+   "pattern": "ocrportal.hhs.gov/ocr/breach/*",
+   "kind": "listing",
+   "reason": "breach notice list"
+  },
+  {
+   "pattern": "news.microsoft.com/*/features/*",
+   "kind": "exclude",
+   "reason": "customer story"
+  },
+  {
+   "pattern": "news.microsoft.com/signal/*",
+   "kind": "exclude",
+   "reason": "magazine feature"
+  },
+  {
+   "pattern": "news.microsoft.com/microsoft-signal/*",
+   "kind": "exclude",
+   "reason": "magazine feature"
+  },
+  {
+   "pattern": "blog.google/*gift-guide*",
+   "kind": "exclude",
+   "reason": "shopping guide"
+  },
+  {
+   "pattern": "kedglobal.com/brandedContent/*",
+   "kind": "exclude",
+   "reason": "sponsored"
+  },
+  {
+   "pattern": "*/betting/*",
+   "kind": "exclude",
+   "reason": "betting"
+  },
+  {
+   "pattern": "*/*betting-odds*",
+   "kind": "exclude",
+   "reason": "betting"
+  },
+  {
+   "pattern": "*/*mock-draft*",
+   "kind": "exclude",
+   "reason": "speculation"
+  },
+  {
+   "pattern": "*/fantasy/*",
+   "kind": "exclude",
+   "reason": "fantasy blurbs"
+  },
+  {
+   "pattern": "baltimoreravens.com/news/*late-for-work*",
+   "kind": "exclude",
+   "reason": "media roundup"
+  },
+  {
+   "pattern": "taipeitimes.com/News/editorials/*",
+   "kind": "exclude",
+   "reason": "opinion"
+  },
+  {
+   "pattern": "channelnewsasia.com/commentary/*",
+   "kind": "exclude",
+   "reason": "opinion"
+  },
+  {
+   "pattern": "nature.com/articles/d42473-*",
+   "kind": "exclude",
+   "reason": "advertisement feature"
+  }
+ ]
+}

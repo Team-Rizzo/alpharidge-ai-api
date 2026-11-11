@@ -1,17 +1,23 @@
-// Unified X Archive + Alpharidge AI Database Schema
+// Alpharidge AI database schema
 
 generator client {
   provider             = "prisma-client-py"
   interface            = "asyncio"
   recursive_type_depth = 5
+  previewFeatures      = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
-/// Twitter/X user accounts
+// ============================================================================
+// Twitter Models (legacy, frozen)
+// ============================================================================
+
+/// Legacy, frozen.
 model Account {
   id                BigInt    @id
   name              String?
@@ -42,17 +48,16 @@ model Account {
   firstSeenAt       DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz
   lastUpdatedAt     DateTime  @default(now()) @map("last_updated_at") @db.Timestamptz
 
-  // Relations
-  tweets            Tweet[]
-  monitoredAccount  MonitoredAccount?
-  relationships     Relationship[]
+  tweets           Tweet[]
+  monitoredAccount MonitoredAccount?
+  relationships    Relationship[]
 
   @@index([screenName], name: "idx_accounts_screen_name")
   @@index([userName], name: "idx_accounts_user_name")
   @@map("accounts")
 }
 
-/// Accounts being actively monitored for tweets via streaming
+/// Legacy, frozen.
 model MonitoredAccount {
   id          Int       @id @default(autoincrement())
   screenName  String    @unique @map("screen_name")
@@ -63,7 +68,6 @@ model MonitoredAccount {
   addedAt     DateTime  @default(now()) @map("added_at") @db.Timestamptz
   lastTweetAt DateTime? @map("last_tweet_at") @db.Timestamptz
 
-  // Relations
   account Account? @relation(fields: [accountId], references: [id])
 
   @@index([screenName], name: "idx_monitored_screen_name")
@@ -71,7 +75,7 @@ model MonitoredAccount {
   @@map("monitored_accounts")
 }
 
-/// Accounts whose followers/followings were imported
+/// Legacy, frozen.
 model SourceAccount {
   id          Int      @id @default(autoincrement())
   screenName  String   @unique @map("screen_name")
@@ -80,7 +84,7 @@ model SourceAccount {
   @@map("source_accounts")
 }
 
-/// Follower/following relationships between accounts
+/// Legacy, frozen.
 model Relationship {
   id               Int      @id @default(autoincrement())
   sourceAccount    String   @map("source_account")
@@ -88,7 +92,6 @@ model Relationship {
   relationshipType String   @map("relationship_type")
   discoveredAt     DateTime @default(now()) @map("discovered_at") @db.Timestamptz
 
-  // Relations
   targetAccount Account @relation(fields: [targetAccountId], references: [id])
 
   @@unique([sourceAccount, targetAccountId, relationshipType])
@@ -98,64 +101,55 @@ model Relationship {
   @@map("relationships")
 }
 
-/// Main tweets storage - raw API data only (source of truth)
+/// Legacy, frozen.
 model Tweet {
-  id                 BigInt    @id
-  type               String    @default("tweet")
-  url                String?
-  text               String?
-  source             String?
-  lang               String?
-  
-  // Engagement metrics
-  retweetCount       Int       @default(0) @map("retweet_count")
-  replyCount         Int       @default(0) @map("reply_count")
-  likeCount          Int       @default(0) @map("like_count")
-  quoteCount         Int       @default(0) @map("quote_count")
-  viewCount          Int       @default(0) @map("view_count")
-  bookmarkCount      Int       @default(0) @map("bookmark_count")
-  
-  // Reply/conversation info
-  isReply            Boolean   @default(false) @map("is_reply")
-  inReplyToId        BigInt?   @map("in_reply_to_id")
-  conversationId     BigInt?   @map("conversation_id")
-  inReplyToUserId    BigInt?   @map("in_reply_to_user_id")
-  inReplyToUsername  String?   @map("in_reply_to_username")
-  
-  // Author
-  authorId           BigInt?   @map("author_id")
-  
-  // Referenced tweets
-  quotedTweetId      BigInt?   @map("quoted_tweet_id")
-  retweetedTweetId   BigInt?   @map("retweeted_tweet_id")
-  
-  // Stream rule info
-  ruleId             String?   @map("rule_id")
-  ruleTag            String?   @map("rule_tag")
-  
-  // Card and place data (stored as JSON)
-  cardData           Json?     @map("card_data") @db.JsonB
-  placeData          Json?     @map("place_data") @db.JsonB
-  
-  // Timestamps
-  createdAt          DateTime? @map("created_at") @db.Timestamptz
-  receivedAt         DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  id     BigInt  @id
+  type   String  @default("tweet")
+  url    String?
+  text   String?
+  source String?
+  lang   String?
 
-  // Relations
-  author             Account?  @relation(fields: [authorId], references: [id])
-  media              TweetMedia[]
-  mentions           TweetMention[]
-  hashtags           TweetHashtag[]
-  urls               TweetUrl[]
-  symbols            TweetSymbol[]
-  scorings           Scoring[]
-  analysis           TweetAnalysis?
-  
-  // Self-referencing relations
-  quotedTweet        Tweet?    @relation("QuotedTweet", fields: [quotedTweetId], references: [id])
-  quotedBy           Tweet[]   @relation("QuotedTweet")
-  retweetedTweet     Tweet?    @relation("RetweetedTweet", fields: [retweetedTweetId], references: [id])
-  retweetedBy        Tweet[]   @relation("RetweetedTweet")
+  retweetCount  Int @default(0) @map("retweet_count")
+  replyCount    Int @default(0) @map("reply_count")
+  likeCount     Int @default(0) @map("like_count")
+  quoteCount    Int @default(0) @map("quote_count")
+  viewCount     Int @default(0) @map("view_count")
+  bookmarkCount Int @default(0) @map("bookmark_count")
+
+  isReply           Boolean @default(false) @map("is_reply")
+  inReplyToId       BigInt? @map("in_reply_to_id")
+  conversationId    BigInt? @map("conversation_id")
+  inReplyToUserId   BigInt? @map("in_reply_to_user_id")
+  inReplyToUsername String? @map("in_reply_to_username")
+
+  authorId BigInt? @map("author_id")
+
+  quotedTweetId    BigInt? @map("quoted_tweet_id")
+  retweetedTweetId BigInt? @map("retweeted_tweet_id")
+
+  ruleId  String? @map("rule_id")
+  ruleTag String? @map("rule_tag")
+
+  cardData  Json? @map("card_data") @db.JsonB
+  placeData Json? @map("place_data") @db.JsonB
+
+  createdAt  DateTime? @map("created_at") @db.Timestamptz
+  receivedAt DateTime  @default(now()) @map("received_at") @db.Timestamptz
+
+  author   Account?       @relation(fields: [authorId], references: [id])
+  media    TweetMedia[]
+  mentions TweetMention[]
+  hashtags TweetHashtag[]
+  urls     TweetUrl[]
+  symbols  TweetSymbol[]
+  scorings Scoring[]
+  analysis TweetAnalysis?
+
+  quotedTweet    Tweet?  @relation("QuotedTweet", fields: [quotedTweetId], references: [id])
+  quotedBy       Tweet[] @relation("QuotedTweet")
+  retweetedTweet Tweet?  @relation("RetweetedTweet", fields: [retweetedTweetId], references: [id])
+  retweetedBy    Tweet[] @relation("RetweetedTweet")
 
   @@index([authorId], name: "idx_tweets_author")
   @@index([createdAt], name: "idx_tweets_created")
@@ -167,42 +161,33 @@ model Tweet {
   @@map("tweets")
 }
 
-/// Tweet analysis/sentiment results - separate from raw tweet data
-/// Allows re-running analysis without modifying source tweet data
+/// Legacy, frozen.
 model TweetAnalysis {
-  id                  Int       @id @default(autoincrement())
-  tweetId             BigInt    @unique @map("tweet_id")
-  
-  // Sentiment analysis
-  sentiment           String?   // very_bullish, bullish, neutral, bearish, very_bearish
-  
-  // Subnet classification (legacy — kept for backward compatibility with existing data)
-  subnetId            Int?      @map("subnet_id")
-  subnetName          String?   @map("subnet_name")
+  id      Int    @id @default(autoincrement())
+  tweetId BigInt @unique @map("tweet_id")
 
-  // Asset classification (new — replaces subnet classification)
-  assetId             Int?      @map("asset_id")
-  assetSymbol         String?   @map("asset_symbol")
-  
-  // Content analysis
-  contentType         String?   @map("content_type")
-  technicalQuality    String?   @map("technical_quality")
-  marketAnalysis      String?   @map("market_analysis")
-  impactPotential     String?   @map("impact_potential")
-  relevanceConfidence String?   @map("relevance_confidence")
-  
-  // Full analysis data (JSON blob)
-  analysisData        Json?     @map("analysis_data") @db.JsonB
+  sentiment String?
 
-  // Miner attribution
-  minerHotkey         String?   @map("miner_hotkey")
+  subnetId   Int?    @map("subnet_id")
+  subnetName String? @map("subnet_name")
 
-  // Timestamps
-  analyzedAt          DateTime  @default(now()) @map("analyzed_at") @db.Timestamptz
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  assetId     Int?    @map("asset_id")
+  assetSymbol String? @map("asset_symbol")
 
-  // Relations
-  tweet               Tweet     @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  contentType         String? @map("content_type")
+  technicalQuality    String? @map("technical_quality")
+  marketAnalysis      String? @map("market_analysis")
+  impactPotential     String? @map("impact_potential")
+  relevanceConfidence String? @map("relevance_confidence")
+
+  analysisData Json? @map("analysis_data") @db.JsonB
+
+  minerHotkey String? @map("miner_hotkey")
+
+  analyzedAt DateTime @default(now()) @map("analyzed_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@index([sentiment], name: "idx_tweet_analysis_sentiment")
   @@index([subnetId], name: "idx_tweet_analysis_subnet")
@@ -211,23 +196,22 @@ model TweetAnalysis {
   @@map("tweet_analysis")
 }
 
-/// Media attachments on tweets
+/// Legacy, frozen.
 model TweetMedia {
   id          Int     @id @default(autoincrement())
   tweetId     BigInt  @map("tweet_id")
   mediaId     String  @map("media_id")
   mediaKey    String? @map("media_key")
-  type        String? // photo, video, animated_gif
+  type        String?
   url         String?
   mediaUrl    String? @map("media_url")
   displayUrl  String? @map("display_url")
   expandedUrl String? @map("expanded_url")
   width       Int?
   height      Int?
-  durationMs  Int?    @map("duration_ms") // for video
+  durationMs  Int?    @map("duration_ms")
   altText     String? @map("alt_text")
 
-  // Relations
   tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@unique([tweetId, mediaId])
@@ -236,7 +220,7 @@ model TweetMedia {
   @@map("tweet_media")
 }
 
-/// User mentions in tweets
+/// Legacy, frozen.
 model TweetMention {
   id         Int     @id @default(autoincrement())
   tweetId    BigInt  @map("tweet_id")
@@ -246,7 +230,6 @@ model TweetMention {
   startIndex Int?    @map("start_index")
   endIndex   Int?    @map("end_index")
 
-  // Relations
   tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@unique([tweetId, userId])
@@ -256,7 +239,7 @@ model TweetMention {
   @@map("tweet_mentions")
 }
 
-/// Hashtags in tweets
+/// Legacy, frozen.
 model TweetHashtag {
   id         Int    @id @default(autoincrement())
   tweetId    BigInt @map("tweet_id")
@@ -264,7 +247,6 @@ model TweetHashtag {
   startIndex Int?   @map("start_index")
   endIndex   Int?   @map("end_index")
 
-  // Relations
   tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@unique([tweetId, tag])
@@ -273,7 +255,7 @@ model TweetHashtag {
   @@map("tweet_hashtags")
 }
 
-/// URLs in tweets
+/// Legacy, frozen.
 model TweetUrl {
   id          Int     @id @default(autoincrement())
   tweetId     BigInt  @map("tweet_id")
@@ -283,14 +265,13 @@ model TweetUrl {
   startIndex  Int?    @map("start_index")
   endIndex    Int?    @map("end_index")
 
-  // Relations
   tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@index([tweetId], name: "idx_tweet_urls_tweet")
   @@map("tweet_urls")
 }
 
-/// Cashtags/symbols in tweets
+/// Legacy, frozen.
 model TweetSymbol {
   id         Int    @id @default(autoincrement())
   tweetId    BigInt @map("tweet_id")
@@ -298,7 +279,6 @@ model TweetSymbol {
   startIndex Int?   @map("start_index")
   endIndex   Int?   @map("end_index")
 
-  // Relations
   tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@unique([tweetId, symbol])
@@ -307,7 +287,7 @@ model TweetSymbol {
   @@map("tweet_symbols")
 }
 
-/// Log of websocket stream events received
+/// Legacy, frozen.
 model StreamEvent {
   id         Int      @id @default(autoincrement())
   eventType  String   @map("event_type")
@@ -323,11 +303,11 @@ model StreamEvent {
   @@map("stream_events")
 }
 
-/// Scoring records for tweet validation
+/// Legacy, frozen.
 model Scoring {
   id              Int       @id @default(autoincrement())
   tweetId         BigInt    @map("tweet_id")
-  status          String    @default("pending") // pending, in_progress, completed
+  status          String    @default("pending")
   startTime       DateTime? @map("start_time") @db.Timestamptz
   validatorHotkey String?   @map("validator_hotkey")
   score           Float?
@@ -335,7 +315,6 @@ model Scoring {
   minerHotkey     String?   @map("miner_hotkey")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  // Relations
   tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
 
   @@index([tweetId], name: "idx_scoring_tweet")
@@ -345,7 +324,11 @@ model Scoring {
   @@map("scoring")
 }
 
-/// Validator penalties
+// ============================================================================
+// Validator Models
+// ============================================================================
+
+/// Legacy, frozen.
 model Penalty {
   id        Int      @id @default(autoincrement())
   hotkey    String
@@ -357,7 +340,7 @@ model Penalty {
   @@map("penalties")
 }
 
-/// Validator rewards
+/// Legacy, frozen.
 model Reward {
   id         Int      @id @default(autoincrement())
   startBlock Int      @map("start_block")
@@ -371,7 +354,7 @@ model Reward {
   @@map("rewards")
 }
 
-/// Blacklisted validator hotkeys
+/// Blacklisted hotkeys.
 model BlacklistedHotkey {
   hotkey    String   @id
   reason    String?
@@ -380,64 +363,61 @@ model BlacklistedHotkey {
   @@map("blacklisted_hotkeys")
 }
 
-/// Historical TAO/USD price data
+/// Legacy, frozen.
 model TaoUsdPrice {
-  id                    Int      @id @default(autoincrement())
-  taoPrice              Float    @map("tao_price")
-  date                  DateTime @default(now()) @db.Timestamptz
-  
-  // Additional market data (optional - populated when using CoinGecko)
-  marketCap             Float?   @map("market_cap")
-  volume24h             Float?   @map("volume_24h")
-  priceChange24h        Float?   @map("price_change_24h")
-  marketCapChange24h    Float?   @map("market_cap_change_24h")
-  priceChange7d         Float?   @map("price_change_7d")
-  priceChange30d        Float?   @map("price_change_30d")
-  source                String?  // "coingecko" or "taostats"
+  id       Int      @id @default(autoincrement())
+  taoPrice Float    @map("tao_price")
+  date     DateTime @default(now()) @db.Timestamptz
+
+  marketCap          Float?  @map("market_cap")
+  volume24h          Float?  @map("volume_24h")
+  priceChange24h     Float?  @map("price_change_24h")
+  marketCapChange24h Float?  @map("market_cap_change_24h")
+  priceChange7d      Float?  @map("price_change_7d")
+  priceChange30d     Float?  @map("price_change_30d")
+  source             String?
 
   @@index([date], name: "idx_tao_usd_price_date")
   @@map("tao_usd_price")
 }
 
 // ============================================================================
-// Telegram Models
+// Telegram Models (legacy, frozen)
 // ============================================================================
 
-/// Telegram groups being monitored
+/// Legacy, frozen.
 model TelegramGroup {
-  id          String             @id @default(cuid())
-  telegramId  BigInt             @unique @map("telegram_id")
+  id          String    @id @default(cuid())
+  telegramId  BigInt    @unique @map("telegram_id")
   title       String
-  isMonitored Boolean            @default(false) @map("is_monitored")
-  isMuted     Boolean            @default(false) @map("is_muted")
-  mutedUntil  DateTime?          @map("muted_until")
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
-  
-  // Relations
-  messages    TelegramMessage[]
+  isMonitored Boolean   @default(false) @map("is_monitored")
+  isMuted     Boolean   @default(false) @map("is_muted")
+  mutedUntil  DateTime? @map("muted_until")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  messages TelegramMessage[]
 
   @@index([telegramId], name: "idx_telegram_groups_telegram_id")
   @@index([isMonitored], name: "idx_telegram_groups_monitored")
   @@map("telegram_groups")
 }
 
-/// Telegram messages
+/// Legacy, frozen.
 model TelegramMessage {
-  id             String                    @id @default(cuid())
-  telegramId     BigInt                    @unique @map("telegram_id")
-  groupId        String                    @map("group_id")
-  senderId       BigInt                    @map("sender_id")
-  senderUsername String?                   @map("sender_username")
-  senderName     String                    @map("sender_name")
+  id             String   @id @default(cuid())
+  telegramId     BigInt   @unique @map("telegram_id")
+  groupId        String   @map("group_id")
+  senderId       BigInt   @map("sender_id")
+  senderUsername String?  @map("sender_username")
+  senderName     String   @map("sender_name")
   content        String
-  replyToId      BigInt?                   @map("reply_to_id")
-  createdAt      DateTime                  @default(now()) @map("created_at")
-  
-  // Relations
-  group          TelegramGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  scorings       TelegramScoring[]
-  analysis       TelegramMessageAnalysis?
+  replyToId      BigInt?  @map("reply_to_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  group    TelegramGroup            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  scorings TelegramScoring[]
+  analysis TelegramMessageAnalysis?
 
   @@index([groupId], name: "idx_telegram_messages_group")
   @@index([createdAt], name: "idx_telegram_messages_created")
@@ -446,41 +426,33 @@ model TelegramMessage {
   @@map("telegram_messages")
 }
 
-/// Telegram message analysis/classification results
+/// Legacy, frozen.
 model TelegramMessageAnalysis {
-  id                  Int              @id @default(autoincrement())
-  messageId           String           @unique @map("message_id")
-  
-  // Sentiment analysis
-  sentiment           String?          // very_bullish, bullish, neutral, bearish, very_bearish
-  
-  // Subnet classification (legacy — kept for backward compatibility with existing data)
-  subnetId            Int?             @map("subnet_id")
-  subnetName          String?          @map("subnet_name")
+  id        Int    @id @default(autoincrement())
+  messageId String @unique @map("message_id")
 
-  // Asset classification (new — replaces subnet classification)
-  assetId             Int?             @map("asset_id")
-  assetSymbol         String?          @map("asset_symbol")
-  
-  // Content analysis
-  contentType         String?          @map("content_type")
-  technicalQuality    String?          @map("technical_quality")
-  marketAnalysis      String?          @map("market_analysis")
-  impactPotential     String?          @map("impact_potential")
-  relevanceConfidence String?          @map("relevance_confidence")
-  
-  // Full analysis data (JSON blob)
-  analysisData        Json?            @map("analysis_data") @db.JsonB
+  sentiment String?
 
-  // Miner attribution
-  minerHotkey         String?          @map("miner_hotkey")
+  subnetId   Int?    @map("subnet_id")
+  subnetName String? @map("subnet_name")
 
-  // Timestamps
-  analyzedAt          DateTime         @default(now()) @map("analyzed_at")
-  updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at")
+  assetId     Int?    @map("asset_id")
+  assetSymbol String? @map("asset_symbol")
 
-  // Relations
-  message             TelegramMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  contentType         String? @map("content_type")
+  technicalQuality    String? @map("technical_quality")
+  marketAnalysis      String? @map("market_analysis")
+  impactPotential     String? @map("impact_potential")
+  relevanceConfidence String? @map("relevance_confidence")
+
+  analysisData Json? @map("analysis_data") @db.JsonB
+
+  minerHotkey String? @map("miner_hotkey")
+
+  analyzedAt DateTime @default(now()) @map("analyzed_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  message TelegramMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([sentiment], name: "idx_telegram_analysis_sentiment")
   @@index([subnetId], name: "idx_telegram_analysis_subnet")
@@ -489,20 +461,19 @@ model TelegramMessageAnalysis {
   @@map("telegram_message_analysis")
 }
 
-/// Scoring records for telegram message validation
+/// Legacy, frozen.
 model TelegramScoring {
-  id              Int              @id @default(autoincrement())
-  messageId       String           @map("message_id")
-  status          String           @default("pending") // pending, in_progress, completed
-  startTime       DateTime?        @map("start_time")
-  validatorHotkey String?          @map("validator_hotkey")
+  id              Int       @id @default(autoincrement())
+  messageId       String    @map("message_id")
+  status          String    @default("pending")
+  startTime       DateTime? @map("start_time")
+  validatorHotkey String?   @map("validator_hotkey")
   score           Float?
-  epoch           Int?             @map("epoch")
-  minerHotkey     String?          @map("miner_hotkey")
-  createdAt       DateTime         @default(now()) @map("created_at")
+  epoch           Int?      @map("epoch")
+  minerHotkey     String?   @map("miner_hotkey")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
-  // Relations
-  message         TelegramMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message TelegramMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId], name: "idx_telegram_scoring_message")
   @@index([status], name: "idx_telegram_scoring_status")
@@ -515,21 +486,21 @@ model TelegramScoring {
 // News Article Models
 // ============================================================================
 
-/// News articles from RSS feeds and CC-NEWS WARC archives
+/// Legacy, frozen.
 model NewsArticle {
-  id          Int       @id @default(autoincrement())
-  url         String    @unique
-  title       String
-  summary     String?
-  content     String?
-  rawHtml     String?   @map("raw_html")
-  published   DateTime? @db.Timestamptz
-  source      String
-  topic       String?
-  extra       Json?     @db.JsonB
-  ruleTag     String?   @map("rule_tag")
-  sourceType  String    @default("rss") @map("source_type")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id         Int       @id @default(autoincrement())
+  url        String    @unique
+  title      String
+  summary    String?
+  content    String?
+  rawHtml    String?   @map("raw_html")
+  published  DateTime? @db.Timestamptz
+  source     String
+  topic      String?
+  extra      Json?     @db.JsonB
+  ruleTag    String?   @map("rule_tag")
+  sourceType String    @default("rss") @map("source_type")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   scorings       NewsArticleScoring[]
   analysis       NewsArticleAnalysis?
@@ -543,10 +514,11 @@ model NewsArticle {
   @@map("news_articles")
 }
 
-/// News article analysis/classification results
-/// Additional analyses of the same article from overlap verifier miners.
-/// The canonical analysis stays 1:1 in news_article_analysis; this table is
-/// append-only raw material for comparison, consensus, and display.
+// ============================================================================
+// Article Analysis Models (legacy, frozen)
+// ============================================================================
+
+/// Legacy, frozen.
 model AnalysisVariant {
   id           Int      @id @default(autoincrement())
   articleId    Int      @map("article_id")
@@ -559,34 +531,34 @@ model AnalysisVariant {
   @@map("analysis_variants")
 }
 
+/// Legacy, frozen.
 model NewsArticleAnalysis {
-  id                  Int          @id @default(autoincrement())
-  articleId           Int          @unique @map("article_id")
+  id                  Int      @id @default(autoincrement())
+  articleId           Int      @unique @map("article_id")
   sentiment           String?
-  sectorId            Int?         @map("sector_id")
-  sectorSymbol        String?      @map("sector_symbol")
-  contentType         String?      @map("content_type")
-  technicalQuality    String?      @map("technical_quality")
-  marketAnalysis      String?      @map("market_analysis")
-  impactPotential     String?      @map("impact_potential")
-  relevanceConfidence String?      @map("relevance_confidence")
-  mentionedAssets     Json?        @map("mentioned_assets") @db.JsonB
-  analysisData        Json?        @map("analysis_data") @db.JsonB
-  minerHotkey         String?      @map("miner_hotkey")
-  analyzedAt          DateTime     @default(now()) @map("analyzed_at") @db.Timestamptz
-  updatedAt           DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  sectorId            Int?     @map("sector_id")
+  sectorSymbol        String?  @map("sector_symbol")
+  contentType         String?  @map("content_type")
+  technicalQuality    String?  @map("technical_quality")
+  marketAnalysis      String?  @map("market_analysis")
+  impactPotential     String?  @map("impact_potential")
+  relevanceConfidence String?  @map("relevance_confidence")
+  mentionedAssets     Json?    @map("mentioned_assets") @db.JsonB
+  analysisData        Json?    @map("analysis_data") @db.JsonB
+  minerHotkey         String?  @map("miner_hotkey")
+  analyzedAt          DateTime @default(now()) @map("analyzed_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  article             NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  // V2 ArticleIntelligence indexed fields
-  impactLevel         String?      @map("impact_level")
-  factualConfidence   String?      @map("factual_confidence")
-  eventType           String?      @map("event_type")
-  eventDate           DateTime?    @map("event_date") @db.Date
-  contentHash         String?      @map("content_hash")
-  primaryGeo          String?      @map("primary_geo")
-  overallSentimentScore Float?     @map("overall_sentiment_score")
-  narrativeEmbedding    Float[]    @default([]) @map("narrative_embedding")
+  impactLevel           String?   @map("impact_level")
+  factualConfidence     String?   @map("factual_confidence")
+  eventType             String?   @map("event_type")
+  eventDate             DateTime? @map("event_date") @db.Date
+  contentHash           String?   @map("content_hash")
+  primaryGeo            String?   @map("primary_geo")
+  overallSentimentScore Float?    @map("overall_sentiment_score")
+  narrativeEmbedding    Float[]   @default([]) @map("narrative_embedding")
 
   @@index([sentiment], name: "idx_news_analysis_sentiment")
   @@index([sectorId], name: "idx_news_analysis_sector")
@@ -598,81 +570,84 @@ model NewsArticleAnalysis {
   @@map("news_article_analysis")
 }
 
-/// Scoring records for news article validation
+/// Legacy, frozen.
 model NewsArticleScoring {
-  id              Int          @id @default(autoincrement())
-  articleId       Int          @map("article_id")
-  status          String       @default("pending")
-  startTime       DateTime?    @map("start_time") @db.Timestamptz
-  validatorHotkey String?      @map("validator_hotkey")
+  id              Int       @id @default(autoincrement())
+  articleId       Int       @map("article_id")
+  status          String    @default("pending")
+  startTime       DateTime? @map("start_time") @db.Timestamptz
+  validatorHotkey String?   @map("validator_hotkey")
   score           Float?
-  epoch           Int?         @map("epoch")
-  minerHotkey     String?      @map("miner_hotkey")
-  // Denormalized copy of news_articles.title, populated at insert. Lets the
-  // unscored-article title dedup probe an index on this table instead of a
-  // whole-table anti-join over news_articles (the /articles/unscored pool
-  // exhaustion). Article titles are immutable post-ingest, so this never drifts.
+  epoch           Int?      @map("epoch")
+  minerHotkey     String?   @map("miner_hotkey")
   title           String?
-  // Denormalized copy of news_articles.published, same immutability. Lets path A
-  // order the pending pool by published via an index (status, published) instead of
-  // sorting the whole pool before LIMIT — so path A halts at 150 regardless of how
-  // large pending grows (required once ccnews routes all inflow into pending).
-  published       DateTime?    @db.Timestamptz
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  published       DateTime? @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  article         NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@index([articleId], name: "idx_news_scoring_article")
   @@index([status], name: "idx_news_scoring_status")
   @@index([validatorHotkey], name: "idx_news_scoring_validator")
   @@index([status, startTime], name: "idx_news_scoring_status_start_time")
-  // Supports the title dedup in get_unscored_articles: path B probes title,
-  // path A probes (title, status). Created CONCURRENTLY out-of-band — see the
-  // migration runbook. NOTE: kept in sync with the DB index built concurrently.
   @@index([title, status], name: "idx_news_scoring_title_status")
-  // NOTE: path A's pending pick is served by a hand-built PARTIAL index that Prisma
-  // can't express — `(published DESC NULLS LAST, id DESC) WHERE status='pending'`
-  // (idx_scoring_pending_published), created CONCURRENTLY. The null-ordering and the
-  // WHERE both matter: they're what let the planner index-scan pending in published
-  // order and halt at LIMIT 150 instead of sorting the whole pool. Built out-of-band
-  // in backfill_scoring_published.sql; not managed here.
   @@map("news_article_scoring")
 }
 
 // ============================================================================
-// Event & Narrative System (ArticleIntelligence V2)
+// Event and Narrative Models (legacy, frozen)
 // ============================================================================
 
-/// Canonical events — groups of articles about the same real-world event
+/// Legacy, frozen.
 model Event {
-  id              Int       @id @default(autoincrement())
-  fingerprint     String    @unique
-  eventType       String    @map("event_type")
-  canonicalTitle  String    @map("canonical_title")
-  eventDate       DateTime? @map("event_date") @db.Date
-  sectorId        Int?      @map("sector_id")
-  sectorSymbol    String?   @map("sector_symbol")
-  articleCount    Int       @default(1) @map("article_count")
+  id              Int                         @id @default(autoincrement())
+  fingerprint     String                      @unique
+  eventType       String                      @map("event_type")
+  canonicalTitle  String                      @map("canonical_title")
+  eventDate       DateTime?                   @map("event_date") @db.Date
+  sectorId        Int?                        @map("sector_id")
+  sectorSymbol    String?                     @map("sector_symbol")
+  articleCount    Int                         @default(1) @map("article_count")
   sentiment       String?
-  impactPotential String?   @map("impact_potential")
-  entities        Json?     @db.JsonB
+  impactPotential String?                     @map("impact_potential")
+  entities        Json?                       @db.JsonB
   summary         String?
-  titleEmbedding  Float[]   @default([]) @map("title_embedding")
-  firstSeenAt     DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz
-  lastArticleAt   DateTime  @default(now()) @map("last_article_at") @db.Timestamptz
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  titleEmbedding  Float[]                     @default([]) @map("title_embedding")
+  category        String?
+  identityKey     String?                     @unique @map("identity_key")
+  firstClaimId    BigInt?                     @unique @map("first_claim_id")
+  stage           String?
+  placeIso2       String?                     @map("place_iso2")
+  placeAdmin1     String?                     @map("place_admin1")
+  confidence      String                      @default("reported")
+  publishAt       DateTime?                   @map("publish_at") @db.Timestamptz(3)
+  officialMatch   Boolean                     @default(false) @map("official_match")
+  storylineId     Int?                        @map("storyline_id")
+  hold            String?
+  marked          String?
+  embedding       Unsupported("vector(384)")?
+  firstSeenAt     DateTime                    @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastArticleAt   DateTime                    @default(now()) @map("last_article_at") @db.Timestamptz
+  updatedAt       DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  articles        EventArticle[]
-  narrativeLinks  EventNarrative[]
+  firstClaim     Claim?           @relation("EventFirstClaim", fields: [firstClaimId], references: [id], onDelete: SetNull)
+  articles       EventArticle[]
+  narrativeLinks EventNarrative[]
+  claims         Claim[]          @relation("EventClaims")
+  entityLinks    EventEntity[]
+  facts          EventFact[]
+  stages         EventStage[]
+  ledgerEntries  LedgerEntry[]
 
   @@index([eventType], name: "idx_events_type")
+  @@index([category, eventDate], name: "idx_events_category_date")
   @@index([eventDate], name: "idx_events_date")
   @@index([sectorId], name: "idx_events_sector")
   @@index([lastArticleAt], name: "idx_events_last_article")
   @@map("events")
 }
 
-/// Join table: articles <-> events (many-to-many)
+/// Legacy, frozen.
 model EventArticle {
   id        Int      @id @default(autoincrement())
   eventId   Int      @map("event_id")
@@ -680,8 +655,8 @@ model EventArticle {
   role      String   @default("reporting")
   addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz
 
-  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  article   NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  event   Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  article NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, articleId])
   @@index([eventId], name: "idx_event_articles_event")
@@ -689,47 +664,47 @@ model EventArticle {
   @@map("event_articles")
 }
 
-/// Market narratives — long-running themes across many articles/events
+/// Legacy, frozen.
 model Narrative {
-  id              Int       @id @default(autoincrement())
-  slug            String    @unique
-  name            String
-  description     String?
-  keywords        Json      @db.JsonB
-  sectorIds       Json?     @map("sector_ids") @db.JsonB
-  sentimentBias   String?   @map("sentiment_bias")
-  phase           String    @default("emerging")
-  articleCount    Int       @default(0) @map("article_count")
-  eventCount      Int       @default(0) @map("event_count")
-  sentimentScore  Float?    @map("sentiment_score")
-  momentum        Float?
-  source          String    @default("seed")
-  embedding       Float[]   @default([])
-  embeddingModel  String?   @map("embedding_model")
-  startDate       DateTime? @map("start_date") @db.Date
-  lastArticleAt   DateTime? @map("last_article_at") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id             Int       @id @default(autoincrement())
+  slug           String    @unique
+  name           String
+  description    String?
+  keywords       Json      @db.JsonB
+  sectorIds      Json?     @map("sector_ids") @db.JsonB
+  sentimentBias  String?   @map("sentiment_bias")
+  phase          String    @default("emerging")
+  articleCount   Int       @default(0) @map("article_count")
+  eventCount     Int       @default(0) @map("event_count")
+  sentimentScore Float?    @map("sentiment_score")
+  momentum       Float?
+  source         String    @default("seed")
+  embedding      Float[]   @default([])
+  embeddingModel String?   @map("embedding_model")
+  startDate      DateTime? @map("start_date") @db.Date
+  lastArticleAt  DateTime? @map("last_article_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  articleLinks    NarrativeArticle[]
-  eventLinks      EventNarrative[]
+  articleLinks NarrativeArticle[]
+  eventLinks   EventNarrative[]
 
   @@index([phase], name: "idx_narratives_phase")
   @@index([lastArticleAt], name: "idx_narratives_last_article")
   @@map("narratives")
 }
 
-/// Join table: articles <-> narratives
+/// Legacy, frozen.
 model NarrativeArticle {
-  id             Int       @id @default(autoincrement())
-  narrativeId    Int       @map("narrative_id")
-  articleId      Int       @map("article_id")
-  confidence     Float     @default(1.0)
-  matchedKeyword String?   @map("matched_keyword")
-  addedAt        DateTime  @default(now()) @map("added_at") @db.Timestamptz
+  id             Int      @id @default(autoincrement())
+  narrativeId    Int      @map("narrative_id")
+  articleId      Int      @map("article_id")
+  confidence     Float    @default(1.0)
+  matchedKeyword String?  @map("matched_keyword")
+  addedAt        DateTime @default(now()) @map("added_at") @db.Timestamptz
 
-  narrative      Narrative   @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
-  article        NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  narrative Narrative   @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  article   NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@unique([narrativeId, articleId])
   @@index([narrativeId], name: "idx_narrative_articles_narrative")
@@ -737,15 +712,15 @@ model NarrativeArticle {
   @@map("narrative_articles")
 }
 
-/// Join table: events <-> narratives
+/// Legacy, frozen.
 model EventNarrative {
-  id           Int       @id @default(autoincrement())
-  eventId      Int       @map("event_id")
-  narrativeId  Int       @map("narrative_id")
-  addedAt      DateTime  @default(now()) @map("added_at") @db.Timestamptz
+  id          Int      @id @default(autoincrement())
+  eventId     Int      @map("event_id")
+  narrativeId Int      @map("narrative_id")
+  addedAt     DateTime @default(now()) @map("added_at") @db.Timestamptz
 
-  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  narrative    Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  narrative Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, narrativeId])
   @@index([eventId], name: "idx_event_narratives_event")
@@ -753,14 +728,14 @@ model EventNarrative {
   @@map("event_narratives")
 }
 
-/// Tracks daily narrative intensity for time-series charting
+/// Legacy, frozen.
 model NarrativeIntensity {
-  id            Int      @id @default(autoincrement())
-  narrativeId   Int      @map("narrative_id")
-  date          DateTime @db.Date
-  articleCount  Int      @default(0) @map("article_count")
-  avgSentiment  Float?   @map("avg_sentiment")
-  sourceCount   Int      @default(0) @map("source_count")
+  id           Int      @id @default(autoincrement())
+  narrativeId  Int      @map("narrative_id")
+  date         DateTime @db.Date
+  articleCount Int      @default(0) @map("article_count")
+  avgSentiment Float?   @map("avg_sentiment")
+  sourceCount  Int      @default(0) @map("source_count")
 
   @@unique([narrativeId, date])
   @@index([narrativeId], name: "idx_narrative_intensity_narrative")
@@ -768,23 +743,23 @@ model NarrativeIntensity {
   @@map("narrative_intensity")
 }
 
-/// Candidate narratives waiting for auto-discovery threshold
+/// Legacy, frozen.
 model NarrativeCandidate {
-  id            Int      @id @default(autoincrement())
-  keyword       String   @unique
-  articleCount  Int      @default(1) @map("article_count")
-  sourceCount   Int      @default(1) @map("source_count")
-  firstSeenAt   DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
-  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
-  promoted      Boolean  @default(false)
-  embedding     Float[]  @default([])
+  id           Int      @id @default(autoincrement())
+  keyword      String   @unique
+  articleCount Int      @default(1) @map("article_count")
+  sourceCount  Int      @default(1) @map("source_count")
+  firstSeenAt  DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt   DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  promoted     Boolean  @default(false)
+  embedding    Float[]  @default([])
 
   @@index([keyword], name: "idx_narrative_candidates_keyword")
   @@index([articleCount], name: "idx_narrative_candidates_count")
   @@map("narrative_candidates")
 }
 
-/// Canonical per-item scoring paper trail. One row per (resource, validator, epoch).
+/// Legacy, frozen.
 model ScoreVerdict {
   id                Int      @id @default(autoincrement())
   resourceType      String   @map("resource_type")
@@ -807,7 +782,7 @@ model ScoreVerdict {
   @@map("score_verdict")
 }
 
-/// Signed per-(validator, epoch) snapshot — the broadcast payload.
+/// Signed points per (signer, epoch).
 model Attestation {
   id              Int      @id @default(autoincrement())
   validatorHotkey String   @map("validator_hotkey")
@@ -816,13 +791,16 @@ model Attestation {
   totalPoints     Float    @map("total_points")
   merkleRoot      String   @map("merkle_root")
   signature       String
+  capacity        Float?
+  pools           Json?
+  leafCount       Int?     @map("leaf_count")
   issuedAt        DateTime @default(now()) @map("issued_at") @db.Timestamptz
 
   @@unique([validatorHotkey, epoch], name: "uq_attestation_validator_epoch")
   @@map("attestation")
 }
 
-/// Receiver-flagged discrepancy; drives 2+ report consensus → blacklist.
+/// Legacy, frozen.
 model BroadcastReport {
   id             Int      @id @default(autoincrement())
   reporterHotkey String   @map("reporter_hotkey")
@@ -837,12 +815,7 @@ model BroadcastReport {
   @@map("broadcast_report")
 }
 
-/// Display-only penalty attribution for the miner dashboard. DECOUPLED from the
-/// consensus pipeline by design: this table is never read by get_attestation,
-/// get_verdicts, write_verdict, or merkle_root, and carries no signatures, hashes,
-/// or points. It exists purely to explain to a miner why a penalty happened. The
-/// authoritative number already reaches the miner (signed) via the Score synapse.
-/// Do NOT fold this into score_verdict or any attestation/Merkle path.
+/// Legacy, frozen.
 model PenaltyDetail {
   id              Int      @id @default(autoincrement())
   minerHotkey     String   @map("miner_hotkey")
@@ -850,21 +823,19 @@ model PenaltyDetail {
   epoch           Int
   resourceType    String   @map("resource_type")
   resourceId      String   @map("resource_id")
-  cause           String // classification_mismatch | timeout | missing_classification | needs_update
+  cause           String
   failedFields    Json?    @map("failed_fields")
   minerValues     Json?    @map("miner_values")
   validatorVals   Json?    @map("validator_values")
   postPreview     String?  @map("post_preview")
-  score           Float?   // numeric score behind the rejection (e.g. composite vs 0.65, summary cosine vs 0.40)
+  score           Float?
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([minerHotkey, epoch], name: "idx_penalty_detail_miner_epoch")
   @@map("penalty_detail")
 }
 
-// Reputation tracking telemetry. DECOUPLED from consensus/scoring — display/monitoring
-// only, never read by attestation/verdict/merkle. Both validators push, so rows can be
-// compared per (miner, epoch) across validator_hotkey for agreement.
+/// Legacy, frozen.
 model ReputationSnapshot {
   id              BigInt   @id @default(autoincrement())
   validatorHotkey String   @map("validator_hotkey")
@@ -881,21 +852,17 @@ model ReputationSnapshot {
   @@map("reputation_snapshot")
 }
 
-/// Display-only per-miner dispatch/cooldown event log for the miner dashboard.
-/// DECOUPLED from consensus — never read by attestation/verdict/merkle. Append-only;
-/// records discrete dispatch-state transitions (parked/unparked/batch_size_changed/
-/// reward_zeroed/chronic_timeout) so a miner can see WHEN and WHY their dispatch state
-/// changed. occurredAt is the validator-supplied event time; createdAt is server ingest.
+/// Legacy, frozen.
 model MinerEvent {
   id              BigInt   @id @default(autoincrement())
   validatorHotkey String   @map("validator_hotkey")
   minerHotkey     String   @map("miner_hotkey")
-  eventType       String   @map("event_type") // parked | unparked | batch_size_changed | reward_zeroed | chronic_timeout
-  streak          String?  // which streak tripped a park: faith | failstreak | timeout
-  shadow          Boolean? // park emitted in shadow mode (logged, not enforced)
+  eventType       String   @map("event_type")
+  streak          String?
+  shadow          Boolean?
   epoch           Int?
-  reason          String?  // short human-readable detail
-  detail          Json?    // event-specific numerics (from/to, last_faith, cooldown_s, level, points, penalties)
+  reason          String?
+  detail          Json?
   occurredAt      DateTime @map("occurred_at") @db.Timestamptz
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -921,9 +888,7 @@ model MechanismProfile {
   @@map("mechanism_profile")
 }
 
-/// Capacity-controller steps proposed by validators. INFORMATIONAL ONLY: a proposal
-/// never changes capacity. Capacity moves when an operator publishes a profile carrying
-/// the new value, so this is a record of what validators observed, not an input.
+/// Legacy, frozen.
 model ControllerProposal {
   id              BigInt   @id @default(autoincrement())
   validatorHotkey String   @map("validator_hotkey")
@@ -935,4 +900,583 @@ model ControllerProposal {
 
   @@index([epoch], name: "idx_controller_proposal_epoch")
   @@map("controller_proposal")
+}
+
+// ============================================================================
+// Event lane
+// ============================================================================
+
+/// Signed miner claim as received.
+model Claim {
+  id         BigInt   @id @default(autoincrement())
+  hotkey     String
+  signature  String
+  nonce      String
+  bodyHash   String   @map("body_hash")
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+  kind       String
+  category   String
+  eventType  String?  @map("event_type")
+  payload    Json     @db.JsonB
+  sourceUrl  String   @map("source_url")
+  sourceId   Int?     @map("source_id")
+  status     String   @default("received")
+  reason     String?
+  eventId    Int?     @map("event_id")
+
+  signedAt         Int?      @map("signed_at")
+  receiptBucket    BigInt?   @map("receipt_bucket")
+  body             String?
+  novelty          String?
+  route            String?
+  pendingOfEventId Int?      @map("pending_of_event_id")
+  docHash          String?   @map("doc_hash")
+  strike           Boolean   @default(false)
+  strikeWeight     Int       @default(1) @map("strike_weight")
+  held             Boolean   @default(false)
+  trust            Float?
+  trustBand        String?   @map("trust_band")
+  wrong            String?
+  coldkey          String?
+  verifiedAt       DateTime? @map("verified_at") @db.Timestamptz(3)
+  judgedAt         DateTime? @map("judged_at") @db.Timestamptz(3)
+  settleAt         DateTime? @map("settle_at") @db.Timestamptz(3)
+
+  source        Source?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  event         Event?          @relation("EventClaims", fields: [eventId], references: [id], onDelete: SetNull)
+  firstOf       Event?          @relation("EventFirstClaim")
+  fetches       SourceFetch[]
+  facts         EventFact[]
+  stages        EventStage[]
+  ledgerEntries LedgerEntry[]
+  answerKeys    AnswerKeyItem[]
+  accuracy      AccuracyCheck[]
+  jobs          Job[]
+  reverifies    ReverifyResult[]
+
+  @@unique([hotkey, nonce], name: "uq_claim_hotkey_nonce")
+  @@unique([hotkey, bodyHash], name: "uq_claim_hotkey_body")
+  @@index([bodyHash], name: "idx_claim_body_hash")
+  @@index([status, receiptBucket], name: "idx_claim_status_bucket")
+  @@index([judgedAt], name: "idx_claim_judged")
+  @@index([status, receivedAt], name: "idx_claim_status_received")
+  @@index([hotkey, receivedAt], name: "idx_claim_hotkey_received")
+  @@index([eventId], name: "idx_claim_event")
+  @@map("claim")
+}
+
+/// Canonical entity keyed by an external identifier scheme.
+model Entity {
+  id         Int      @id @default(autoincrement())
+  scheme     String
+  externalId String   @map("external_id")
+  name       String
+  kind       String?
+  aliases    String[] @default([])
+  // Other identifiers for the same entity, as "<scheme>:<id>".
+  xrefs      String[] @default([])
+  // Official website (Wikidata P856), for primary-source trust.
+  website    String?
+  // "linked" or "unclear"; registry rows are frozen at `revision`.
+  status     String   @default("linked")
+  // "seed", "override" or "registry".
+  origin     String   @default("seed")
+  revision   String?
+  checkedAt  DateTime? @map("checked_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  events EventEntity[]
+
+  @@unique([scheme, externalId], name: "uq_entity_scheme_external")
+  @@index([name], name: "idx_entity_name")
+  @@map("entity")
+}
+
+model EventEntity {
+  eventId  Int     @map("event_id")
+  entityId Int     @map("entity_id")
+  role     String?
+
+  event  Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, entityId])
+  @@index([entityId], name: "idx_event_entity_entity")
+  @@map("event_entity")
+}
+
+model EventFact {
+  id        BigInt   @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  claimId   BigInt?  @map("claim_id")
+  field     String
+  value     Json     @db.JsonB
+  verified  Boolean  @default(false)
+  slot      String?
+  docHash   String?  @map("doc_hash")
+  status    String   @default("accepted")
+  paid      Boolean  @default(false)
+  sourceUrl String?  @map("source_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  claim Claim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, field], name: "idx_event_fact_event_field")
+  @@index([eventId, slot], name: "idx_event_fact_event_slot")
+  @@index([claimId], name: "idx_event_fact_claim")
+  @@map("event_fact")
+}
+
+/// Stage reached by an event; skipped stages are filled without a claim.
+model EventStage {
+  id      BigInt   @id @default(autoincrement())
+  eventId Int      @map("event_id")
+  stage   String
+  claimId BigInt?  @map("claim_id")
+  at      DateTime @default(now()) @db.Timestamptz(3)
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  claim Claim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, stage], name: "uq_event_stage")
+  @@index([claimId], name: "idx_event_stage_claim")
+  @@map("event_stage")
+}
+
+/// GeoNames places: countries' admin1 regions and the cities under them.
+model GeoPlace {
+  geonamesId Int     @id @map("geonames_id")
+  iso2       String
+  admin1     String?
+  name       String
+  parentId   Int?    @map("parent_id")
+
+  @@index([iso2, admin1], name: "idx_geo_place_admin1")
+  @@map("geo_place")
+}
+
+/// Registered source (domain plus optional path rule).
+model Source {
+  id            Int      @id @default(autoincrement())
+  domain        String
+  host          String   @default("")
+  pathRule      String   @default("") @map("path_rule")
+  ownerId       String?  @map("owner_id")
+  status        String   @default("pending")
+  baseTrust     Float    @default(0) @map("base_trust")
+  categoryTrust Json     @default("{}") @map("category_trust") @db.JsonB
+  // History before this time no longer counts toward earned trust.
+  resetAt       DateTime? @map("reset_at") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  owner  Owner?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  claims Claim[]
+  trusts SourceTrust[]
+  events SourceEvent[]
+
+  @@unique([domain, host, pathRule], name: "uq_source_host_path")
+  @@index([status], name: "idx_source_status")
+  @@map("source")
+}
+
+/// A cluster of sources run by one owner.
+model Owner {
+  id        String   @id
+  evidence  Json     @default("{}") @db.JsonB
+  firstSeen DateTime @default(now()) @map("first_seen") @db.Timestamptz
+
+  sources Source[]
+
+  @@map("owner")
+}
+
+/// Per-category trust for a source, rewritten by the nightly job.
+model SourceTrust {
+  id              Int      @id @default(autoincrement())
+  sourceId        Int      @map("source_id")
+  category        String
+  base            Float    @default(0.1)
+  earned          Float    @default(0.1)
+  penalties       Float    @default(0)
+  trust           Float    @default(0.1)
+  judgedFirsts    Float    @default(0) @map("judged_firsts")
+  confirmedFirsts Float    @default(0) @map("confirmed_firsts")
+  confirmOwners   Int      @default(0) @map("confirm_owners")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, category], name: "uq_source_trust_source_category")
+  @@map("source_trust")
+}
+
+/// A source's part in an event: first, confirm, or a penalty case.
+model SourceEvent {
+  id          BigInt    @id @default(autoincrement())
+  sourceId    Int       @map("source_id")
+  eventId     Int?      @map("event_id")
+  claimId     BigInt?   @map("claim_id")
+  ownerId     String?   @map("owner_id")
+  bySourceId  Int?      @map("by_source_id")
+  role        String
+  category    String
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(3)
+  at          DateTime  @default(now()) @db.Timestamptz(3)
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId], name: "idx_source_event_source")
+  @@index([eventId], name: "idx_source_event_event")
+  @@map("source_event")
+}
+
+model PageRule {
+  id        Int      @id @default(autoincrement())
+  pattern   String   @unique
+  kind      String
+  reason    String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("page_rule")
+}
+
+/// Every change to a source or rule, by the nightly job, a detector or the operator.
+model TrustLog {
+  id       BigInt   @id @default(autoincrement())
+  sourceId Int?     @map("source_id")
+  ruleId   Int?     @map("rule_id")
+  field    String
+  old      String?
+  new      String?
+  reason   String
+  actor    String
+  at       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([sourceId], name: "idx_trust_log_source")
+  @@map("trust_log")
+}
+
+model SourceFetch {
+  id          BigInt   @id @default(autoincrement())
+  claimId     BigInt   @map("claim_id")
+  httpStatus  Int?     @map("http_status")
+  contentHash String?  @map("content_hash")
+  verdict     String
+  spans       Json?    @db.JsonB
+  fetchedAt   DateTime @default(now()) @map("fetched_at") @db.Timestamptz(3)
+
+  finalUrl     String?   @map("final_url")
+  canonicalUrl String?   @map("canonical_url")
+  publishedAt  DateTime? @map("published_at") @db.Timestamptz(3)
+  simhash      BigInt?
+  bytes        Int?
+  pageType     String?   @map("page_type")
+  reason       String?
+  checkResult  Json?     @map("check_result") @db.JsonB
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([claimId], name: "idx_source_fetch_claim")
+  @@map("source_fetch")
+}
+
+/// Legacy, frozen.
+model LlmSpend {
+  id      Int      @id @default(autoincrement())
+  day     DateTime @db.Date
+  purpose String
+  calls   Int      @default(0)
+  usd     Float    @default(0)
+
+  @@unique([day, purpose], name: "uq_llm_spend_day_purpose")
+  @@map("llm_spend")
+}
+
+/// Combined page-judge verdicts, kept once per prompt version, claim and page content.
+model JudgeVerdict {
+  id        BigInt   @id @default(autoincrement())
+  key       String   @unique
+  claimId   BigInt?  @map("claim_id")
+  record    Json     @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("judge_verdict")
+}
+
+/// A claim or a found page waiting for the listed validators' page verdicts.
+model JudgeItem {
+  id        BigInt   @id @default(autoincrement())
+  key       String   @unique
+  claimId   BigInt   @map("claim_id")
+  kind      String
+  hotkey    String?
+  task      Json     @db.JsonB
+  status    String   @default("pending")
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@index([status, id], name: "idx_judge_item_status")
+  @@index([hotkey, createdAt], name: "idx_judge_item_hotkey")
+  @@index([claimId], name: "idx_judge_item_claim")
+  @@map("judge_item")
+}
+
+/// Each validator's signed verdict on a judge item, once per item.
+model JudgePost {
+  id        BigInt   @id @default(autoincrement())
+  itemId    BigInt   @map("item_id")
+  validator String
+  body      String
+  signedAt  BigInt   @map("signed_at")
+  nonce     String
+  signature String
+  postedAt  DateTime @map("posted_at") @db.Timestamptz(3)
+
+  @@unique([itemId, validator])
+  @@index([postedAt], name: "idx_judge_post_posted")
+  @@map("judge_post")
+}
+
+/// A page a validator found for an open scoop.
+model ScoopCandidate {
+  id        BigInt   @id @default(autoincrement())
+  scoopId   BigInt   @map("scoop_id")
+  url       String
+  validator String
+  status    String   @default("queued")
+  reason    String?
+  foundAt   DateTime @map("found_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([scoopId, url])
+  @@map("scoop_candidate")
+}
+
+/// The tie block of each receipt bucket that held more than one claim.
+model TieSeed {
+  bucket    BigInt   @id
+  block     BigInt
+  blockHash String   @map("block_hash")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("tie_seed")
+}
+
+/// Signed claim receipts, one per stored claim: each names the previous receipt's hash.
+model ClaimReceipt {
+  seq        BigInt   @id
+  version    Int
+  prev       String
+  claimId    BigInt   @unique @map("claim_id")
+  hotkey     String
+  bodySha256 String   @map("body_sha256")
+  receivedMs BigInt   @map("received_ms")
+  hash       String   @unique
+  signature  String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("claim_receipt")
+}
+
+/// Append-only points ledger.
+model LedgerEntry {
+  id            BigInt   @id @default(autoincrement())
+  hotkey        String
+  claimId       BigInt?  @map("claim_id")
+  eventId       Int?     @map("event_id")
+  kind          String
+  points        Float
+  epoch         Int
+  reason        String?
+  route         String?
+  category      String?
+  factors       Json?    @db.JsonB
+  receivedMs    BigInt?  @map("received_ms")
+  receiptBucket BigInt?  @map("receipt_bucket")
+  coldkey       String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  claim Claim? @relation(fields: [claimId], references: [id], onDelete: Restrict)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Restrict)
+
+  @@index([epoch, hotkey], name: "idx_ledger_epoch_hotkey")
+  @@index([hotkey, createdAt], name: "idx_ledger_hotkey_created")
+  @@index([claimId], name: "idx_ledger_claim")
+  @@map("ledger_entry")
+}
+
+model AnswerKeyItem {
+  id             BigInt    @id @default(autoincrement())
+  adapter        String
+  externalId     String    @map("external_id")
+  payload        Json      @db.JsonB
+  matchedClaimId BigInt?   @map("matched_claim_id")
+  observedAt     DateTime  @default(now()) @map("observed_at") @db.Timestamptz(3)
+  category       String?
+  eventType      String?   @map("event_type")
+  eventDate      DateTime? @map("event_date") @db.Date
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(3)
+  status         String    @default("open")
+  matchedEventId Int?      @map("matched_event_id")
+  matchedAt      DateTime? @map("matched_at") @db.Timestamptz(3)
+
+  matchedClaim Claim? @relation(fields: [matchedClaimId], references: [id], onDelete: SetNull)
+
+  @@unique([adapter, externalId], name: "uq_answer_key_adapter_external")
+  @@index([matchedClaimId], name: "idx_answer_key_claim")
+  @@index([status, observedAt], name: "idx_answer_key_status_observed")
+  @@map("answer_key_item")
+}
+
+model AccuracyCheck {
+  id       BigInt   @id @default(autoincrement())
+  claimId  BigInt   @map("claim_id")
+  hotkey   String
+  category String
+  kind     String
+  ref      String   @default("")
+  correct  Boolean
+  at       DateTime @default(now()) @db.Timestamptz(3)
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([claimId, kind, ref], name: "uq_accuracy_check_claim_kind_ref")
+  @@index([hotkey, category, at], name: "idx_accuracy_check_hotkey")
+  @@map("accuracy_check")
+}
+
+model MinerAccuracy {
+  id        Int      @id @default(autoincrement())
+  hotkey    String
+  category  String
+  n         Int      @default(0)
+  correct   Int      @default(0)
+  q         Float
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([hotkey, category], name: "uq_miner_accuracy_hotkey_category")
+  @@map("miner_accuracy")
+}
+
+model WebhookSubscription {
+  id         Int      @id @default(autoincrement())
+  ownerId    String   @map("owner_id")
+  url        String
+  secret     String
+  categories String[] @default([])
+  eventTypes String[] @default([]) @map("event_types")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  // Last feed seq queued for delivery.
+  cursor     BigInt   @default(0)
+
+  deliveries WebhookDelivery[]
+
+  @@index([ownerId], name: "idx_webhook_subscription_owner")
+  @@map("webhook_subscription")
+}
+
+model WebhookDelivery {
+  id             BigInt   @id @default(autoincrement())
+  subscriptionId Int      @map("subscription_id")
+  seq            BigInt
+  body           String
+  status         String   @default("pending")
+  attempts       Int      @default(0)
+  nextAt         DateTime @default(now()) @map("next_at") @db.Timestamptz(3)
+  error          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, seq], name: "uq_webhook_delivery_subscription_seq")
+  @@index([status, nextAt], name: "idx_webhook_delivery_status_next")
+  @@map("webhook_delivery")
+}
+
+/// Append-only product feed: event, stage, fact and confidence changes.
+model FeedRecord {
+  seq       BigInt   @id @default(autoincrement())
+  at        DateTime @db.Timestamptz(3)
+  kind      String
+  eventId   Int      @map("event_id")
+  category  String
+  eventType String   @map("event_type")
+  payload   Json     @db.JsonB
+
+  @@index([eventId], name: "idx_feed_record_event")
+  @@index([at], name: "idx_feed_record_at")
+  @@map("feed_record")
+}
+
+/// Product API keys, stored as sha256 hashes.
+model ApiKey {
+  id        Int      @id @default(autoincrement())
+  keyHash   String   @unique @map("key_hash")
+  ownerId   String   @map("owner_id")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("api_key")
+}
+
+/// Work queue for claim processing.
+model Job {
+  id        BigInt    @id @default(autoincrement())
+  kind      String
+  claimId   BigInt?   @map("claim_id")
+  status    String    @default("pending")
+  attempts  Int       @default(0)
+  runAt     DateTime  @default(now()) @map("run_at") @db.Timestamptz(3)
+  lockedAt  DateTime? @map("locked_at") @db.Timestamptz(3)
+  error     String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  claim Claim? @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([status, kind, runAt], name: "idx_job_status_kind_run")
+  @@index([claimId], name: "idx_job_claim")
+  @@map("job")
+}
+
+model CategoryWeight {
+  id          Int      @id @default(autoincrement())
+  weekStart   DateTime @map("week_start") @db.Date
+  category    String
+  weight      Float
+  targetShare Float    @map("target_share")
+  actualShare Float?   @map("actual_share")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([weekStart, category], name: "uq_category_weight_week")
+  @@map("category_weight")
+}
+
+model ReverifyResult {
+  id              Int      @id @default(autoincrement())
+  claimId         BigInt   @map("claim_id")
+  validatorHotkey String   @map("validator_hotkey")
+  epoch           Int
+  verdict         String
+  observed        Json     @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([claimId, validatorHotkey], name: "uq_reverify_claim_validator")
+  @@index([epoch], name: "idx_reverify_epoch")
+  @@map("reverify_result")
+}
+
+model ReverifyPull {
+  id              Int       @id @default(autoincrement())
+  validatorHotkey String    @map("validator_hotkey")
+  epoch           Int
+  at              DateTime  @default(now()) @db.Timestamptz(3)
+  reportedAt      DateTime? @map("reported_at") @db.Timestamptz(3)
+
+  @@index([validatorHotkey, epoch], name: "idx_reverify_pull_validator_epoch")
+  @@map("reverify_pull")
 }

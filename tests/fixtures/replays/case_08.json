@@ -1,0 +1,41 @@
+{
+ "index": [
+  {
+   "kind": "event",
+   "headline": "Dana Okafor named finance minister",
+   "event_type": "appointment",
+   "category": "politics",
+   "stage": "announced",
+   "actors": [
+    {
+     "id_scheme": "other",
+     "id": "dana-okafor",
+     "role": "person",
+     "name": "Dana Okafor"
+    }
+   ],
+   "event_date": "2026-10-13",
+   "facts": [],
+   "source_url": "https://news.example.com/okafor"
+  }
+ ],
+ "replay": {
+  "kind": "event",
+  "headline": "Okafor takes the top job",
+  "event_type": "personnel",
+  "category": "finance",
+  "stage": null,
+  "actors": [
+   {
+    "id_scheme": "other",
+    "id": "dana-okafor",
+    "role": "person",
+    "name": "Dana Okafor"
+   }
+  ],
+  "event_date": "2026-10-13",
+  "facts": [],
+  "source_url": "https://other.example.net/okafor"
+ },
+ "expect": "known"
+}

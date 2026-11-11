@@ -1,0 +1,6 @@
+{"took": 12, "timed_out": false, "hits": {"total": {"value": 4, "relation": "eq"}, "hits": [
+ {"_id": "0000950170-26-012345:acme-8k.htm", "_source": {"ciks": ["0000111111"], "display_names": ["Acme Inc.  (ACME)  (CIK 0000111111)"], "form": "8-K", "root_forms": ["8-K"], "file_date": "2026-10-13", "period_ending": "2026-10-13", "items": ["2.01", "5.02", "9.01"], "adsh": "0000950170-26-012345", "file_type": "8-K", "biz_states": ["CA"]}},
+ {"_id": "0000950170-26-012345:ex99-1.htm", "_source": {"ciks": ["0000111111"], "display_names": ["Acme Inc.  (ACME)  (CIK 0000111111)"], "form": "8-K", "root_forms": ["8-K"], "file_date": "2026-10-13", "items": ["2.01", "5.02", "9.01"], "adsh": "0000950170-26-012345", "file_type": "EX-99.1"}},
+ {"_id": "0001193125-26-054321:s1.htm", "_source": {"ciks": ["0000222222"], "display_names": ["Gamma Robotics Corp  (CIK 0000222222)"], "form": "S-1", "root_forms": ["S-1"], "file_date": "2026-10-13", "items": [], "adsh": "0001193125-26-054321", "file_type": "S-1"}},
+ {"_id": "0001193125-26-054400:8ka.htm", "_source": {"ciks": ["0000333333"], "display_names": ["Delta Corp  (DLT)  (CIK 0000333333)"], "form": "8-K/A", "root_forms": ["8-K"], "file_date": "2026-10-13", "items": ["5.02"], "adsh": "0001193125-26-054400", "file_type": "8-K/A"}}
+]}}
