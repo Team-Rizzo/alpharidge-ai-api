@@ -334,6 +334,18 @@ class Verifier:
             return replace(result, verdict=REJECTED, reason=n.reason or "known_event")
         return result
 
+    async def _filed_by_subject(self, store: Store, row: ClaimRow, claim: Claim,
+                                now_ms: int) -> ClaimRow:
+        """A new claim on a filing its subject made takes the event route, as novelty gives it
+        once the filer is confirmed; a claim placed before that could be confirmed gets it here."""
+        source = await trust.resolve(store, row.source_url, now_ms)
+        ct = await trust.of_claim(store, self.registry, self.index(), claim, source, row.category,
+                                  row.source_url)
+        if ct.t < trust.PRIZE_TRUST_MIN or not await store.update_claim(row.id, "novelty",
+                                                                          route="event"):
+            return row
+        return await store.get_claim(row.id) or row
+
     async def verify(self, store: Store, row: ClaimRow, now_ms: int,
                      near: Optional[Sequence[EventRecord]] = None) -> ClaimRow:
         """novelty -> fetched, or on to rejected when the check fails."""
@@ -347,6 +359,9 @@ class Verifier:
         self._requested.pop((intake.FETCH_JOB, row.id), None)
         claim = Claim.model_validate(row.payload)
         await self.registry.refresh(store)
+        if (row.route == "scoop" and row.novelty == novelty.NEW
+                and trust.filing_of(row.source_url) is not None):
+            row = await self._filed_by_subject(store, row, claim, now_ms)
         page, rec = fetched
         url = (page.ok and page.final_url) or row.source_url
         source = await trust.resolve(store, url, now_ms)

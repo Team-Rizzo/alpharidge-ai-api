@@ -288,3 +288,17 @@ async def test_fetch_jobs_go_oldest_claim_first_up_to_the_hotkey_cap():
     ids = {(h, b): i for h, b, i in order}
     got = [j.claim_id for j in await store.take_jobs(["fetch"], 10, 60_000, 1, per_hotkey=2)]
     assert got == [ids[k] for k in (("a", 1), ("a", 2), ("c", 4), ("b", 5), ("a", 3))]
+
+
+@pytest.mark.parametrize("filer, route", [("0000000001", "event"), (None, "scoop")])
+async def test_a_scoop_on_a_filing_its_subject_made_takes_the_event_route(monkeypatch, filer, route):
+    store, v = MemoryStore(), make()
+    url = "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/a8k.htm"
+    row = await submit(store, url, route="scoop", trusted=False)
+
+    async def filed(actors, u, event_type):
+        return filer
+    monkeypatch.setattr(v.registry.filings, "filer", filed)
+    out = await v._filed_by_subject(store, row, Claim.model_validate(row.payload), RECEIVED_MS)
+    assert out.route == route and (await store.get_claim(row.id)).route == route
+    await v.fetcher.aclose()
