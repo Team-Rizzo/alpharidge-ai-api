@@ -96,6 +96,39 @@ async def _event_shown(store: Store, claim: ClaimRow) -> Tuple[bool, Optional[st
     return False, None
 
 
+# Changes younger than this are left for the next read, so one committed a moment late is not
+# skipped by the cursor.
+FEED_LAG_MS = 2000
+FEED_MAX = 500
+
+
+def _cursor(text: str) -> Tuple[int, int]:
+    if not text:
+        return 0, 0
+    ms, _, cid = text.partition("-")
+    try:
+        return int(ms), int(cid or 0)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_cursor")
+
+
+@router.get("/claims")
+async def claim_changes(request: Request, since: str = "", limit: int = 200,
+                        store: Store = Depends(get_store)):
+    """The caller's claims that changed after `since`, each with its status reply, and the
+    cursor to ask from next time."""
+    auth = await authenticate(request, _can_read, "miner")
+    hotkey = auth.ss58_address if auth is not None else ""
+    after = _cursor(since)
+    rows = await store.claim_changes(hotkey, after, time.time_ns() // 1_000_000 - FEED_LAG_MS,
+                                     max(1, min(int(limit), FEED_MAX)))
+    found = {c.id: c for c in await store.claims_by_ids([cid for cid, _ in rows])}
+    claims = [await _status_reply(store, found[cid]) for cid, _ in rows if cid in found]
+    last = rows[-1] if rows else None
+    return {"claims": claims, "more": len(rows) == max(1, min(int(limit), FEED_MAX)),
+            "cursor": f"{last[1]}-{last[0]}" if last else f"{after[0]}-{after[1]}"}
+
+
 @router.get("/claims/{claim_id}")
 async def get_claim(claim_id: str, request: Request, store: Store = Depends(get_store)):
     auth = await authenticate(request, _can_read, "miner")

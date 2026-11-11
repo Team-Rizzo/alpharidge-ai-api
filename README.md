@@ -252,6 +252,8 @@ Signed requests use the subnet's per-request scheme (`X-Auth-*` headers over met
 
 Every stored claim gets a receipt signed with `API_ATTESTATION_PRIVKEY`, the ledger key (`alpharidge_ai.ledger.receipts`): returned by `POST /claims` (the same one on a re-send) and shown on `GET /claims/{id}` and `/dashboard/items`. Receipts are written in the claim's transaction, each naming the previous one's hash, in the append-only `claim_receipt` table.
 
+`GET /claims?since=<cursor>&limit=` (signed by the miner) returns the caller's claims that changed after the cursor, each with its status reply, and the next cursor; one call replaces polling each open claim.
+
 `POST /claims` answers `429` with `budget_exhausted` or `rate_limited` and a `Retry-After` header, and stores nothing. Actor IDs in a claim (Wikidata QID, CIK, LEI) link only when the registry record's name or an alias matches the actor's name; with `EL_REGISTRY=off` only the entity seed and overrides are known.
 
 ## Tests

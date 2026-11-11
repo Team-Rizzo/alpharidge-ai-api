@@ -197,6 +197,16 @@ class PrismaStore:
             event_type, since_ms, exclude_id, owner, doc_hash, judged_since_ms, ",".join(reasons))
         return int(rows[0]["n"]) if rows else 0
 
+    async def claim_changes(self, hotkey, after, until_ms, limit):
+        rows = await self.db.query_raw(
+            'SELECT id, ms FROM (SELECT id, (extract(epoch FROM updated_at) * 1000)::bigint AS ms '
+            'FROM "claim" WHERE hotkey = $1 AND updated_at >= to_timestamp($2::double precision '
+            '/ 1000) - interval \'1 millisecond\' AND updated_at < to_timestamp($4::double '
+            'precision / 1000)) c WHERE (ms, id) > ($2::bigint, $3::bigint) '
+            'ORDER BY ms, id LIMIT $5',
+            hotkey, int(after[0]), int(after[1]), int(until_ms), int(limit))
+        return [(int(r["id"]), int(r["ms"])) for r in rows]
+
     async def claim_heads(self, status, limit=500, skip=()):
         rows = await self.db.query_raw(
             'SELECT id, event_id, source_url, '

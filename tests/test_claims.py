@@ -530,3 +530,27 @@ async def test_claims_past_the_in_flight_cap_get_503(client, store, monkeypatch)
     monkeypatch.setattr(claims_router, "_in_flight", 0)
     assert post(client, MINER, canonical_body(claim(headline="busy"))).status_code == 202
     assert claims_router._in_flight == 0
+
+
+async def test_the_change_feed_gives_a_miner_its_own_changed_claims_in_order(client, store,
+                                                                            monkeypatch):
+    monkeypatch.setattr(claims_router, "FEED_LAG_MS", -10_000)
+    mine = [int(post(client, MINER, canonical_body(claim(headline=f"h{i}"))).json()["id"])
+            for i in range(3)]
+    theirs = int(post(client, RIVAL, canonical_body(claim(headline="r"))).json()["id"])
+
+    def feed(since="", limit=200):
+        path = f"/claims?since={since}&limit={limit}"
+        r = client.get(path, headers=signed(MINER, "GET", path))
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    got = feed(limit=2)
+    assert [c["id"] for c in got["claims"]] == [str(i) for i in mine[:2]] and got["more"]
+    rest = feed(got["cursor"])
+    assert [c["id"] for c in rest["claims"]] == [str(mine[2])] and not rest["more"]
+    await store.update_claim(mine[0], "queued", status="rejected", reason="unsupported")
+    again = feed(rest["cursor"])
+    assert [(c["id"], c["status"]) for c in again["claims"]] == [(str(mine[0]), "rejected")]
+    assert str(theirs) not in {c["id"] for c in got["claims"] + rest["claims"] + again["claims"]}
+    assert feed(again["cursor"])["claims"] == []

@@ -389,6 +389,10 @@ class Store(Protocol):
                             reasons: Sequence[str]) -> int:
         """Claims of an owner (coldkey, else hotkey) on one page and type, received since
         `since_ms` and judged since `judged_since_ms` with one of `reasons`."""
+    async def claim_changes(self, hotkey: str, after: Tuple[int, int], until_ms: int,
+                            limit: int) -> List[Tuple[int, int]]:
+        """(claim id, changed ms) of a hotkey's claims changed after the (ms, id) cursor and
+        before `until_ms`, oldest change first."""
     async def claim_heads(self, status: str, limit: int = 500,
                           skip: Sequence[int] = ()) -> List[ClaimHead]: ...
     async def claims_ahead(self, claim: ClaimRow, since_ms: int) -> int: ...

@@ -72,6 +72,8 @@ class MemoryStore:
     receipt_rows: List[dict] = field(default_factory=list)
     _ids: itertools.count = field(default_factory=lambda: itertools.count(1))
     _locked: Dict[int, int] = field(default_factory=dict)
+    # Claim id -> when it last changed, in ms.
+    changed: Dict[int, int] = field(default_factory=dict)
 
     async def is_blacklisted(self, hotkey):
         return hotkey in self.blacklist
@@ -89,6 +91,7 @@ class MemoryStore:
             raise DuplicateClaim(row.hotkey)
         row = replace(row, id=next(self._ids))
         self.claims[row.id] = row
+        self._touch(row.id)
         if receipt is not None:
             self.receipt_rows.append(
                 dict(receipt(row.id, self.receipt_rows[-1] if self.receipt_rows else None)))
@@ -114,6 +117,7 @@ class MemoryStore:
         if c is None or c.status != expect:
             return False
         self.claims[claim_id] = replace(c, **fields)
+        self._touch(claim_id)
         return True
 
     async def claims_by_status(self, status, received_before_ms=None, limit=500, skip=()):
@@ -128,6 +132,17 @@ class MemoryStore:
                    if c.id != exclude_id and (c.coldkey or c.hotkey) == owner
                    and c.doc_hash == doc_hash and (c.judged_ms or 0) >= judged_since_ms
                    and c.reason in reasons)
+
+    def _touch(self, claim_id):
+        import time
+        self.changed[claim_id] = max(time.time_ns() // 1_000_000,
+                                     max(self.changed.values(), default=0))
+
+    async def claim_changes(self, hotkey, after, until_ms, limit):
+        rows = sorted((ms, cid) for cid, ms in self.changed.items()
+                      if self.claims[cid].hotkey == hotkey and (ms, cid) > tuple(after)
+                      and ms < until_ms)
+        return [(cid, ms) for ms, cid in rows[:limit]]
 
     async def claim_heads(self, status, limit=500, skip=()):
         return [ClaimHead(c.id, c.event_id, c.source_url, c.received_ms,
