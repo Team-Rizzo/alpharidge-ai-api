@@ -494,7 +494,17 @@ async def fetch_job(store: Store, job: Job) -> None:
     if row.status == "queued" and not await budget.within_budget(store, row, now_ms):
         return
     # Two jobs can fetch one claim; the later must not add a row after the check closed it.
-    await get_verifier().fetch(store, row, open_only=True)
+    v = get_verifier()
+    page, _ = await v.fetch(store, row, open_only=True)
+    if page.ok and trust.filing_of(row.source_url) is not None:
+        # The filer check and the filing's details are read now, beside other fetches, so the
+        # check finds them ready.
+        claim = Claim.model_validate(row.payload)
+        try:
+            await v.registry.filings.report(claim.actors, page.final_url or row.source_url,
+                                            claim.event_type)
+        except Exception as e:
+            logger.debug(f"Filing details for claim {row.id} not read yet: {e!r}")
 
 
 async def fetch_gave_up(store: Store, job: Job) -> None:

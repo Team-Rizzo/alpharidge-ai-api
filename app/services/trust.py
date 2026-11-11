@@ -280,7 +280,8 @@ class Filings:
         self._tickers: Dict[str, set] = {}
         self._tickers_due = 0.0
         self._subs: Dict[str, Tuple[float, Optional[dict]]] = {}
-        self._lock = asyncio.Lock()
+        # One lock per filing, filer and the ticker list, so different filings load at once.
+        self._locks: Dict[str, asyncio.Lock] = {}
 
     @property
     def sec(self):
@@ -310,10 +311,15 @@ class Filings:
                                                     else TRUST_TICKERS_RETRY_S)
         return self._tickers
 
+    def _lock(self, key: str) -> asyncio.Lock:
+        if len(self._locks) > 4 * TRUST_FILING_CACHE_MAX:
+            self._locks = {k: v for k, v in self._locks.items() if v.locked()}
+        return self._locks.setdefault(key, asyncio.Lock())
+
     async def warm(self) -> None:
         """Reads the ticker list when it is due, with the SEC user agent set."""
         if EVENT_LANE["AK_SEC_USER_AGENT"]:
-            async with self._lock:
+            async with self._lock("tickers"):
                 await self.tickers()
 
     async def filer(self, actors, url: str, event_type) -> Optional[str]:
@@ -328,7 +334,7 @@ class Filings:
         if not mine:
             return None
         acc = hit[1]
-        async with self._lock:
+        async with self._lock(f"filing:{acc}"):
             if acc not in self._filers:
                 raw = await self.fetcher.filing_index(url)
                 if raw is None:
@@ -345,7 +351,7 @@ class Filings:
             else:
                 cik = next((c for c, n in found.items() if names_filer(a.name, n)), None)
                 if cik is None and a.name:
-                    async with self._lock:
+                    async with self._lock("tickers"):
                         tickers = await self.tickers()
                     cik = next((c for c in found
                                 if a.name.strip().upper() in tickers.get(c, ())), None)
@@ -360,7 +366,7 @@ class Filings:
         cik = await self.filer(actors, url, event_type) if hit else None
         if cik is None:
             return None
-        async with self._lock:
+        async with self._lock(f"filer:{cik}"):
             due, subs = self._subs.get(cik, (0.0, None))
             if time.monotonic() >= due:
                 try:
