@@ -272,6 +272,61 @@ class Resolver:
                             f"contradicted by {trust.label(by)}", "resolver", theirs.id,
                             now_ms=now_ms)
 
+    # Filings
+
+    async def refile(self, store: Store, row: ClaimRow, now_ms: int,
+                     head: Optional[int] = None) -> str:
+        """A new claim on a filing its subject made, held as a scoop or turned away as low trust
+        because the filer was not confirmed when it was checked: placed as the trusted claim it
+        is, while its event is still open to it. Returns the outcome."""
+        from app.services import verifier
+
+        if (trust.filing_of(row.source_url) is None or row.novelty != novelty.NEW
+                or row.route != "scoop"):
+            return "not_a_filing_scoop"
+        source = await store.get_source(row.source_id) if row.source_id is not None else None
+        ev = await store.get_event(row.event_id) if row.event_id is not None else None
+        if source is None or ev is None:
+            return "not_placed"
+        record = ledger.judge_record(await store.source_fetches(row.id))
+        if not record or record.get("outcome") != "pass":
+            # A trusted claim is paid on a passed page-judge record, which validators check.
+            return "no_judge_pass"
+        v = verifier.get_verifier()
+        await v.registry.refresh(store)
+        claim = Claim.model_validate(row.payload)
+        ct = await trust.of_claim(store, v.registry, self.index(), claim, source, row.category,
+                                  row.source_url)
+        if ct.t < trust.PRIZE_TRUST_MIN:
+            return "not_filed_by_subject"
+        async with ledger.claim_lock(row.id):
+            row = await store.get_claim(row.id)
+            if row.status == "verified":
+                if ev.first_claim_id not in (None, row.id):
+                    return "event_taken"
+                if any(c.route == "scoop" and c.id != row.id
+                       for c in await store.claims_for_event(ev.id, ("verified",))):
+                    return "rival_scoops"
+                for cand in await store.scoop_candidates(row.id, (scoops.QUEUED,)):
+                    await store.update_scoop_candidate(cand.id, status=scoops.CLOSED)
+                await store.update_claim(row.id, "verified", route="event", trust=ct.t,
+                                         trust_band=ct.band)
+                await store.update_event(ev.id, confidence=REPORTED, first_claim_id=row.id)
+                await store.update_facts(row.id, "accepted")
+                row = await store.get_claim(row.id)
+                a = await points.claim_age(store, row, claim.event_date)
+                await points.pay(store, row, "event",
+                                 points.factors(claim.event_type, "event", ct.t, a), now_ms, head)
+                return "paid"
+            if row.status == "rejected" and row.reason == "low_trust":
+                if ev.confidence != LINE or ev.first_claim_id is not None:
+                    return "event_taken"
+                # Back to the resolver, which places it as the head of its line.
+                await store.update_claim(row.id, "rejected", status="fetched", reason=None,
+                                         trust=ct.t, trust_band=ct.band)
+                return "reopened"
+        return "not_eligible"
+
     # Scoop windows
 
     async def close_windows(self, store: Store, now_ms: int, head: Optional[int] = None) -> None:

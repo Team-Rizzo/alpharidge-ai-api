@@ -98,6 +98,30 @@ async def retract_event(event_id: int, body: RetractBody, store: Store = Depends
     return await _retract(store, await ops.lead_claim(store, event_id), body, operator, entities)
 
 
+class RefileBody(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/claims/{claim_id}/refile")
+async def refile_claim(claim_id: int, body: RefileBody, store: Store = Depends(get_store),
+                       operator: str = Depends(get_operator_hotkey)):
+    """A claim on a filing its subject made, held or turned away before its filer could be
+    confirmed: placed as a trusted claim."""
+    from app.services import resolve
+
+    row = await store.get_claim(claim_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="unknown_claim")
+    head = await block.current_block()
+    if head is None:
+        raise HTTPException(status_code=503, detail="chain_unavailable")
+    outcome = await resolve.get_resolver().refile(store, row, _now_ms(), head)
+    logger.info(f"Operator {operator} refiled claim {claim_id}: {outcome} ({body.reason})")
+    row = await store.get_claim(claim_id)
+    return {"claim_id": str(row.id), "outcome": outcome, "status": row.status,
+            "route": row.route}
+
+
 class PenaliseBody(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
