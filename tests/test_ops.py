@@ -271,3 +271,16 @@ async def test_a_coldkey_with_many_claws_alarms(monkeypatch):
     (alarm,) = await ops._claws(store, now)
     assert (alarm["coldkey"], alarm["paid"], alarm["clawed"]) == ("c1", 4, 2)
     assert await ops._claws(store, now + 6 * 24 * HOUR_MS) == []
+
+
+async def test_refile_waits_its_turn_on_the_filing_host(ops_api, monkeypatch):
+    from alpharidge_ai.verify.fetch import Paced
+    from app.services import resolve
+
+    row = await ops_api.store.create_claim(_claim("m1", status="verified"))
+
+    async def paced(*a, **k):
+        raise Paced(2.4)
+    monkeypatch.setattr(resolve.Resolver, "refile", paced)
+    r = ops_api.post(f"/ops/claims/{row.id}/refile", json={"reason": "r"}, headers=OPERATOR)
+    assert r.status_code == 503 and r.headers["Retry-After"] == "3"

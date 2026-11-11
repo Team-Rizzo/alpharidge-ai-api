@@ -2,11 +2,13 @@
 retractions, wrong-claim metrics, conflicting claim pairs and the hotkey blacklist."""
 
 import logging
+import math
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alpharidge_ai.verify.fetch import Paced
 from app.config import EVENT_LANE
 from app.routers.auth import get_operator_hotkey
 from app.routers.claims import get_store
@@ -115,7 +117,12 @@ async def refile_claim(claim_id: int, body: RefileBody, store: Store = Depends(g
     head = await block.current_block()
     if head is None:
         raise HTTPException(status_code=503, detail="chain_unavailable")
-    outcome = await resolve.get_resolver().refile(store, row, _now_ms(), head)
+    try:
+        outcome = await resolve.get_resolver().refile(store, row, _now_ms(), head)
+    except Paced as e:
+        # The filing's index page waits its turn on the filing host; nothing was changed.
+        wait = max(1, math.ceil(e.wait_s))
+        raise HTTPException(status_code=503, detail="busy", headers={"Retry-After": str(wait)})
     logger.info(f"Operator {operator} refiled claim {claim_id}: {outcome} ({body.reason})")
     row = await store.get_claim(claim_id)
     return {"claim_id": str(row.id), "outcome": outcome, "status": row.status,

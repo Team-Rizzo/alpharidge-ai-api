@@ -159,6 +159,12 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    @app.exception_handler(Exception)
+    async def unhandled(request: Request, exc: Exception):
+        logger.error(f"Unhandled error on {request.method} {request.url.path}", exc_info=exc)
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            content={"detail": "internal_error"})
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
