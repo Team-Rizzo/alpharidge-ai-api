@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from app.services.entities import EntityRecord, refreshes
 from app.services.store.rows import (
     INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
+    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
 )
@@ -122,6 +122,11 @@ class MemoryStore:
                 and (received_before_ms is None or c.received_ms < received_before_ms)]
         return [replace(c) for c in sorted(rows, key=lambda c: (c.bucket, c.id))[:limit]]
 
+    async def claim_heads(self, status, limit=500, skip=()):
+        return [ClaimHead(c.id, c.event_id, c.source_url, c.received_ms,
+                          (c.payload or {}).get("event_date"))
+                for c in await self.claims_by_status(status, limit=limit, skip=skip)]
+
     async def claims_ahead(self, claim, since_ms):
         return sum(_counts(c, claim, since_ms) for c in self.claims.values())
 
@@ -218,6 +223,12 @@ class MemoryStore:
         job = Job(id=next(self._ids), kind=kind, claim_id=claim_id, run_ms=run_ms)
         self.jobs[job.id] = job
         return replace(job)
+
+    async def add_job_once(self, kind, claim_id, run_ms):
+        if any(j.kind == kind and j.claim_id == claim_id and j.status in ("pending", "running")
+               for j in self.jobs.values()):
+            return None
+        return await self.add_job(kind, claim_id, run_ms)
 
     async def append_ledger(self, row):
         row = replace(row, id=next(self._ids))

@@ -1,6 +1,7 @@
 """Miner claim intake and status."""
 
 import time
+from collections import OrderedDict
 from typing import Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -18,6 +19,10 @@ from app.utils.receipt import received_ns
 router = APIRouter()
 
 _store: Optional[Store] = None
+
+STATUS_CACHE_MAX = 50_000
+# Claim id -> (expiry, owner hotkey, reply).
+_status: "OrderedDict[int, Tuple[float, str, dict]]" = OrderedDict()
 
 
 def get_store() -> Store:
@@ -94,11 +99,30 @@ async def _event_shown(store: Store, claim: ClaimRow) -> Tuple[bool, Optional[st
 @router.get("/claims/{claim_id}")
 async def get_claim(claim_id: str, request: Request, store: Store = Depends(get_store)):
     auth = await authenticate(request, _can_read, "miner")
-    claim = await store.get_claim(int(claim_id)) if claim_id.isdigit() else None
-    if claim is None or (auth is not None and claim.hotkey != auth.ss58_address
-                         and not hotkey_whitelist.is_validator_hotkey(auth.ss58_address)
-                         and auth.ss58_address not in config.OPERATOR_HOTKEYS):
+    cid = int(claim_id) if claim_id.isdigit() else None
+    now = time.monotonic()
+    hit = _status.get(cid) if cid is not None else None
+    if hit is not None and hit[0] > now:
+        owner, reply = hit[1], hit[2]
+    else:
+        claim = await store.get_claim(cid) if cid is not None else None
+        if claim is None:
+            raise HTTPException(status_code=404, detail="not_found")
+        owner, reply = claim.hotkey, await _status_reply(store, claim)
+        ttl = EVENT_LANE["STATUS_CACHE_S"]
+        if ttl > 0:
+            _status.pop(cid, None)
+            _status[cid] = (now + ttl, owner, reply)
+            while len(_status) > STATUS_CACHE_MAX:
+                _status.popitem(last=False)
+    if (auth is not None and owner != auth.ss58_address
+            and not hotkey_whitelist.is_validator_hotkey(auth.ss58_address)
+            and auth.ss58_address not in config.OPERATOR_HOTKEYS):
         raise HTTPException(status_code=404, detail="not_found")
+    return reply
+
+
+async def _status_reply(store: Store, claim: ClaimRow) -> dict:
     points = await store.claim_points(claim.id)
     shown, verification = await _event_shown(store, claim)
     fetch = next((f for f in reversed(await store.source_fetches(claim.id)) if f.check), None)

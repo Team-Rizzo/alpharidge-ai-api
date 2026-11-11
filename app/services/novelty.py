@@ -574,7 +574,9 @@ def contrastive(page_text: str, candidates: Iterable[EventRecord],
 
 
 def _has(text: str, phrase: str) -> bool:
-    return bool(phrase) and re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
+    # The substring test is a fast path: the pattern can only match where the phrase occurs.
+    return (bool(phrase) and phrase in text
+            and re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None)
 
 
 # One event prize per source document.

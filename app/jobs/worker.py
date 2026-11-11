@@ -164,15 +164,25 @@ _last_settle_ms = 0
 
 async def tick(store: Store, now_ms: int) -> None:
     global _last_settle_ms
-    await expire_queued(store, now_ms)
-    await advance_queued(store, now_ms)
-    await verifier.verify_ready(store, now_ms)
-    await resolve.get_resolver().run(store, now_ms)
+    spent: Dict[str, float] = {}
+
+    async def timed(name: str, step: Awaitable) -> None:
+        at = time.perf_counter()
+        await step
+        spent[name] = time.perf_counter() - at
+
+    await timed("expire", expire_queued(store, now_ms))
+    await timed("advance", advance_queued(store, now_ms))
+    await timed("verify", verifier.verify_ready(store, now_ms))
+    await timed("resolve", resolve.get_resolver().run(store, now_ms))
     if now_ms - _last_settle_ms >= EVENT_LANE["SETTLE_EVERY_S"] * 1000:
         _last_settle_ms = now_ms
-        await ledger.refresh_params()
-        await points.settle_due(store, now_ms)
-        await judge.close_moved(store)
+        await timed("params", ledger.refresh_params())
+        await timed("settle", points.settle_due(store, now_ms))
+        await timed("close", judge.close_moved(store))
+    slow = EVENT_LANE["TICK_LOG_S"]
+    if slow > 0 and sum(spent.values()) >= slow:
+        logger.info("[TICK] " + " ".join(f"{k}={v:.2f}s" for k, v in spent.items()))
 
 
 async def run_pool(store: Store, pool: JobPool) -> None:

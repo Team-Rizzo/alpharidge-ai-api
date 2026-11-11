@@ -99,6 +99,25 @@ async def _cancel(task: asyncio.Task) -> None:
         pass
 
 
+async def _profile(seconds: float) -> None:
+    """Profile the whole process for a while after start-up and log where the time went."""
+    import cProfile
+    import io
+    import pstats
+
+    prof = cProfile.Profile()
+    prof.enable()
+    try:
+        await asyncio.sleep(seconds)
+    finally:
+        prof.disable()
+        out = io.StringIO()
+        stats = pstats.Stats(prof, stream=out)
+        stats.sort_stats("tottime").print_stats(40)
+        stats.sort_stats("cumulative").print_stats(40)
+        logger.info(f"[PROFILE] {seconds:.0f} s\n{out.getvalue()}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.jobs import answer_key
@@ -122,6 +141,8 @@ async def lifespan(app: FastAPI):
              asyncio.create_task(run_worker(claims.get_store())),
              asyncio.create_task(run_daily(claims.get_store())),
              asyncio.create_task(answer_key.run_forever(claims.get_store()))]
+    if config.EVENT_LANE["PROFILE_S"] > 0:
+        tasks.append(asyncio.create_task(_profile(config.EVENT_LANE["PROFILE_S"])))
     yield
 
     logger.info("Shutting down Alpharidge AI API...")

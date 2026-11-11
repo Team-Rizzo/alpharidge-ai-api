@@ -11,7 +11,7 @@ from app.services.entities import canonical_id, record_from, refreshes
 from app.utils.clock import ms as _ms
 from app.services.store.rows import (
     INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
+    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
     Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow, ReverifyRow,
     ScoopCandidateRow,
     SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
@@ -186,6 +186,17 @@ class PrismaStore:
             where=where, order=[{"receiptBucket": "asc"}, {"id": "asc"}], take=limit)
         return [_claim_from(m) for m in rows]
 
+    async def claim_heads(self, status, limit=500, skip=()):
+        rows = await self.db.query_raw(
+            'SELECT id, event_id, source_url, '
+            '(extract(epoch FROM received_at) * 1000)::bigint AS received_ms, '
+            "payload->>'event_date' AS event_date FROM \"claim\" WHERE status = $1 "
+            "AND id <> ALL(string_to_array($2, ',')::bigint[]) "
+            'ORDER BY receipt_bucket, id LIMIT $3',
+            status, ",".join(str(int(i)) for i in skip), limit)
+        return [ClaimHead(int(r["id"]), int(r["event_id"]) if r["event_id"] is not None else None,
+                          r["source_url"], int(r["received_ms"]), r["event_date"]) for r in rows]
+
     async def claims_ahead(self, claim, since_ms):
         at = _dt(claim.received_ms)
         return await self.db.claim.count(where={
@@ -317,6 +328,16 @@ class PrismaStore:
         m = await self.db.job.create(data={"kind": kind, "claimId": claim_id,
                                            "runAt": _dt(run_ms)})
         return Job(id=m.id, kind=m.kind, claim_id=m.claimId, run_ms=run_ms)
+
+    async def add_job_once(self, kind, claim_id, run_ms):
+        rows = await self.db.query_raw(
+            'INSERT INTO "job" (kind, claim_id, run_at) SELECT $1, $2::bigint, '
+            'to_timestamp($3::double precision / 1000) WHERE NOT EXISTS (SELECT 1 FROM "job" '
+            "WHERE kind = $1 AND claim_id = $2::bigint AND status IN ('pending', 'running')) "
+            'RETURNING id', kind, claim_id, run_ms)
+        if not rows:
+            return None
+        return Job(id=int(rows[0]["id"]), kind=kind, claim_id=claim_id, run_ms=run_ms)
 
     async def append_ledger(self, row):
         from prisma import Json

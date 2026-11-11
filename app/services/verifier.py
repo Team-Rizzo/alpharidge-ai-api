@@ -129,9 +129,13 @@ def _utc(ms: int) -> datetime:
 
 def _age(row: ClaimRow, page: Optional[FetchedPage] = None) -> float:
     """The age factor pay would use, from the cached page's publish date when there is one."""
+    return _age_of(row.payload.get("event_date"), row.received_ms, page)
+
+
+def _age_of(event_date, received_ms: int, page: Optional[FetchedPage] = None) -> float:
     try:
-        return points.age(date.fromisoformat(str(row.payload.get("event_date"))[:10]),
-                          row.received_ms, _ms(page.published_at) if page else None)
+        return points.age(date.fromisoformat(str(event_date)[:10]), received_ms,
+                          _ms(page.published_at) if page else None)
     except (AttributeError, ValueError):
         return 0.0
 
@@ -271,6 +275,11 @@ class Verifier:
         own = [i for i in (row.event_id,) if i is not None]
         return await novelty.near_events(store, claim, self.index(), self.places, own)
 
+    def looked(self, claim_id: int, now_ms: int) -> bool:
+        """True while the claim's last fetch request is under FETCH_REQUEST_S old."""
+        last = self._requested.get((intake.FETCH_JOB, claim_id))
+        return last is not None and now_ms - last < FETCH_REQUEST_S * 1000
+
     def _due(self, kind: str, row: ClaimRow, now_ms: int) -> bool:
         """At most one look per claim and kind every FETCH_REQUEST_S."""
         last = self._requested.get((kind, row.id))
@@ -294,7 +303,7 @@ class Verifier:
                        or (failed[-1].check or {}).get("gave_up")):
             return _failed(row, failed[-1]), failed[-1]
         if not failed or now_ms >= failed[-1].fetched_ms + FETCH_REQUEST_S * 1000:
-            await store.add_job(intake.FETCH_JOB, row.id, now_ms)
+            await store.add_job_once(intake.FETCH_JOB, row.id, now_ms)
         return None
 
     async def _untrusted_reason(self, store: Store, claim: Claim, row: ClaimRow,
@@ -496,14 +505,22 @@ async def verify_ready(store: Store, now_ms: int, limit: int = 50, scan: int = 5
     higher age factor go first, so older events reach the judges after fresh ones."""
     v, done = get_verifier(), 0
     waiting = [i for i, until in v._judge_wait.items() if until > now_ms]
-    rows = await store.claims_by_status("novelty", limit=scan, skip=waiting)
+    heads = await store.claim_heads("novelty", limit=scan, skip=waiting)
     # A line moves at its freshest claim's age and keeps its own receipt order.
-    line = {r.id: r.event_id if r.event_id is not None else -r.id for r in rows}
+    line = {h.id: h.event_id if h.event_id is not None else -h.id for h in heads}
     lead: Dict[int, float] = {}
-    for r in rows:
-        a = _age(r, v.cache.get(r.source_url, r.received_ms))
-        lead[line[r.id]] = max(lead.get(line[r.id], 0.0), a)
-    for row in sorted(rows, key=lambda r: -lead[line[r.id]]):
+    for h in heads:
+        a = _age_of(h.event_date, h.received_ms, v.cache.get(h.source_url, h.received_ms))
+        lead[line[h.id]] = max(lead.get(line[h.id], 0.0), a)
+    # Only claims with a cached page, or due a fetch request, are read in full.
+    order = [h.id for h in sorted(heads, key=lambda h: -lead[line[h.id]])
+             if v.cache.get(h.source_url, h.received_ms) is not None
+             or not v.looked(h.id, now_ms)]
+    rows = {r.id: r for r in await store.claims_by_ids(order)} if order else {}
+    for cid in order:
+        row = rows.get(cid)
+        if row is None:
+            continue
         if done >= limit:
             break
         try:

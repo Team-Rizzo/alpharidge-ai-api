@@ -194,6 +194,21 @@ async def test_an_operator_off_the_metagraph_reads_any_claim(client, store, monk
     assert client.get(path, headers=signed(op, "GET", path)).json()["reason"] == "unsupported"
 
 
+async def test_status_reply_is_reused_briefly_and_stays_owner_only(client, store, monkeypatch):
+    from app.config import EVENT_LANE
+    monkeypatch.setitem(EVENT_LANE, "STATUS_CACHE_S", 20)
+    claims_router._status.clear()
+    cid = int(post(client, MINER, canonical_body(claim())).json()["id"])
+    path = f"/claims/{cid}"
+    assert client.get(path, headers=signed(MINER, "GET", path)).json()["status"] == "queued"
+    await store.update_claim(cid, "queued", status="rejected", reason="unsupported")
+    assert client.get(path, headers=signed(MINER, "GET", path)).json()["status"] == "queued"
+    assert client.get(path, headers=signed(RIVAL, "GET", path)).status_code == 404
+    assert client.get(path, headers=signed(VALI, "GET", path)).status_code == 200
+    claims_router._status.clear()
+    assert client.get(path, headers=signed(MINER, "GET", path)).json()["status"] == "rejected"
+
+
 def test_the_query_string_is_signed(client):
     cid = post(client, MINER, canonical_body(claim())).json()["id"]
     path = f"/claims/{cid}"

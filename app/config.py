@@ -94,6 +94,12 @@ EVENT_LANE = {
     "CHECK_BUDGET_BASE": _el("CHECK_BUDGET_BASE", 200, int),
     # Claims taken in at once; past it POST /claims answers 503 busy at once.
     "CLAIMS_IN_FLIGHT": _el("CLAIMS_IN_FLIGHT", 16, int),
+    # Seconds a claim's status reply is reused before it is read again.
+    "STATUS_CACHE_S": _el("STATUS_CACHE_S", 20),
+    # Operator diagnostics, off by default: log worker ticks slower than this many seconds,
+    # and profile the process for this many seconds after start-up.
+    "TICK_LOG_S": _el("TICK_LOG_S", 0),
+    "PROFILE_S": _el("PROFILE_S", 0),
     "PUBLISH_HOLD_S": _el("PUBLISH_HOLD_S", 120),
     # Answer key: official feeds, private, used for accuracy only.
     # Set but empty means none.

@@ -260,3 +260,17 @@ async def test_failed_fetch_is_retried_and_not_reused(base):
     finally:
         del PAGES["/late"]
     await v.fetcher.aclose()
+
+
+async def test_verify_ready_asks_for_one_fetch_per_claim_and_checks_cached_pages(base, monkeypatch):
+    store, v = MemoryStore(), make()
+    monkeypatch.setattr(verifier, "_default", v)
+    row = await submit(store, f"{base}/supported")
+    now = RECEIVED_MS + 1000
+    for t in (now, now + 1000, now + 61_000, now + 122_000):
+        await verifier.verify_ready(store, t)
+    assert [j.kind for j in store.jobs.values() if j.status == "pending"] == ["fetch"]
+    await v.fetch(store, await store.get_claim(row.id))
+    await verifier.verify_ready(store, now + 123_000)
+    assert (await store.get_claim(row.id)).status == "fetched"
+    await v.fetcher.aclose()
