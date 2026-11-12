@@ -129,6 +129,22 @@ async def refile_claim(claim_id: int, body: RefileBody, store: Store = Depends(g
             "route": row.route}
 
 
+@router.post("/claims/{claim_id}/refetch")
+async def refetch_claim(claim_id: int, body: RefileBody, store: Store = Depends(get_store),
+                        operator: str = Depends(get_operator_hotkey)):
+    """A claim turned away as fetch_failed through a fault on the fetching side: its page is
+    fetched and checked afresh."""
+    from app.services import verifier
+
+    row = await store.get_claim(claim_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="unknown_claim")
+    outcome = await verifier.refetch(store, row, _now_ms())
+    logger.info(f"Operator {operator} refetched claim {claim_id}: {outcome} ({body.reason})")
+    row = await store.get_claim(claim_id)
+    return {"claim_id": str(row.id), "outcome": outcome, "status": row.status}
+
+
 class PenaliseBody(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 

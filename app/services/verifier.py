@@ -52,6 +52,8 @@ JUDGE_REPEAT_MAX = 2
 logger = logging.getLogger(__name__)
 
 PENDING = "pending"
+# Marks failed fetches an operator set aside so the claim's page is fetched afresh.
+SUPERSEDED = "superseded"
 # Claims still waiting on their page.
 OPEN = ("queued", "novelty")
 
@@ -321,7 +323,8 @@ class Verifier:
             return await self.fetch(store, row)
         if not self._due(intake.FETCH_JOB, row, now_ms):
             return None
-        failed = [f for f in await store.source_fetches(row.id) if not f.content_hash]
+        failed = [f for f in await store.source_fetches(row.id)
+                  if not f.content_hash and not (f.check or {}).get(SUPERSEDED)]
         if failed and (len(failed) >= FETCH_TRIES or failed[-1].reason == BLOCKED
                        or (failed[-1].check or {}).get("gave_up")):
             return _failed(row, failed[-1]), failed[-1]
@@ -484,6 +487,26 @@ def get_verifier() -> Verifier:
     if _default is None:
         _default = Verifier()
     return _default
+
+
+async def refetch(store: Store, row: ClaimRow, now_ms: int) -> str:
+    """A claim turned away because its page could not be fetched, when the fault was on the
+    fetching side: back to novelty for a fresh fetch, while its line is still open. Returns
+    the outcome."""
+    if row.status != "rejected" or row.reason != FETCH_FAILED:
+        return "not_eligible"
+    ev = await store.get_event(row.event_id) if row.event_id is not None else None
+    if ev is None or ev.confidence != "line" or ev.first_claim_id is not None:
+        return "event_taken"
+    async with ledger.claim_lock(row.id):
+        for f in await store.source_fetches(row.id):
+            if not f.content_hash and not (f.check or {}).get(SUPERSEDED):
+                await store.update_source_fetch(f.id, check={**(f.check or {}), SUPERSEDED: True})
+        if not await store.update_claim(row.id, "rejected", status="novelty", reason=None):
+            return "not_eligible"
+        get_verifier()._requested.pop((intake.FETCH_JOB, row.id), None)
+        await store.add_job_once(intake.FETCH_JOB, row.id, now_ms)
+    return "reopened"
 
 
 async def fetch_job(store: Store, job: Job) -> None:

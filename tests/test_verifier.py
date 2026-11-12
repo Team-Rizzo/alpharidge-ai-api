@@ -360,3 +360,42 @@ async def test_the_contrastive_match_is_the_same_in_the_parse_workers(monkeypatc
     finally:
         parse_pool.uninstall()
     assert aside == here == 7
+
+
+async def test_a_claim_turned_away_by_a_fetch_fault_is_fetched_afresh(base):
+    from app.services.store import SourceFetchRow
+    store, v = MemoryStore(), make()
+    row = await submit(store, f"{base}/supported")
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-refetch", confidence="line"))
+    for _ in range(verifier.FETCH_TRIES):
+        await store.add_source_fetch(SourceFetchRow(row.id, "rejected", reason="fetch_failed",
+                                                    fetched_ms=RECEIVED_MS))
+    await store.update_claim(row.id, "novelty", status="rejected", reason="fetch_failed",
+                             event_id=ev.id)
+    monkey = verifier._default
+    verifier._default = v
+    try:
+        row = await store.get_claim(row.id)
+        assert await verifier.refetch(store, row, RECEIVED_MS) == "reopened"
+        assert await verifier.refetch(store, await store.get_claim(row.id),
+                                      RECEIVED_MS) == "not_eligible"
+        assert [j.kind for j in store.jobs.values() if j.status == "pending"] == ["fetch"]
+        row = await run(v, store, await store.get_claim(row.id))
+        assert row.status == "fetched" and row.reason is None
+    finally:
+        verifier._default = monkey
+        await v.fetcher.aclose()
+
+
+async def test_a_fetch_fault_is_not_refetched_once_the_event_is_taken(base):
+    store, v = MemoryStore(), make()
+    row = await submit(store, f"{base}/supported")
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-taken", confidence="reported", first_claim_id=99))
+    await store.update_claim(row.id, "novelty", status="rejected", reason="fetch_failed",
+                             event_id=ev.id)
+    assert await verifier.refetch(store, await store.get_claim(row.id), RECEIVED_MS) == \
+        "event_taken"
+    assert (await store.get_claim(row.id)).status == "rejected"
+    await v.fetcher.aclose()
