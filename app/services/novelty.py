@@ -352,14 +352,33 @@ def _linked(keys: Iterable[str]) -> bool:
     return any(not k.startswith("name:") for k in keys)
 
 
+def _name_forms(keys: Iterable[str]) -> Tuple[Set[str], Set[str]]:
+    """Words and joined forms of the folded subject names."""
+    names = [k[len("name:"):] for k in keys if k.startswith("name:")]
+    words = {w for n in names for w in n.split() if len(w) >= 3 and w not in ("and", "the")}
+    return words, {n.replace(" ", "") for n in names}
+
+
+def _named_apart(ident: Identity, cand: EventRecord) -> bool:
+    """No actor is shared, and no subject name shares a word or starts the other. Many small
+    companies report on one day, so one rounded figure alone can agree by chance."""
+    (ours, our_joined), (theirs, their_joined) = (_name_forms(k) for k in
+                                                  (ident.subject, cand.subject_keys))
+    if _overlap(ident, cand) or not (our_joined and their_joined) or ours & theirs:
+        return False
+    return not any(a.startswith(b) or b.startswith(a) for a in our_joined for b in their_joined)
+
+
 def _same_numbers(ident: Identity, claim: Claim, cand: EventRecord) -> bool:
     """Same type and date, and every figure both give agrees. Subjects that both carry an
-    ID are left to the identity rules. A day off still matches, except for types whose
-    window is one day (rate decisions, data prints), where distinct releases sit a day apart."""
+    ID are left to the identity rules, and subjects whose names share nothing stay apart.
+    A day off still matches, except for types whose window is one day (rate decisions, data
+    prints), where distinct releases sit a day apart."""
     slack = 0 if TYPE_SPEC[claim.event_type].window_days <= 1 else 1
     if (cand.event_type != claim.event_type.value or _apart(ident, cand)
             or abs((cand.event_date - claim.event_date).days) > slack
-            or (_linked(ident.subject) and _linked(cand.subject_keys))):
+            or (_linked(ident.subject) and _linked(cand.subject_keys))
+            or _named_apart(ident, cand)):
         return False
     mine = {f: Fact(field=f, value=v, unit=u) for f, v, u in numbers(claim)}
     theirs = {f: Fact(field=f, value=v, unit=u) for f, v, u in cand.numbers}

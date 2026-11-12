@@ -147,6 +147,23 @@ async def test_same_figures_a_day_off_are_one_event_but_rate_decisions_stay_apar
     assert (await _decide(store, other_bank, entities)).state == "new"
 
 
+async def test_one_shared_figure_never_joins_two_named_companies(entities):
+    def results(actor, revenue):
+        return dict(BASE, event_type="earnings", headline="x", stage=None, actors=[actor],
+                    facts=[{"field": "period", "value": "third quarter"},
+                           {"field": "revenue", "value": revenue, "unit": "usd_millions"}])
+    store = MemoryStore()
+    await index(store, Claim(**results(other("Frontera Energy Corporation", role="company"),
+                                       33.0)), entities)
+    filer = {"id_scheme": "cik", "id": "0000722313", "name": "Nortech Systems",
+             "role": "company"}
+    assert (await _decide(store, results(filer, 33.0), entities)).state == "new"
+    assert (await _decide(store, results(other("Allot Ltd", role="company"), 33.1),
+                          entities)).state == "new"
+    copy = results(other("Frontera Energy", role="company"), 33.0)
+    assert (await _decide(store, copy, entities)).state == "known"
+
+
 def _release(indicator, actual, measure):
     return {"kind": "event", "headline": "x", "event_type": "economic_data",
             "event_date": "2026-10-15", "place": {"iso2": "US"},
