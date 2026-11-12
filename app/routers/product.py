@@ -77,8 +77,10 @@ def _keys(entities: EntityIndex, entity: Optional[str]):
 
 
 def _shown(request: Request, out):
-    """Sources are shown once the claims behind them settle."""
-    return product.hide_sources(out, _now_ms())
+    """Sources go only to API-key callers, once the claims behind them settle; miners,
+    validators and the public never see them."""
+    keyed = getattr(request.state, "api_key", False)
+    return product.hide_sources(out, _now_ms() if keyed else None)
 
 
 async def _page(store: Store, entities: EntityIndex, q: EventQuery) -> dict:

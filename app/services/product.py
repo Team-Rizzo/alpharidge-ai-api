@@ -55,15 +55,16 @@ def open_ms(c: Optional[ClaimRow]) -> Optional[int]:
     return c.settle_ms if c is not None else None
 
 
-def hide_sources(obj, now_ms: int):
-    """`obj` with each source_url whose claim has not settled left out."""
+def hide_sources(obj, now_ms: Optional[int]):
+    """`obj` with each source_url whose claim has not settled left out; every source_url when
+    `now_ms` is None."""
     if isinstance(obj, list):
         return [hide_sources(x, now_ms) for x in obj]
     if not isinstance(obj, dict):
         return obj
     out = {k: hide_sources(v, now_ms) for k, v in obj.items() if k != OPEN_AT}
     at = obj.get(OPEN_AT)
-    if out.get("source_url") and (at is None or at > now_ms):
+    if out.get("source_url") and (now_ms is None or at is None or at > now_ms):
         out["source_url"] = None
     return out
 

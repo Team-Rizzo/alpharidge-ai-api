@@ -232,9 +232,12 @@ async def test_dashboard_shows_route_and_check(api, monkeypatch):
     assert client.get("/dashboard/items?reason=Bad%20one").status_code == 400
     client.clock["now"] = SEEN + product.settle_ms() + 1
     claim.status, claim.reason = "provisional", None
-    assert client.get("/dashboard/items").json()["items"][0]["source_domain"] == "newsone.com"
-    assert client.get("/events").json()["items"][0]["source_url"] == "https://newsone.com/a"
-    assert client.get("/events", headers=KEY).json()["items"][0]["source_url"]
+    # A claim's source never reaches the public, even settled; API-key callers get it then.
+    public = client.get("/dashboard/items").json()["items"][0]
+    assert public["source_domain"] is None and public["trust_band"]
+    assert client.get("/events").json()["items"][0]["source_url"] is None
+    assert client.get("/events", headers=KEY).json()["items"][0]["source_url"] == \
+        "https://newsone.com/a"
 
 
 async def test_items_show_each_validator_only_once_open(api, monkeypatch):
