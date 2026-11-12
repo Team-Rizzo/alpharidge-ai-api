@@ -109,6 +109,8 @@ EVENT_LANE = {
     "PARSE_PROCESSES": _el("PARSE_PROCESSES", 0, int),
     # Processes for the fixed check and contrastive match; 0 runs them in the API process.
     "CHECK_PROCESSES": _el("CHECK_PROCESSES", 0, int),
+    # Claims checked at once in a worker tick, one per hotkey at a time; 1 checks them in turn.
+    "VERIFY_CONCURRENCY": _el("VERIFY_CONCURRENCY", 1, int),
     # Listed validators whose verdicts decide a page (0: all of them). With fewer than all,
     # each page goes to one of them, and to the others once it has waited JUDGE_HANDOFF_S.
     "JUDGES_PER_ITEM": _el("JUDGES_PER_ITEM", 0, int),

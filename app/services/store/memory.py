@@ -379,7 +379,7 @@ class MemoryStore:
         self.events[rec.id] = rec
         return replace(rec)
 
-    async def prize_docs(self, since_ms):
+    async def prize_docs(self, since_ms, probe=None):
         return [c.doc_hash for c in self.claims.values()
                 if c.doc_hash and c.route in PRIZE_ROUTES and c.status in WON
                 and c.received_ms >= since_ms]

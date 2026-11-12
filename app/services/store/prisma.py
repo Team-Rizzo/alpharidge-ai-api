@@ -571,12 +571,22 @@ class PrismaStore:
             raise DuplicateEvent(rec.fingerprint)
         return _event_from(rows[0])
 
-    async def prize_docs(self, since_ms):
-        rows = await self.db.query_raw(
-            'SELECT doc_hash FROM "claim" WHERE doc_hash IS NOT NULL '
-            "AND route = ANY(string_to_array($1, ',')) AND status = ANY(string_to_array($2, ',')) "
-            'AND received_at >= to_timestamp($3::double precision / 1000)',
-            ",".join(PRIZE_ROUTES), ",".join(WON), since_ms)
+    async def prize_docs(self, since_ms, probe=None):
+        sql = ('SELECT doc_hash FROM "claim" WHERE doc_hash IS NOT NULL '
+               "AND route = ANY(string_to_array($1, ',')) "
+               "AND status = ANY(string_to_array($2, ',')) "
+               'AND received_at >= to_timestamp($3::double precision / 1000)')
+        args = [",".join(PRIZE_ROUTES), ",".join(WON), since_ms]
+        if probe is not None:
+            # Only rows that can match: the same URL hash, or at the same length the same lead
+            # or one of the probe's minhash slots.
+            url, lead, length, slots = probe
+            sql += (" AND (left(doc_hash, 16) = $4::text OR (length(doc_hash) = $6::int AND ("
+                    "($5::text <> '' AND substr(doc_hash, 17, 16) = $5::text) OR EXISTS ("
+                    "SELECT 1 FROM unnest(string_to_array($7::text, ',')) WITH ORDINALITY "
+                    "AS s(v, i) WHERE substr(doc_hash, 25 + 8 * i::int, 8) = s.v))))")
+            args += [url, lead, length, ",".join(slots)]
+        rows = await self.db.query_raw(sql, *args)
         return [r["doc_hash"] for r in rows]
 
     async def add_source_fetch(self, row):

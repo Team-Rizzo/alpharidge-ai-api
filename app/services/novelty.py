@@ -637,9 +637,21 @@ def same_doc(a: str, b: str) -> bool:
     return k > 0 and same / k >= DOC_SAME_JACCARD
 
 
+def doc_probe(doc: str) -> Tuple[str, str, int, List[str]]:
+    """What any document `same_doc` matches must share with this one: its URL hash, or at its
+    length the wire lead or one of the first minhash slots any match agrees on."""
+    sig = doc[32:]
+    k = len(sig) // 8
+    lead = doc[16:32] if len(doc) > 32 and int(doc[16:32] or "0", 16) else ""
+    # A match agrees on at least `need` slots, so on one of any k - need + 1 of them.
+    need = next((n for n in range(k + 1) if n / k >= DOC_SAME_JACCARD), k + 1) if k else 0
+    slots = k - need + 1 if k else 0
+    return doc[:16], lead, len(doc), [sig[i * 8:i * 8 + 8] for i in range(slots)]
+
+
 async def doc_prize_open(store: Store, doc: str, now_ms: int, listing: bool = False) -> bool:
     """False once this document (or a syndicated copy) has used its event prizes."""
     since = now_ms - int(2 * MAX_AGE_D * 24 * HOUR_MS)
-    used = sum(same_doc(doc, d) for d in await store.prize_docs(since))
+    used = sum(same_doc(doc, d) for d in await store.prize_docs(since, doc_probe(doc)))
     return used < (LISTING_PRIZES_MAX if listing else 1)
 

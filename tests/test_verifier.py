@@ -399,3 +399,42 @@ async def test_a_fetch_fault_is_not_refetched_once_the_event_is_taken(base):
         "event_taken"
     assert (await store.get_claim(row.id)).status == "rejected"
     await v.fetcher.aclose()
+
+
+async def test_verify_ready_checks_claims_at_once_one_per_hotkey(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    heads = [SimpleNamespace(id=i, event_id=i, event_date=None, received_ms=RECEIVED_MS,
+                             source_url=f"https://example.org/{i}", hotkey=hk)
+             for i, hk in enumerate("aabcdd", start=1)]
+    running, most, order = [], [0], []
+
+    async def verify(store, row, now_ms):
+        assert row.hotkey not in running
+        running.append(row.hotkey)
+        most[0] = max(most[0], len(running))
+        await asyncio.sleep(0.01)
+        running.remove(row.hotkey)
+        order.append(row.id)
+        return row
+
+    async def claim_heads(status, limit, skip):
+        return heads
+
+    async def claims_by_ids(ids):
+        return [h for h in heads if h.id in ids]
+
+    v = SimpleNamespace(_judge_wait={}, cache=SimpleNamespace(get=lambda *a: None),
+                        looked=lambda *a: False, verify=verify)
+    monkeypatch.setattr(verifier, "_default", v)
+    store = SimpleNamespace(claim_heads=claim_heads, claims_by_ids=claims_by_ids)
+    monkeypatch.setitem(verifier.EVENT_LANE, "VERIFY_CONCURRENCY", 3)
+    await verifier.verify_ready(store, RECEIVED_MS)
+    assert most[0] == 3 and sorted(order) == [1, 2, 3, 4, 5, 6]
+    assert order.index(1) < order.index(2) and order.index(5) < order.index(6)
+    running.clear(), order.clear()
+    most[0] = 0
+    monkeypatch.setitem(verifier.EVENT_LANE, "VERIFY_CONCURRENCY", 1)
+    await verifier.verify_ready(store, RECEIVED_MS)
+    assert most[0] == 1 and len(order) == 6

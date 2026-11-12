@@ -137,6 +137,10 @@ async def _aside(fn, *args, **kwargs):
         pool, functools.partial(fn, *args, **kwargs))
 
 
+# Claims checked at once place a retyped claim one at a time, as novelty does.
+_placing = asyncio.Lock()
+
+
 def _utc(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 
@@ -354,7 +358,9 @@ class Verifier:
         category = category_of(claim.event_type).value
         ct = await trust.of_claim(store, self.registry, self.index(), claim, source, category,
                                   url)
-        n = await novelty.place(store, claim, self.index(), self.places, now_ms, ct.t, ct.filer)
+        async with _placing:
+            n = await novelty.place(store, claim, self.index(), self.places, now_ms, ct.t,
+                                    ct.filer)
         fields.update(payload=claim.model_dump(mode="json", exclude_none=True),
                       event_type=claim.event_type.value, category=category, novelty=n.state,
                       route=n.route, event_id=n.event_id)
@@ -410,8 +416,8 @@ class Verifier:
                 result = replace(result, verdict=REJECTED, reason="contrastive_known")
 
         if page.ok:
-            fields["doc_hash"] = novelty.doc_hash(page.canonical_url or page.final_url
-                                                  or row.source_url, page.text)
+            fields["doc_hash"] = await _aside(novelty.doc_hash, page.canonical_url
+                                              or page.final_url or row.source_url, page.text)
         ct = None
         if result.passed and row.route in PRIZE_ROUTES and trust.filing_of(url) is None:
             # An untrusted page that cannot be held as a scoop is not judged.
@@ -589,18 +595,27 @@ async def verify_ready(store: Store, now_ms: int, limit: int = 50, scan: int = 5
              if v.cache.get(h.source_url, h.received_ms) is not None
              or not v.looked(h.id, now_ms)]
     rows = {r.id: r for r in await store.claims_by_ids(order)} if order else {}
-    for cid in order:
-        row = rows.get(cid)
-        if row is None:
-            continue
-        if done >= limit:
-            break
-        try:
-            cached = v.cache.get(row.source_url, row.received_ms) is not None
-            out = await v.verify(store, row, now_ms)
-            done += cached and out.status != row.status
-        except intake.InvalidTransition:
-            pass
-        except Exception as e:
-            logger.warning(f"Verify of claim {row.id} failed: {e!r}")
+    slots = asyncio.Semaphore(max(1, EVENT_LANE["VERIFY_CONCURRENCY"]))
+    hotkeys: Dict[str, asyncio.Lock] = {}
+
+    async def one(row: ClaimRow) -> None:
+        nonlocal done
+        async with hotkeys.setdefault(row.hotkey, asyncio.Lock()), slots:
+            if done >= limit:
+                return
+            try:
+                cached = v.cache.get(row.source_url, row.received_ms) is not None
+                out = await v.verify(store, row, now_ms)
+                done += cached and out.status != row.status
+            except intake.InvalidTransition:
+                pass
+            except Exception as e:
+                logger.warning(f"Verify of claim {row.id} failed: {e!r}")
+
+    if EVENT_LANE["VERIFY_CONCURRENCY"] <= 1:
+        for cid in order:
+            if cid in rows and done < limit:
+                await one(rows[cid])
+        return done
+    await asyncio.gather(*(one(rows[cid]) for cid in order if cid in rows))
     return done
