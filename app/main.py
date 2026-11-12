@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 
 import bittensor  # noqa: F401  loaded before _setup_logging; see there
@@ -13,7 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app import config, db
 from app.routers import claims, dashboard, judge, ledger, mechanism, ops, product, scoops
 from app.routers import config as config_router
-from app.utils import auth, block, hotkey_whitelist
+from app.utils import auth, block, hotkey_whitelist, parse_pool
 from app.utils.body_limit import BodyLimit
 from app.utils.rate_limit import limit
 from app.utils.receipt import ReceiptClock
@@ -99,6 +100,39 @@ async def _cancel(task: asyncio.Task) -> None:
         pass
 
 
+async def _profile(seconds: float) -> None:
+    """Profile the whole process for a while after start-up and log where the time went."""
+    import cProfile
+    import io
+    import pstats
+
+    prof = cProfile.Profile()
+    prof.enable()
+    try:
+        await asyncio.sleep(seconds)
+    finally:
+        prof.disable()
+        out = io.StringIO()
+        stats = pstats.Stats(prof, stream=out)
+        stats.sort_stats("tottime").print_stats(40)
+        stats.sort_stats("cumulative").print_stats(40)
+        logger.info(f"[PROFILE] {seconds:.0f} s\n{out.getvalue()}")
+
+
+_READER_PATHS = re.compile("|".join(f"(?:{p})" for p in config.READER_ROUTES))
+
+
+class ReaderOnly(BaseHTTPMiddleware):
+    """A reader answers only GET on the read routes; everything else belongs to the writer."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method not in ("GET", "HEAD") or not _READER_PATHS.fullmatch(
+                request.url.path):
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND,
+                                content={"detail": "writer_route"})
+        return await call_next(request)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.jobs import answer_key
@@ -118,15 +152,23 @@ async def lifespan(app: FastAPI):
     await hotkey_whitelist.sync_async()
     await db.connect()
 
-    tasks = [asyncio.create_task(hotkey_whitelist.run_sync()),
-             asyncio.create_task(run_worker(claims.get_store())),
-             asyncio.create_task(run_daily(claims.get_store())),
-             asyncio.create_task(answer_key.run_forever(claims.get_store()))]
+    tasks = [asyncio.create_task(hotkey_whitelist.run_sync())]
+    if config.API_ROLE == "reader":
+        logger.info("Serving read routes only (API_ROLE=reader)")
+    else:
+        parse_pool.install(config.EVENT_LANE["PARSE_PROCESSES"])
+        parse_pool.install_checks(config.EVENT_LANE["CHECK_PROCESSES"])
+        tasks += [asyncio.create_task(run_worker(claims.get_store())),
+                  asyncio.create_task(run_daily(claims.get_store())),
+                  asyncio.create_task(answer_key.run_forever(claims.get_store()))]
+    if config.EVENT_LANE["PROFILE_S"] > 0:
+        tasks.append(asyncio.create_task(_profile(config.EVENT_LANE["PROFILE_S"])))
     yield
 
     logger.info("Shutting down Alpharidge AI API...")
     for task in tasks:
         await _cancel(task)
+    parse_pool.uninstall()
     await db.disconnect()
 
 
@@ -138,6 +180,12 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    @app.exception_handler(Exception)
+    async def unhandled(request: Request, exc: Exception):
+        logger.error(f"Unhandled error on {request.method} {request.url.path}", exc_info=exc)
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            content={"detail": "internal_error"})
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -147,6 +195,8 @@ def create_app() -> FastAPI:
     )
     if config.BLOCKED_HOTKEYS:
         app.add_middleware(BlockedHotkeyMiddleware)
+    if config.API_ROLE == "reader":
+        app.add_middleware(ReaderOnly)
     app.add_middleware(FilteredAccessLogMiddleware)
     app.add_middleware(BodyLimit)
     # Outermost, so the receipt time is taken before any other work.

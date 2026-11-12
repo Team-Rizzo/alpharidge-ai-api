@@ -195,3 +195,47 @@ async def test_concurrent_receipts_link_in_one_sequence(store):
 def rc_pubkey():
     from bittensor_wallet import Keypair
     return Keypair.create_from_seed("0x" + os.environ["API_ATTESTATION_PRIVKEY"]).ss58_address
+
+
+async def test_prize_docs_probe_keeps_every_document_that_matches(store):
+    import random
+
+    from app.services import novelty
+    rng = random.Random(7)
+
+    def hexes(n):
+        return "".join(rng.choice("0123456789abcdef") for _ in range(n))
+
+    base = hexes(16) + hexes(16) + hexes(64 * 8)
+    docs = [base[:16] + hexes(len(base) - 16), hexes(16) + base[16:32] + hexes(64 * 8),
+            hexes(16) + "0" * 16 + base[32:], base[:40]]
+    # The least overlap that still matches, all in the last slots.
+    keeps = [set(range(25, 64))]
+    keeps += [set(rng.sample(range(64), n)) for n in (37, 38, 39, 40, 64) for _ in range(4)]
+    for keep in keeps:
+        sig = "".join(base[32 + i * 8:40 + i * 8] if i in keep else hexes(8) for i in range(64))
+        docs.append(hexes(32) + sig)
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    for d in docs:
+        row = await store.create_claim(claim(hk))
+        assert await store.update_claim(row.id, "received", status="provisional", route="event",
+                                        doc_hash=d)
+    for doc in (base, hexes(16) + "0" * 16 + base[32:], docs[4], docs[9]):
+        probed = await store.prize_docs(T0 - 1, novelty.doc_probe(doc))
+        every = await store.prize_docs(T0 - 1)
+        assert (sum(novelty.same_doc(doc, d) for d in probed)
+                == sum(novelty.same_doc(doc, d) for d in every))
+        assert sum(novelty.same_doc(doc, d) for d in every) > 0
+
+
+async def test_won_by_host_counts_paid_claims_per_host_and_type(store):
+    host = f"h{uuid.uuid4().hex[:8]}.example.org"
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    for i, (status, at) in enumerate((("provisional", T0 + 10), ("provisional", T0 - 7_000_000),
+                                      ("rejected", T0 + 10), ("settled", T0 + 20))):
+        row = await store.create_claim(replace(claim(hk), source_url=f"https://{host}/p{i}"))
+        assert await store.update_claim(row.id, "received", status=status, route="event",
+                                        verified_ms=at)
+    got = [r for r in await store.won_by_host(T0 - 86_400_000, T0 - 3_600_000)
+           if r[0] == host]
+    assert got == [(host, "merger_acquisition", 2, 3)]

@@ -194,6 +194,21 @@ async def test_an_operator_off_the_metagraph_reads_any_claim(client, store, monk
     assert client.get(path, headers=signed(op, "GET", path)).json()["reason"] == "unsupported"
 
 
+async def test_status_reply_is_reused_briefly_and_stays_owner_only(client, store, monkeypatch):
+    from app.config import EVENT_LANE
+    monkeypatch.setitem(EVENT_LANE, "STATUS_CACHE_S", 20)
+    claims_router._status.clear()
+    cid = int(post(client, MINER, canonical_body(claim())).json()["id"])
+    path = f"/claims/{cid}"
+    assert client.get(path, headers=signed(MINER, "GET", path)).json()["status"] == "queued"
+    await store.update_claim(cid, "queued", status="rejected", reason="unsupported")
+    assert client.get(path, headers=signed(MINER, "GET", path)).json()["status"] == "queued"
+    assert client.get(path, headers=signed(RIVAL, "GET", path)).status_code == 404
+    assert client.get(path, headers=signed(VALI, "GET", path)).status_code == 200
+    claims_router._status.clear()
+    assert client.get(path, headers=signed(MINER, "GET", path)).json()["status"] == "rejected"
+
+
 def test_the_query_string_is_signed(client):
     cid = post(client, MINER, canonical_body(claim())).json()["id"]
     path = f"/claims/{cid}"
@@ -270,6 +285,21 @@ async def test_ties_wait_for_the_tie_block_and_draw_on_its_hash(store, monkeypat
     pair = await line.in_line_order(store, [store.claims[public[2]], store.claims[public[0]]])
     assert [c.id for c in pair] == [public[0], public[2]]
     assert not line.ready(alone, t0 + 600) and line.ready(alone, t0 + 750)
+
+
+async def test_tie_lookups_go_oldest_first_and_stop_at_the_first_gap(store, monkeypatch):
+    asked = []
+
+    async def tie_block(after_ms):
+        asked.append(after_ms)
+        return None if after_ms >= line.closes_ms(12) else (after_ms, f"0x{after_ms:x}")
+    monkeypatch.setattr(line.block, "tie_block", tie_block)
+    monkeypatch.setattr(line, "TIE_LOOKUPS_PER_TICK", 3)
+    got = await line.tie_seeds(store, {14, 10, 11, 12, 13})
+    assert sorted(got) == [10, 11] and asked == [line.closes_ms(b) for b in (10, 11, 12)]
+    asked.clear()
+    assert sorted(await line.tie_seeds(store, {10, 11, 12})) == [10, 11]
+    assert asked == [line.closes_ms(12)]
 
 
 async def test_over_budget_gets_429(client, store, monkeypatch):
@@ -461,13 +491,15 @@ async def test_a_held_lookup_keeps_line_order_until_the_hold_ends(store, monkeyp
     assert seen[1:] == [first.id, later.id, other.id]
 
 
-async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch):
+@pytest.mark.parametrize("wait_s", [0, 5])
+async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch, wait_s):
     from types import SimpleNamespace
     from alpharidge_ai.verify.fetch import Paced
     from app.services import novelty, trust, verifier
     from app.services.entities import EntityIndex
 
     monkeypatch.setattr(verifier.get_verifier(), "entities", EntityIndex())
+    monkeypatch.setattr(worker, "ADVANCE_PACE_WAIT_S", wait_s)
     seen, busy = [], [True]
 
     async def apply(store, row, *a, **kw):
@@ -475,7 +507,7 @@ async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch)
 
     async def of_claim(*a, **kw):
         if busy.pop() if busy else False:
-            raise Paced(1.0)
+            raise Paced(0.05)
         return SimpleNamespace(t=0.0, filer=None)
     monkeypatch.setattr(novelty, "apply", apply)
     monkeypatch.setattr(trust, "resolve", lambda *a, **kw: asyncio.sleep(0))
@@ -487,9 +519,11 @@ async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch)
                           actors=[{"id_scheme": "other", "id": "acme", "role": "target", "name": "Acme"},
                                   {"id_scheme": "other", "id": "w", "role": "acquirer", "name": "W"}])
     await worker.advance_queued(store, t0 + 2000)
-    assert seen == []
-    await worker.advance_queued(store, t0 + 3000)
-    assert seen == [first.id, later.id]
+    # With time left in the pass the host is waited for, in line order; without, the type waits.
+    assert seen == ([first.id, later.id] if wait_s else [])
+    if not wait_s:
+        await worker.advance_queued(store, t0 + 3000)
+        assert seen == [first.id, later.id]
 
 
 async def test_claims_past_the_in_flight_cap_get_503(client, store, monkeypatch):
@@ -500,3 +534,27 @@ async def test_claims_past_the_in_flight_cap_get_503(client, store, monkeypatch)
     monkeypatch.setattr(claims_router, "_in_flight", 0)
     assert post(client, MINER, canonical_body(claim(headline="busy"))).status_code == 202
     assert claims_router._in_flight == 0
+
+
+async def test_the_change_feed_gives_a_miner_its_own_changed_claims_in_order(client, store,
+                                                                            monkeypatch):
+    monkeypatch.setattr(claims_router, "FEED_LAG_MS", -10_000)
+    mine = [int(post(client, MINER, canonical_body(claim(headline=f"h{i}"))).json()["id"])
+            for i in range(3)]
+    theirs = int(post(client, RIVAL, canonical_body(claim(headline="r"))).json()["id"])
+
+    def feed(since="", limit=200):
+        path = f"/claims?since={since}&limit={limit}"
+        r = client.get(path, headers=signed(MINER, "GET", path))
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    got = feed(limit=2)
+    assert [c["id"] for c in got["claims"]] == [str(i) for i in mine[:2]] and got["more"]
+    rest = feed(got["cursor"])
+    assert [c["id"] for c in rest["claims"]] == [str(mine[2])] and not rest["more"]
+    await store.update_claim(mine[0], "queued", status="rejected", reason="unsupported")
+    again = feed(rest["cursor"])
+    assert [(c["id"], c["status"]) for c in again["claims"]] == [(str(mine[0]), "rejected")]
+    assert str(theirs) not in {c["id"] for c in got["claims"] + rest["claims"] + again["claims"]}
+    assert feed(again["cursor"])["claims"] == []

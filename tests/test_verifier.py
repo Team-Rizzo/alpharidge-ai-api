@@ -260,3 +260,181 @@ async def test_failed_fetch_is_retried_and_not_reused(base):
     finally:
         del PAGES["/late"]
     await v.fetcher.aclose()
+
+
+async def test_verify_ready_asks_for_one_fetch_per_claim_and_checks_cached_pages(base, monkeypatch):
+    store, v = MemoryStore(), make()
+    monkeypatch.setattr(verifier, "_default", v)
+    row = await submit(store, f"{base}/supported")
+    now = RECEIVED_MS + 1000
+    for t in (now, now + 1000, now + 61_000, now + 122_000):
+        await verifier.verify_ready(store, t)
+    assert [j.kind for j in store.jobs.values() if j.status == "pending"] == ["fetch"]
+    await v.fetch(store, await store.get_claim(row.id))
+    await verifier.verify_ready(store, now + 123_000)
+    assert (await store.get_claim(row.id)).status == "fetched"
+    await v.fetcher.aclose()
+
+
+async def test_fetch_jobs_go_oldest_claim_first_up_to_the_hotkey_cap():
+    from dataclasses import replace
+    store = MemoryStore()
+    order = []
+    for hotkey, bucket in (("a", 3), ("a", 1), ("b", 5), ("a", 2), ("c", 4)):
+        row = await submit(store, f"https://example.org/{hotkey}{bucket}")
+        store.claims[row.id] = replace(store.claims[row.id], hotkey=hotkey, bucket=bucket)
+        await store.add_job("fetch", row.id, 0)
+        order.append((hotkey, bucket, row.id))
+    ids = {(h, b): i for h, b, i in order}
+    got = [j.claim_id for j in await store.take_jobs(["fetch"], 10, 60_000, 1, per_hotkey=2)]
+    assert got == [ids[k] for k in (("a", 1), ("a", 2), ("c", 4), ("b", 5), ("a", 3))]
+
+
+@pytest.mark.parametrize("filer, route", [("0000000001", "event"), (None, "scoop")])
+async def test_a_scoop_on_a_filing_its_subject_made_takes_the_event_route(monkeypatch, filer, route):
+    store, v = MemoryStore(), make()
+    url = "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/a8k.htm"
+    row = await submit(store, url, route="scoop", trusted=False)
+
+    async def filed(actors, u, event_type):
+        return filer
+    monkeypatch.setattr(v.registry.filings, "filer", filed)
+    out = await v._filed_by_subject(store, row, Claim.model_validate(row.payload), RECEIVED_MS)
+    assert out.route == route and (await store.get_claim(row.id)).route == route
+    await v.fetcher.aclose()
+
+
+async def test_pages_parsed_in_worker_processes_are_the_same(base, monkeypatch):
+    from dataclasses import asdict
+
+    from alpharidge_ai.verify import fetch
+    from app.utils import parse_pool
+
+    cfg = FetchConfig(public_only=False, domain_rps=1000, retry_delay_s=0)
+    urls = [f"{base}{p}" for p in ("/supported", "/paywall", "/old")]
+    on_thread = [asdict(await Fetcher(cfg).fetch(u)) for u in urls]
+    monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
+    parse_pool.install(2)
+    try:
+        assert isinstance(fetch._PARSE, parse_pool.ParsePool)
+        in_workers = [asdict(await Fetcher(cfg).fetch(u)) for u in urls]
+    finally:
+        parse_pool.uninstall()
+    for a, b in zip(on_thread, in_workers):
+        a.pop("fetched_at", None), b.pop("fetched_at", None)
+    assert in_workers == on_thread and in_workers[0]["text"]
+
+
+async def test_the_check_gives_the_same_result_in_the_parse_workers(base, monkeypatch):
+    from alpharidge_ai.verify import fetch
+    from app.utils import parse_pool
+
+    store, v = MemoryStore(), make()
+    page, _ = await v.fetch(store, await submit(store, f"{base}/supported"))
+    claim = Claim.model_validate(payload(f"{base}/supported"))
+    at = datetime(2026, 10, 13, 12, 40, tzinfo=timezone.utc)
+    here = await v.check_aside(claim, page, at)
+    monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
+    parse_pool.install_checks(1)
+    try:
+        aside = await v.check_aside(claim, page, at)
+    finally:
+        parse_pool.uninstall()
+    assert aside == here and here.passed
+    await v.fetcher.aclose()
+
+
+async def test_the_contrastive_match_is_the_same_in_the_parse_workers(monkeypatch):
+    from alpharidge_ai.verify import fetch
+    from app.services import novelty
+    from app.utils import parse_pool
+
+    ev = EventRecord("merger_acquisition", "finance", date(2026, 10, 13), "fp", id=7,
+                     subject_keys=("name:beta systems",))
+    args = (DEAL, [ev], [])
+    here = await verifier._aside(novelty.contrastive, *args)
+    monkeypatch.setattr(fetch, "_PARSE", fetch._PARSE)
+    parse_pool.install_checks(1)
+    try:
+        aside = await verifier._aside(novelty.contrastive, *args)
+    finally:
+        parse_pool.uninstall()
+    assert aside == here == 7
+
+
+async def test_a_claim_turned_away_by_a_fetch_fault_is_fetched_afresh(base):
+    from app.services.store import SourceFetchRow
+    store, v = MemoryStore(), make()
+    row = await submit(store, f"{base}/supported")
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-refetch", confidence="line"))
+    for _ in range(verifier.FETCH_TRIES):
+        await store.add_source_fetch(SourceFetchRow(row.id, "rejected", reason="fetch_failed",
+                                                    fetched_ms=RECEIVED_MS))
+    await store.update_claim(row.id, "novelty", status="rejected", reason="fetch_failed",
+                             event_id=ev.id)
+    monkey = verifier._default
+    verifier._default = v
+    try:
+        row = await store.get_claim(row.id)
+        assert await verifier.refetch(store, row, RECEIVED_MS) == "reopened"
+        assert await verifier.refetch(store, await store.get_claim(row.id),
+                                      RECEIVED_MS) == "not_eligible"
+        assert [j.kind for j in store.jobs.values() if j.status == "pending"] == ["fetch"]
+        row = await run(v, store, await store.get_claim(row.id))
+        assert row.status == "fetched" and row.reason is None
+    finally:
+        verifier._default = monkey
+        await v.fetcher.aclose()
+
+
+async def test_a_fetch_fault_is_not_refetched_once_the_event_is_taken(base):
+    store, v = MemoryStore(), make()
+    row = await submit(store, f"{base}/supported")
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-taken", confidence="reported", first_claim_id=99))
+    await store.update_claim(row.id, "novelty", status="rejected", reason="fetch_failed",
+                             event_id=ev.id)
+    assert await verifier.refetch(store, await store.get_claim(row.id), RECEIVED_MS) == \
+        "event_taken"
+    assert (await store.get_claim(row.id)).status == "rejected"
+    await v.fetcher.aclose()
+
+
+async def test_verify_ready_checks_claims_at_once_one_per_hotkey(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    heads = [SimpleNamespace(id=i, event_id=i, event_date=None, received_ms=RECEIVED_MS,
+                             source_url=f"https://example.org/{i}", hotkey=hk)
+             for i, hk in enumerate("aabcdd", start=1)]
+    running, most, order = [], [0], []
+
+    async def verify(store, row, now_ms):
+        assert row.hotkey not in running
+        running.append(row.hotkey)
+        most[0] = max(most[0], len(running))
+        await asyncio.sleep(0.01)
+        running.remove(row.hotkey)
+        order.append(row.id)
+        return row
+
+    async def claim_heads(status, limit, skip):
+        return heads
+
+    async def claims_by_ids(ids):
+        return [h for h in heads if h.id in ids]
+
+    v = SimpleNamespace(_judge_wait={}, cache=SimpleNamespace(get=lambda *a: None),
+                        looked=lambda *a: False, verify=verify)
+    monkeypatch.setattr(verifier, "_default", v)
+    store = SimpleNamespace(claim_heads=claim_heads, claims_by_ids=claims_by_ids)
+    monkeypatch.setitem(verifier.EVENT_LANE, "VERIFY_CONCURRENCY", 3)
+    await verifier.verify_ready(store, RECEIVED_MS)
+    assert most[0] == 3 and sorted(order) == [1, 2, 3, 4, 5, 6]
+    assert order.index(1) < order.index(2) and order.index(5) < order.index(6)
+    running.clear(), order.clear()
+    most[0] = 0
+    monkeypatch.setitem(verifier.EVENT_LANE, "VERIFY_CONCURRENCY", 1)
+    await verifier.verify_ready(store, RECEIVED_MS)
+    assert most[0] == 1 and len(order) == 6

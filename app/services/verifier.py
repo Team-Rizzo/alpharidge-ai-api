@@ -7,6 +7,8 @@ URL cache window and never written to the database. Failed fetches are retried, 
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import logging
 import re
 import time
@@ -26,6 +28,7 @@ from app.services import (budget, intake, judge as judges, ledger, novelty, page
 from app.services.answer_key import releases
 from app.services.entities import EntityIndex, PlaceIndex, shared_index
 from app.services.store import PRIZE_ROUTES, ClaimRow, EventRecord, Job, SourceFetchRow, Store
+from app.utils import parse_pool
 from app.utils.clock import DAY_MS, ms as _ms, now_ms as _now_ms
 
 FETCH_MAX_BYTES = 2_000_000
@@ -49,6 +52,8 @@ JUDGE_REPEAT_MAX = 2
 logger = logging.getLogger(__name__)
 
 PENDING = "pending"
+# Marks failed fetches an operator set aside so the claim's page is fetched afresh.
+SUPERSEDED = "superseded"
 # Claims still waiting on their page.
 OPEN = ("queued", "novelty")
 
@@ -120,7 +125,20 @@ def fetch_config() -> FetchConfig:
         max_bytes=FETCH_MAX_BYTES, max_redirects=FETCH_MAX_REDIRECTS,
         retries=EVENT_LANE["FETCH_RETRY"], retry_delay_s=FETCH_RETRY_DELAY_S,
         domain_rps=EVENT_LANE["DOMAIN_RPS"], public_only=EVENT_LANE["FETCH_PUBLIC_ONLY"],
-        pace_max_wait_s=FETCH_PACE_MAX_WAIT_S)
+        pace_max_wait_s=FETCH_PACE_MAX_WAIT_S, host_rps=EVENT_LANE["HOST_RPS"])
+
+
+async def _aside(fn, *args, **kwargs):
+    """A pure CPU-bound call, in the page-parse workers when they run."""
+    pool = parse_pool.current()
+    if pool is None:
+        return fn(*args, **kwargs)
+    return await asyncio.get_running_loop().run_in_executor(
+        pool, functools.partial(fn, *args, **kwargs))
+
+
+# Claims checked at once place a retyped claim one at a time, as novelty does.
+_placing = asyncio.Lock()
 
 
 def _utc(ms: int) -> datetime:
@@ -129,9 +147,13 @@ def _utc(ms: int) -> datetime:
 
 def _age(row: ClaimRow, page: Optional[FetchedPage] = None) -> float:
     """The age factor pay would use, from the cached page's publish date when there is one."""
+    return _age_of(row.payload.get("event_date"), row.received_ms, page)
+
+
+def _age_of(event_date, received_ms: int, page: Optional[FetchedPage] = None) -> float:
     try:
-        return points.age(date.fromisoformat(str(row.payload.get("event_date"))[:10]),
-                          row.received_ms, _ms(page.published_at) if page else None)
+        return points.age(date.fromisoformat(str(event_date)[:10]), received_ms,
+                          _ms(page.published_at) if page else None)
     except (AttributeError, ValueError):
         return 0.0
 
@@ -224,6 +246,15 @@ class Verifier:
             return check_scoop(claim, page, received, excluded=excluded)
         return check_claim(claim, page, received, excluded=excluded)
 
+    async def check_aside(self, claim: Claim, page: FetchedPage, received: datetime,
+                          scoop: bool = False) -> CheckResult:
+        """`check`, in the page-parse workers when they run."""
+        if parse_pool.current() is None:
+            return self.check(claim, page, received, scoop)
+        excluded = self.rules.page_excluded(page.final_url or page.url, page)
+        return await _aside(check_scoop if scoop else check_claim, claim, page, received,
+                            excluded=excluded)
+
     def index(self) -> EntityIndex:
         if self.entities is None:
             self.entities = shared_index()
@@ -261,15 +292,22 @@ class Verifier:
         """The owner's (coldkey, else hotkey) non-pass judge outcomes today on this page and
         type."""
         day = now_ms - now_ms % DAY_MS
-        owner = row.coldkey or row.hotkey
-        return sum(1 for c in await store.claims_of_types(day - DAY_MS, [row.event_type])
-                   if c.id != row.id and (c.coldkey or c.hotkey) == owner
-                   and c.doc_hash == doc_hash and (c.judged_ms or 0) >= day
-                   and c.reason in ("judge_reject", "judge_unclear"))
+        return await store.judge_repeats(row.coldkey or row.hotkey, row.event_type, doc_hash,
+                                         day - DAY_MS, day, row.id,
+                                         ("judge_reject", "judge_unclear"))
 
     async def _near(self, store: Store, claim: Claim, row: ClaimRow) -> List[EventRecord]:
         own = [i for i in (row.event_id,) if i is not None]
         return await novelty.near_events(store, claim, self.index(), self.places, own)
+
+    def wake(self, claim_id: int) -> None:
+        """A claim waiting for page verdicts is looked at again on the next pass."""
+        self._judge_wait.pop(claim_id, None)
+
+    def looked(self, claim_id: int, now_ms: int) -> bool:
+        """True while the claim's last fetch request is under FETCH_REQUEST_S old."""
+        last = self._requested.get((intake.FETCH_JOB, claim_id))
+        return last is not None and now_ms - last < FETCH_REQUEST_S * 1000
 
     def _due(self, kind: str, row: ClaimRow, now_ms: int) -> bool:
         """At most one look per claim and kind every FETCH_REQUEST_S."""
@@ -289,12 +327,13 @@ class Verifier:
             return await self.fetch(store, row)
         if not self._due(intake.FETCH_JOB, row, now_ms):
             return None
-        failed = [f for f in await store.source_fetches(row.id) if not f.content_hash]
+        failed = [f for f in await store.source_fetches(row.id)
+                  if not f.content_hash and not (f.check or {}).get(SUPERSEDED)]
         if failed and (len(failed) >= FETCH_TRIES or failed[-1].reason == BLOCKED
                        or (failed[-1].check or {}).get("gave_up")):
             return _failed(row, failed[-1]), failed[-1]
         if not failed or now_ms >= failed[-1].fetched_ms + FETCH_REQUEST_S * 1000:
-            await store.add_job(intake.FETCH_JOB, row.id, now_ms)
+            await store.add_job_once(intake.FETCH_JOB, row.id, now_ms)
         return None
 
     async def _untrusted_reason(self, store: Store, claim: Claim, row: ClaimRow,
@@ -319,13 +358,27 @@ class Verifier:
         category = category_of(claim.event_type).value
         ct = await trust.of_claim(store, self.registry, self.index(), claim, source, category,
                                   url)
-        n = await novelty.place(store, claim, self.index(), self.places, now_ms, ct.t, ct.filer)
+        async with _placing:
+            n = await novelty.place(store, claim, self.index(), self.places, now_ms, ct.t,
+                                    ct.filer)
         fields.update(payload=claim.model_dump(mode="json", exclude_none=True),
                       event_type=claim.event_type.value, category=category, novelty=n.state,
                       route=n.route, event_id=n.event_id)
         if n.state == novelty.KNOWN and n.route is None:
             return replace(result, verdict=REJECTED, reason=n.reason or "known_event")
         return result
+
+    async def _filed_by_subject(self, store: Store, row: ClaimRow, claim: Claim,
+                                now_ms: int) -> ClaimRow:
+        """A new claim on a filing its subject made takes the event route, as novelty gives it
+        once the filer is confirmed; a claim placed before that could be confirmed gets it here."""
+        source = await trust.resolve(store, row.source_url, now_ms)
+        ct = await trust.of_claim(store, self.registry, self.index(), claim, source, row.category,
+                                  row.source_url)
+        if ct.t < trust.PRIZE_TRUST_MIN or not await store.update_claim(row.id, "novelty",
+                                                                          route="event"):
+            return row
+        return await store.get_claim(row.id) or row
 
     async def verify(self, store: Store, row: ClaimRow, now_ms: int,
                      near: Optional[Sequence[EventRecord]] = None) -> ClaimRow:
@@ -340,18 +393,22 @@ class Verifier:
         self._requested.pop((intake.FETCH_JOB, row.id), None)
         claim = Claim.model_validate(row.payload)
         await self.registry.refresh(store)
+        if (row.route == "scoop" and row.novelty == novelty.NEW
+                and trust.filing_of(row.source_url) is not None):
+            row = await self._filed_by_subject(store, row, claim, now_ms)
         page, rec = fetched
         url = (page.ok and page.final_url) or row.source_url
         source = await trust.resolve(store, url, now_ms)
         received = _utc(row.received_ms)
-        result = self.check(claim, page, received, scoop=row.route == "scoop")
+        result = await self.check_aside(claim, page, received, scoop=row.route == "scoop")
 
         fields = {"source_id": source.id}
         contrastive = False
         if result.passed and row.route in PRIZE_ROUTES:
             near = await self._near(store, claim, row) if near is None else near
-            hit = novelty.contrastive(page.text, [e for e in near if e.id != row.event_id],
-                                     novelty.subject_names(claim, self.index()))
+            hit = await _aside(novelty.contrastive, page.text,
+                               [e for e in near if e.id != row.event_id],
+                               novelty.subject_names(claim, self.index()))
             ev = await store.get_event(hit) if hit is not None else None
             if ev is not None:
                 contrastive = True
@@ -359,8 +416,8 @@ class Verifier:
                 result = replace(result, verdict=REJECTED, reason="contrastive_known")
 
         if page.ok:
-            fields["doc_hash"] = novelty.doc_hash(page.canonical_url or page.final_url
-                                                  or row.source_url, page.text)
+            fields["doc_hash"] = await _aside(novelty.doc_hash, page.canonical_url
+                                              or page.final_url or row.source_url, page.text)
         ct = None
         if result.passed and row.route in PRIZE_ROUTES and trust.filing_of(url) is None:
             # An untrusted page that cannot be held as a scoop is not judged.
@@ -438,6 +495,26 @@ def get_verifier() -> Verifier:
     return _default
 
 
+async def refetch(store: Store, row: ClaimRow, now_ms: int) -> str:
+    """A claim turned away because its page could not be fetched, when the fault was on the
+    fetching side: back to novelty for a fresh fetch, while its line is still open. Returns
+    the outcome."""
+    if row.status != "rejected" or row.reason != FETCH_FAILED:
+        return "not_eligible"
+    ev = await store.get_event(row.event_id) if row.event_id is not None else None
+    if ev is None or ev.confidence != "line" or ev.first_claim_id is not None:
+        return "event_taken"
+    async with ledger.claim_lock(row.id):
+        for f in await store.source_fetches(row.id):
+            if not f.content_hash and not (f.check or {}).get(SUPERSEDED):
+                await store.update_source_fetch(f.id, check={**(f.check or {}), SUPERSEDED: True})
+        if not await store.update_claim(row.id, "rejected", status="novelty", reason=None):
+            return "not_eligible"
+        get_verifier()._requested.pop((intake.FETCH_JOB, row.id), None)
+        await store.add_job_once(intake.FETCH_JOB, row.id, now_ms)
+    return "reopened"
+
+
 async def fetch_job(store: Store, job: Job) -> None:
     row = await store.get_claim(job.claim_id) if job.claim_id is not None else None
     if row is None or row.status not in OPEN:
@@ -446,7 +523,17 @@ async def fetch_job(store: Store, job: Job) -> None:
     if row.status == "queued" and not await budget.within_budget(store, row, now_ms):
         return
     # Two jobs can fetch one claim; the later must not add a row after the check closed it.
-    await get_verifier().fetch(store, row, open_only=True)
+    v = get_verifier()
+    page, _ = await v.fetch(store, row, open_only=True)
+    if page.ok and trust.filing_of(row.source_url) is not None:
+        # The filer check and the filing's details are read now, beside other fetches, so the
+        # check finds them ready.
+        claim = Claim.model_validate(row.payload)
+        try:
+            await v.registry.filings.report(claim.actors, page.final_url or row.source_url,
+                                            claim.event_type)
+        except Exception as e:
+            logger.debug(f"Filing details for claim {row.id} not read yet: {e!r}")
 
 
 async def fetch_gave_up(store: Store, job: Job) -> None:
@@ -496,22 +583,39 @@ async def verify_ready(store: Store, now_ms: int, limit: int = 50, scan: int = 5
     higher age factor go first, so older events reach the judges after fresh ones."""
     v, done = get_verifier(), 0
     waiting = [i for i, until in v._judge_wait.items() if until > now_ms]
-    rows = await store.claims_by_status("novelty", limit=scan, skip=waiting)
+    heads = await store.claim_heads("novelty", limit=scan, skip=waiting)
     # A line moves at its freshest claim's age and keeps its own receipt order.
-    line = {r.id: r.event_id if r.event_id is not None else -r.id for r in rows}
+    line = {h.id: h.event_id if h.event_id is not None else -h.id for h in heads}
     lead: Dict[int, float] = {}
-    for r in rows:
-        a = _age(r, v.cache.get(r.source_url, r.received_ms))
-        lead[line[r.id]] = max(lead.get(line[r.id], 0.0), a)
-    for row in sorted(rows, key=lambda r: -lead[line[r.id]]):
-        if done >= limit:
-            break
-        try:
-            cached = v.cache.get(row.source_url, row.received_ms) is not None
-            out = await v.verify(store, row, now_ms)
-            done += cached and out.status != row.status
-        except intake.InvalidTransition:
-            pass
-        except Exception as e:
-            logger.warning(f"Verify of claim {row.id} failed: {e!r}")
+    for h in heads:
+        a = _age_of(h.event_date, h.received_ms, v.cache.get(h.source_url, h.received_ms))
+        lead[line[h.id]] = max(lead.get(line[h.id], 0.0), a)
+    # Only claims with a cached page, or due a fetch request, are read in full.
+    order = [h.id for h in sorted(heads, key=lambda h: -lead[line[h.id]])
+             if v.cache.get(h.source_url, h.received_ms) is not None
+             or not v.looked(h.id, now_ms)]
+    rows = {r.id: r for r in await store.claims_by_ids(order)} if order else {}
+    slots = asyncio.Semaphore(max(1, EVENT_LANE["VERIFY_CONCURRENCY"]))
+    hotkeys: Dict[str, asyncio.Lock] = {}
+
+    async def one(row: ClaimRow) -> None:
+        nonlocal done
+        async with hotkeys.setdefault(row.hotkey, asyncio.Lock()), slots:
+            if done >= limit:
+                return
+            try:
+                cached = v.cache.get(row.source_url, row.received_ms) is not None
+                out = await v.verify(store, row, now_ms)
+                done += cached and out.status != row.status
+            except intake.InvalidTransition:
+                pass
+            except Exception as e:
+                logger.warning(f"Verify of claim {row.id} failed: {e!r}")
+
+    if EVENT_LANE["VERIFY_CONCURRENCY"] <= 1:
+        for cid in order:
+            if cid in rows and done < limit:
+                await one(rows[cid])
+        return done
+    await asyncio.gather(*(one(rows[cid]) for cid in order if cid in rows))
     return done

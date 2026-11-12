@@ -30,6 +30,12 @@ INTERNAL_ALLOWED_IPS: set[str] = {"127.0.0.1", "::1", *_csv("INTERNAL_ALLOWED_IP
 
 MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "4.0.0")
 
+# "writer" (the default) runs everything; a "reader" serves only the read routes below, runs
+# no jobs and writes nothing, so several can serve status and dashboard reads beside one writer.
+API_ROLE = os.getenv("API_ROLE", "writer").strip().lower()
+READER_ROUTES = (r"/health", r"/claims", r"/claims/\d+", r"/events(/.*)?", r"/entities/.+", r"/feed",
+                 r"/dashboard/.+")
+
 # Validator settings served on /config/subnet from VALIDATOR_<KEY> env vars, when set.
 # The judge endpoint and model go to REVERIFY_VALIDATORS only.
 _SERVED_KEYS = ("REVERIFY_FETCH_TIMEOUT_S", "REVERIFY_DOMAIN_RPS", "SCAN_INTERVAL_S",
@@ -86,6 +92,9 @@ EVENT_LANE = {
     "FETCH_PUBLIC_ONLY": _el("FETCH_PUBLIC_ONLY", "true", _flag),
     "FETCH_RETRY": _el("FETCH_RETRY", 1, int),
     "DOMAIN_RPS": _el("DOMAIN_RPS", 1),
+    # Requests per second for particular hosts, "host=rate,host=rate"; others use DOMAIN_RPS.
+    "HOST_RPS": tuple((h.strip(), float(r)) for h, _, r in (
+        part.partition("=") for part in _csv("EL_HOST_RPS")) if h.strip() and r.strip()),
     # Fetch and re-check jobs run outside the worker tick, in a bounded pool.
     "FETCH_CONCURRENCY": _el("FETCH_CONCURRENCY", 16, int),
     "WORKER_INTERVAL_S": _el("WORKER_INTERVAL_S", 1),
@@ -94,7 +103,27 @@ EVENT_LANE = {
     "CHECK_BUDGET_BASE": _el("CHECK_BUDGET_BASE", 200, int),
     # Claims taken in at once; past it POST /claims answers 503 busy at once.
     "CLAIMS_IN_FLIGHT": _el("CLAIMS_IN_FLIGHT", 16, int),
+    # Seconds a claim's status reply is reused before it is read again.
+    "STATUS_CACHE_S": _el("STATUS_CACHE_S", 20),
+    # Processes that parse fetched pages; 0 parses them on one thread.
+    "PARSE_PROCESSES": _el("PARSE_PROCESSES", 0, int),
+    # Processes for the fixed check and contrastive match; 0 runs them in the API process.
+    "CHECK_PROCESSES": _el("CHECK_PROCESSES", 0, int),
+    # Claims checked at once in a worker tick, one per hotkey at a time; 1 checks them in turn.
+    "VERIFY_CONCURRENCY": _el("VERIFY_CONCURRENCY", 1, int),
+    # Listed validators whose verdicts decide a page (0: all of them). With fewer than all,
+    # each page goes to one of them, and to the others once it has waited JUDGE_HANDOFF_S.
+    "JUDGES_PER_ITEM": _el("JUDGES_PER_ITEM", 0, int),
+    # Operator diagnostics, off by default: log worker ticks slower than this many seconds,
+    # and profile the process for this many seconds after start-up.
+    "TICK_LOG_S": _el("TICK_LOG_S", 0),
+    "PROFILE_S": _el("PROFILE_S", 0),
     "PUBLISH_HOLD_S": _el("PUBLISH_HOLD_S", 120),
+    # Paid claims from one host and type in an hour and in a day past which the operator is
+    # alerted; "host=hour/day,..." sets other limits for hosts that publish many events.
+    "ALARM_SOURCE_HOUR": _el("ALARM_SOURCE_HOUR", 20, int),
+    "ALARM_SOURCE_DAY": _el("ALARM_SOURCE_DAY", 50, int),
+    "ALARM_SOURCE_HOSTS": os.getenv("EL_ALARM_SOURCE_HOSTS", ""),
     # Answer key: official feeds, private, used for accuracy only.
     # Set but empty means none.
     "AK_ADAPTERS": tuple(_csv("EL_AK_ADAPTERS") if "EL_AK_ADAPTERS" in os.environ

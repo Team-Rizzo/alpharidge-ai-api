@@ -2,11 +2,13 @@
 retractions, wrong-claim metrics, conflicting claim pairs and the hotkey blacklist."""
 
 import logging
+import math
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alpharidge_ai.verify.fetch import Paced
 from app.config import EVENT_LANE
 from app.routers.auth import get_operator_hotkey
 from app.routers.claims import get_store
@@ -96,6 +98,51 @@ async def retract_event(event_id: int, body: RetractBody, store: Store = Depends
                         operator: str = Depends(get_operator_hotkey),
                         entities: EntityIndex = Depends(get_entities)):
     return await _retract(store, await ops.lead_claim(store, event_id), body, operator, entities)
+
+
+class RefileBody(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/claims/{claim_id}/refile")
+async def refile_claim(claim_id: int, body: RefileBody, store: Store = Depends(get_store),
+                       operator: str = Depends(get_operator_hotkey)):
+    """A claim on a filing its subject made, held or turned away before its filer could be
+    confirmed: placed as a trusted claim."""
+    from app.services import resolve
+
+    row = await store.get_claim(claim_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="unknown_claim")
+    head = await block.current_block()
+    if head is None:
+        raise HTTPException(status_code=503, detail="chain_unavailable")
+    try:
+        outcome = await resolve.get_resolver().refile(store, row, _now_ms(), head)
+    except Paced as e:
+        # The filing's index page waits its turn on the filing host; nothing was changed.
+        wait = max(1, math.ceil(e.wait_s))
+        raise HTTPException(status_code=503, detail="busy", headers={"Retry-After": str(wait)})
+    logger.info(f"Operator {operator} refiled claim {claim_id}: {outcome} ({body.reason})")
+    row = await store.get_claim(claim_id)
+    return {"claim_id": str(row.id), "outcome": outcome, "status": row.status,
+            "route": row.route}
+
+
+@router.post("/claims/{claim_id}/refetch")
+async def refetch_claim(claim_id: int, body: RefileBody, store: Store = Depends(get_store),
+                        operator: str = Depends(get_operator_hotkey)):
+    """A claim turned away as fetch_failed through a fault on the fetching side: its page is
+    fetched and checked afresh."""
+    from app.services import verifier
+
+    row = await store.get_claim(claim_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="unknown_claim")
+    outcome = await verifier.refetch(store, row, _now_ms())
+    logger.info(f"Operator {operator} refetched claim {claim_id}: {outcome} ({body.reason})")
+    row = await store.get_claim(claim_id)
+    return {"claim_id": str(row.id), "outcome": outcome, "status": row.status}
 
 
 class PenaliseBody(BaseModel):

@@ -271,3 +271,33 @@ async def test_a_coldkey_with_many_claws_alarms(monkeypatch):
     (alarm,) = await ops._claws(store, now)
     assert (alarm["coldkey"], alarm["paid"], alarm["clawed"]) == ("c1", 4, 2)
     assert await ops._claws(store, now + 6 * 24 * HOUR_MS) == []
+
+
+async def test_refile_waits_its_turn_on_the_filing_host(ops_api, monkeypatch):
+    from alpharidge_ai.verify.fetch import Paced
+    from app.services import resolve
+
+    row = await ops_api.store.create_claim(_claim("m1", status="verified"))
+
+    async def paced(*a, **k):
+        raise Paced(2.4)
+    monkeypatch.setattr(resolve.Resolver, "refile", paced)
+    r = ops_api.post(f"/ops/claims/{row.id}/refile", json={"reason": "r"}, headers=OPERATOR)
+    assert r.status_code == 503 and r.headers["Retry-After"] == "3"
+
+
+async def test_one_host_and_type_paid_too_often_raises_an_alarm(monkeypatch):
+    store = MemoryStore()
+    monkeypatch.setitem(EVENT_LANE, "ALARM_SOURCE_HOUR", 2)
+    monkeypatch.setitem(EVENT_LANE, "ALARM_SOURCE_DAY", 3)
+    monkeypatch.setitem(EVENT_LANE, "ALARM_SOURCE_HOSTS", "wire.example.com=10/40, bad")
+    now = T0 + 2 * HOUR_MS
+    for i in range(3):
+        for host in ("journal.example.org", "wire.example.com"):
+            row = await store.create_claim(_claim(f"hk{i}{host}"))
+            await store.update_claim(row.id, "received", status="provisional", route="event",
+                                     verified_ms=now - 60_000, source_url=f"https://{host}/{i}")
+    got = await ops._sources(store, now)
+    assert [(a["host"], a["paid_hour"], a["paid_day"]) for a in got] == [
+        ("journal.example.org", 3, 3)]
+    assert got[0]["limits"] == {"hour": 2, "day": 3}

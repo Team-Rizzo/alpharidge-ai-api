@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 from typing import List, Optional, Tuple
 
 from alpharidge_ai.judge.combine import combined
@@ -33,6 +34,9 @@ JUDGE_NO_POST_REJECT_S = 24 * 3600
 JUDGE_UNAVAILABLE = "judge_unavailable"
 # Items served per pull, from the oldest.
 PENDING_MAX = 200
+# With fewer judges than listed validators, an item no one has posted on goes to every
+# listed validator after this long, not only the one it was given to.
+JUDGE_HANDOFF_S = 180
 POST_MAX_BYTES = 100_000
 
 
@@ -66,6 +70,21 @@ def _posts(rows: List[JudgePostRow]) -> List[dict]:
              "nonce": p.nonce, "signature": p.signature} for p in rows]
 
 
+def needed() -> int:
+    """Posts that decide an item before the quorum wait."""
+    listed = len(config.REVERIFY_VALIDATORS)
+    per_item = EVENT_LANE["JUDGES_PER_ITEM"]
+    return max(1, listed if per_item <= 0 else min(per_item, listed))
+
+
+def assigned(item: JudgeItemRow) -> Optional[str]:
+    """The listed validator an item is given to first, when fewer judges than listed decide."""
+    listed = sorted(config.REVERIFY_VALIDATORS)
+    if not listed or needed() >= len(listed):
+        return None
+    return listed[int(hashlib.sha256(item.key.encode()).hexdigest(), 16) % len(listed)]
+
+
 async def combine(store: Store, item: JudgeItemRow, claim, content_hash: str,
                   filing: Optional[dict], now_ms: int) -> Optional[dict]:
     """The item's record once its verdict is due, else None."""
@@ -75,7 +94,7 @@ async def combine(store: Store, item: JudgeItemRow, claim, content_hash: str,
     if not posts:
         return None
     waited = now_ms >= item.created_ms + JUDGE_QUORUM_WAIT_S * 1000
-    if not waited and not listed <= {p.validator for p in posts}:
+    if not waited and len({p.validator for p in posts}) < needed():
         return None
     bodies = [json.loads(p.body) for p in posts]
     return {"content_hash": content_hash, **combined(bodies, claim, filing),
@@ -137,11 +156,19 @@ async def pending_for(store: Store, validator: str, limit: int = PENDING_MAX) ->
     """Items this validator has not posted on, oldest first; items whose claim has moved on
     are closed."""
     items = await store.judge_items(PENDING, limit=5 * limit)
-    mine = {p.item_id for p in await store.judge_posts([i.id for i in items])
-            if p.validator == validator}
+    posts = await store.judge_posts([i.id for i in items])
+    mine = {p.item_id for p in posts if p.validator == validator}
+    count: dict = {}
+    for p in posts:
+        count[p.item_id] = count.get(p.item_id, 0) + 1
+    handoff = time.time_ns() // 1_000_000 - JUDGE_HANDOFF_S * 1000
     out = []
     for i in items:
         if i.id in mine:
+            continue
+        owner = assigned(i)
+        if owner is not None and (count.get(i.id, 0) >= needed() or (
+                owner != validator and i.created_ms > handoff)):
             continue
         if not await _live(store, i):
             await store.update_judge_item(i.id, CLOSED)
@@ -188,6 +215,11 @@ async def add_post(store: Store, validator: str, raw: bytes, signed_at: int, non
     got = await store.add_judge_post(JudgePostRow(
         item_id=item.id, validator=validator, body=raw.decode("utf-8"), signed_at=int(signed_at),
         nonce=nonce, signature=signature, posted_ms=now_ms))
+    if got and config.REVERIFY_VALIDATORS and len({
+            p.validator for p in await store.judge_posts([item.id])}) >= needed():
+        # Enough listed validators have posted: the claim is looked at on the next pass.
+        from app.services import verifier
+        verifier.get_verifier().wake(item.claim_id)
     return "accepted" if got else "duplicate"
 
 

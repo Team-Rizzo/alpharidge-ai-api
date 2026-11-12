@@ -24,15 +24,20 @@ def owner(claim: ClaimRow) -> str:
     return claim.coldkey or claim.hotkey
 
 
+TIE_LOOKUPS_PER_TICK = 200
+
+
 async def tie_seeds(store: Store, buckets) -> Dict[int, str]:
     """The tie block hash of each bucket that has one: the first finalised block stamped at
-    or after the bucket closed. Looked up on the chain once, then kept."""
+    or after the bucket closed. Looked up on the chain once, then kept; oldest first, a few
+    per call, stopping at the first bucket without one."""
     got = await store.tie_seeds(buckets)
-    for b in set(buckets) - set(got):
+    for b in sorted(set(buckets) - set(got))[:TIE_LOOKUPS_PER_TICK]:
         found = await block.tie_block(closes_ms(b))
-        if found is not None:
-            await store.put_tie_seed(b, *found)
-            got[b] = found
+        if found is None:
+            break
+        await store.put_tie_seed(b, *found)
+        got[b] = found
     return {b: h for b, (_, h) in got.items()}
 
 

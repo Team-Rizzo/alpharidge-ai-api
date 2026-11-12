@@ -146,11 +146,15 @@ async def _viewer(request: Request) -> Optional[str]:
     return auth.ss58_address if auth is not None else None
 
 
+def _own(c: ClaimRow, viewer: Optional[str]) -> bool:
+    """The claim's own hotkey (a signed request) or an operator."""
+    return c.hotkey == viewer or viewer in config.OPERATOR_HOTKEYS
+
+
 def _open(c: ClaimRow, viewer: Optional[str], now_ms: int) -> bool:
-    """A claim's source is shown to its own hotkey and operators, and to everyone once it
-    settles."""
-    return (c.hotkey == viewer or viewer in config.OPERATOR_HOTKEYS
-            or now_ms >= (c.settle_ms or c.received_ms + product.settle_ms()))
+    """A claim's trust band and validators are shown to its own hotkey and operators, and to
+    everyone once it settles. Its source never goes beyond its own hotkey and operators."""
+    return _own(c, viewer) or now_ms >= (c.settle_ms or c.received_ms + product.settle_ms())
 
 
 # What each validator posted to `/ledger/reverify`; "changed" is an agree on a page that has
@@ -253,7 +257,8 @@ async def dashboard_items(request: Request, hotkey: Optional[str] = None, route:
             "tie_block": ties[c.bucket][0] if c.bucket in ties else None,
             "receipt": receipts.get(c.id),
             "check": _check(f),
-            "source_domain": trust.domain_of(url) if shown else None, "trust_band": c.trust_band if shown else None,
+            "source_domain": trust.domain_of(url) if _own(c, viewer) else None,
+            "trust_band": c.trust_band if shown else None,
             "points": _points(paid.get(c.id, {})), "reverify": checks.get(c.id, {}),
             "validators": validators.get(c.id, []) if shown else None,
         })

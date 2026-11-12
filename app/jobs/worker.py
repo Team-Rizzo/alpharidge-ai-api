@@ -22,6 +22,8 @@ JOB_MAX_ATTEMPTS = 3
 # Kinds tried again after a failure, this long after, until dropped.
 RETRIED = (scoops.CONFIRM_JOB,)
 JOB_RETRY_S = 60
+# How long one advance pass may wait, in total, for busy source hosts before it holds types.
+ADVANCE_PACE_WAIT_S = 10
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,7 @@ class JobPool:
             return 0
         busy = [hk for hk, n in self.running.items() if hk and n >= self.per_hotkey]
         jobs = await store.take_jobs(list(HANDLERS), free, JOB_LEASE_S * 1000,
-                                     now_ms, busy)
+                                     now_ms, busy, per_hotkey=self.per_hotkey)
         for job in jobs:
             if job.attempts > JOB_MAX_ATTEMPTS:
                 await self._give_up(store, job)
@@ -133,29 +135,37 @@ async def advance_queued(store: Store, now_ms: int, limit: int = 200) -> int:
     await v.registry.refresh(store)
     await v.registry.filings.warm()
     done, waiting = 0, set()
+    until = time.monotonic() + ADVANCE_PACE_WAIT_S
     for row in await line.ready_claims(store, now_ms, limit):
-        try:
-            # Registry IDs are resolved first; the claim, and any later claim of its type,
-            # waits in the queue until they are.
-            claim = Claim.model_validate(row.payload)
-            if row.event_type in waiting or not await reg.ensure(
-                    store, v.entities, claim.actors, now_ms, row.received_ms):
+        while True:
+            try:
+                # Registry IDs are resolved first; the claim, and any later claim of its type,
+                # waits in the queue until they are.
+                claim = Claim.model_validate(row.payload)
+                if row.event_type in waiting or not await reg.ensure(
+                        store, v.entities, claim.actors, now_ms, row.received_ms):
+                    waiting.add(row.event_type)
+                    break
+                # The claimed URL's trust routes the claim; verify freezes it from the fetched
+                # page.
+                source = await trust.resolve(store, row.source_url, now_ms)
+                ct = await trust.of_claim(store, v.registry, v.entities, claim, source,
+                                          row.category, row.source_url)
+                await novelty.apply(store, row, v.entities, v.places, now_ms, trust=ct.t,
+                                    filer=ct.filer)
+                done += 1
+            except intake.InvalidTransition:
+                pass
+            except Paced as e:
+                # A busy source host is waited for while the pass has time left; past that it
+                # holds the claim and the rest of its type until next tick.
+                if time.monotonic() + e.wait_s <= until:
+                    await asyncio.sleep(e.wait_s)
+                    continue
                 waiting.add(row.event_type)
-                continue
-            # The claimed URL's trust routes the claim; verify freezes it from the fetched page.
-            source = await trust.resolve(store, row.source_url, now_ms)
-            ct = await trust.of_claim(store, v.registry, v.entities, claim, source, row.category,
-                                      row.source_url)
-            await novelty.apply(store, row, v.entities, v.places, now_ms, trust=ct.t,
-                                filer=ct.filer)
-            done += 1
-        except intake.InvalidTransition:
-            pass
-        except Paced:
-            # A busy source host holds the claim and the rest of its type until next tick.
-            waiting.add(row.event_type)
-        except Exception as e:
-            logger.warning(f"Novelty for claim {row.id} failed: {e!r}")
+            except Exception as e:
+                logger.warning(f"Novelty for claim {row.id} failed: {e!r}")
+            break
     return done
 
 
@@ -164,15 +174,25 @@ _last_settle_ms = 0
 
 async def tick(store: Store, now_ms: int) -> None:
     global _last_settle_ms
-    await expire_queued(store, now_ms)
-    await advance_queued(store, now_ms)
-    await verifier.verify_ready(store, now_ms)
-    await resolve.get_resolver().run(store, now_ms)
+    spent: Dict[str, float] = {}
+
+    async def timed(name: str, step: Awaitable) -> None:
+        at = time.perf_counter()
+        await step
+        spent[name] = time.perf_counter() - at
+
+    await timed("expire", expire_queued(store, now_ms))
+    await timed("advance", advance_queued(store, now_ms))
+    await timed("verify", verifier.verify_ready(store, now_ms))
+    await timed("resolve", resolve.get_resolver().run(store, now_ms))
     if now_ms - _last_settle_ms >= EVENT_LANE["SETTLE_EVERY_S"] * 1000:
         _last_settle_ms = now_ms
-        await ledger.refresh_params()
-        await points.settle_due(store, now_ms)
-        await judge.close_moved(store)
+        await timed("params", ledger.refresh_params())
+        await timed("settle", points.settle_due(store, now_ms))
+        await timed("close", judge.close_moved(store))
+    slow = EVENT_LANE["TICK_LOG_S"]
+    if slow > 0 and sum(spent.values()) >= slow:
+        logger.info("[TICK] " + " ".join(f"{k}={v:.2f}s" for k, v in spent.items()))
 
 
 async def run_pool(store: Store, pool: JobPool) -> None:

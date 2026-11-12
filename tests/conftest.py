@@ -6,6 +6,8 @@ import pytest
 # Make the `app` package importable from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# The deployment's .env never reaches the tests.
+os.environ["API_SKIP_DOTENV"] = "1"
 # Disabling auth keeps endpoint tests from needing a live metagraph.
 os.environ.setdefault("AUTH_ENABLED", "false")
 # Fixed key so runs are reproducible.
@@ -31,9 +33,19 @@ os.environ.setdefault("API_ATTESTATION_PRIVKEY", "7e" * 32)
 # Tests never reach a registry or a real chain.
 os.environ.setdefault("EL_REGISTRY", "off")
 os.environ.setdefault("SUBTENSOR_NETWORK", "mock")
+# Status replies are read fresh in tests unless a test turns the cache on.
+os.environ.setdefault("EL_STATUS_CACHE_S", "0")
 
 
 @pytest.fixture
 def scoops_on(monkeypatch):
     from app.config import EVENT_LANE
     monkeypatch.setitem(EVENT_LANE, "SCOOPS", True)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_status_replies():
+    from app.routers import claims
+    claims._status.clear()
+    yield
+    claims._status.clear()

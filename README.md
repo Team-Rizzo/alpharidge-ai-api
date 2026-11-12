@@ -95,6 +95,13 @@ Everything is read from the environment, with `.env` in the repo root loaded at 
 | `EL_RATE_LIMIT_ENABLED` | Per-IP rate limits (behind a reverse proxy, pass the client address through) |
 | `EL_FETCH_TIMEOUT_S`, `EL_FETCH_RETRY`, `EL_FETCH_PUBLIC_ONLY`, `EL_DOMAIN_RPS`, `EL_FETCH_CONCURRENCY`, `EL_USER_AGENT_CONTACT` | Fetching (15 s a request, 5 s to connect, as validators); the user agent is `AlphaRidgeBot/<version> (+<contact>)`. The contact is a URL or email the operator chooses |
 | `EL_SETTLE_DELAY_H`, `EL_SETTLE_EVERY_S`, `EL_WORKER_INTERVAL_S` | Settlement and worker timing (a signed profile's `ledger.settle_delay_h` overrides `EL_SETTLE_DELAY_H`) |
+| `API_ROLE` | `writer` (default) runs everything. `reader` serves only GET `/health`, `/claims/{id}`, `/events`, `/entities`, `/feed` and `/dashboard/*`, runs no jobs and writes nothing; run several readers on their own ports and route those paths to them. Run exactly one writer |
+| `EL_PARSE_PROCESSES` | Worker processes that parse fetched pages (default 0: one thread in the API process). Parsing is CPU-bound; a few processes take it off the API's event loop |
+| `EL_TIE_NETWORK` | Chain endpoint for tie-block lookups, such as `archive`; they read block timestamps from the past, which a pruned node no longer keeps. Unset uses the main connection |
+| `EL_HOST_RPS` | Per-host request rates, `host=rate,...` (e.g. `www.prnewswire.com=0.5`); other hosts use `EL_DOMAIN_RPS`. A host that answers 429 is left alone for its Retry-After (60 s without one) and the fetch is tried again later |
+| `EL_JUDGES_PER_ITEM` | Listed validators whose page verdicts decide a claim (default 0: all). With 1, each page goes to one listed validator (split evenly), and to the others if no verdict comes within 3 minutes |
+| `EL_STATUS_CACHE_S` | Seconds a claim's `GET /claims/{id}` reply is reused (default 20; 0 reads it fresh each time) |
+| `EL_TICK_LOG_S`, `EL_PROFILE_S` | Diagnostics, off by default: log worker ticks slower than this many seconds by step; profile the process for this many seconds after start-up and log the result |
 | `EL_JUDGE_HOTKEY_ITEMS`, `EL_JUDGE_NEW_HOTKEY_ITEMS` | Claims a hotkey may send to the page judge per UTC day (2666), and with no passing claim in 7 days (266); past it a claim is `judge_allowance`. The API runs no model and holds no judge key: the listed validators judge pages with their own keys, and a claim waits until they answer (`judge_failing` when none has within 20 minutes; with no answer for 24 h it is `judge_unavailable`, which uses none of the check budget) |
 | `EL_RECHECK_KEY`, `EL_RECHECK_PROXY`, `EL_RECHECK_PROXY_PUBLIC_ONLY` | Later re-check of paid sources (the key is secret) |
 | `EL_RECHECK_*`, `EL_PAGE_FLAG_*`, `EL_ALARM_CLAW_*`, `EL_ALARM_COLDKEY_*`, `EL_ALARM_FETCH_*`, `EL_AUDIT_*`, `EL_HEDGE_GAP_S`, `EL_TRUST_SPIKE_*` (the names in `.env.example`) | Re-check sampling and timing, page-type review thresholds, the ops alarms (clawed share, coldkey concentration, fetch failures), the judge audit bar, the hedge-pair gap and the source volume spike flag. No public default: the API won't start until each is set |
@@ -246,6 +253,8 @@ Each `/dashboard/items` row carries `validators`: one entry per validator hotkey
 Signed requests use the subnet's per-request scheme (`X-Auth-*` headers over method, path, query, body hash, time and nonce).
 
 Every stored claim gets a receipt signed with `API_ATTESTATION_PRIVKEY`, the ledger key (`alpharidge_ai.ledger.receipts`): returned by `POST /claims` (the same one on a re-send) and shown on `GET /claims/{id}` and `/dashboard/items`. Receipts are written in the claim's transaction, each naming the previous one's hash, in the append-only `claim_receipt` table.
+
+`GET /claims?since=<cursor>&limit=` (signed by the miner) returns the caller's claims that changed after the cursor, each with its status reply, and the next cursor; one call replaces polling each open claim.
 
 `POST /claims` answers `429` with `budget_exhausted` or `rate_limited` and a `Retry-After` header, and stores nothing. Actor IDs in a claim (Wikidata QID, CIK, LEI) link only when the registry record's name or an alias matches the actor's name; with `EL_REGISTRY=off` only the entity seed and overrides are known.
 

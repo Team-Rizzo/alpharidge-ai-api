@@ -387,7 +387,7 @@ async def test_ledger_endpoints(monkeypatch):
     assert paid_right(item, Claim.model_validate_json(item["body"]),
                       parse_datetime(item["received_at"]))
     assert lane.store.pulls and lane.store.pulls[0][:2] == ("vali", epoch)
-    # A validator off the re-verify list gets the page and body once the claim settles.
+    # A validator off the re-verify list never gets the page or body.
     caller["hk"] = "late"
     monkeypatch.setattr(ledger_router, "_now_ms", lambda: row.settle_ms - 1)
     (early,) = client.get(url + "late").json()["items"]
@@ -395,7 +395,7 @@ async def test_ledger_endpoints(monkeypatch):
     assert early["body_sha256"] == row.body_hash and early["points"] == item["points"]
     monkeypatch.setattr(ledger_router, "_now_ms", lambda: row.settle_ms)
     (late,) = client.get(url + "late").json()["items"]
-    assert late == item
+    assert late["withheld"] and not {"body", "source_url", "final_url", "judge"} & set(late)
     caller["hk"] = "vali"
 
     bad = {"epoch": epoch, "results": [{"claim_id": "999", "verdict": "agree"}]}

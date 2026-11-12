@@ -941,6 +941,7 @@ model Claim {
   verifiedAt       DateTime? @map("verified_at") @db.Timestamptz(3)
   judgedAt         DateTime? @map("judged_at") @db.Timestamptz(3)
   settleAt         DateTime? @map("settle_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(3)
 
   source        Source?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   event         Event?          @relation("EventClaims", fields: [eventId], references: [id], onDelete: SetNull)
@@ -961,6 +962,7 @@ model Claim {
   @@index([judgedAt], name: "idx_claim_judged")
   @@index([status, receivedAt], name: "idx_claim_status_received")
   @@index([hotkey, receivedAt], name: "idx_claim_hotkey_received")
+  @@index([hotkey, updatedAt, id], name: "idx_claim_hotkey_updated")
   @@index([eventId], name: "idx_claim_event")
   @@map("claim")
 }

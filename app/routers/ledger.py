@@ -120,8 +120,9 @@ async def get_sample(epoch: int, validator: str, cursor: Optional[str] = None, l
                         if k in ("base", "T", "A")} if prov else {},
             "ledger_ids": [str(r.id) for r in mine],
         }
-        # The page and body go to listed re-verifiers at once, to the rest after settle.
-        if not listed and now < (c.settle_ms or c.received_ms + product.settle_ms()):
+        # The page and body go to listed re-verifiers only: a claim's source is never shown
+        # to other hotkeys.
+        if not listed:
             items.append({**item, "withheld": True})
             continue
         fetches = await store.source_fetches(cid)

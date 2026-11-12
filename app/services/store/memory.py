@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from app.services.entities import EntityRecord, refreshes
 from app.services.store.rows import (
     INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
+    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
 )
@@ -72,6 +72,8 @@ class MemoryStore:
     receipt_rows: List[dict] = field(default_factory=list)
     _ids: itertools.count = field(default_factory=lambda: itertools.count(1))
     _locked: Dict[int, int] = field(default_factory=dict)
+    # Claim id -> when it last changed, in ms.
+    changed: Dict[int, int] = field(default_factory=dict)
 
     async def is_blacklisted(self, hotkey):
         return hotkey in self.blacklist
@@ -89,6 +91,7 @@ class MemoryStore:
             raise DuplicateClaim(row.hotkey)
         row = replace(row, id=next(self._ids))
         self.claims[row.id] = row
+        self._touch(row.id)
         if receipt is not None:
             self.receipt_rows.append(
                 dict(receipt(row.id, self.receipt_rows[-1] if self.receipt_rows else None)))
@@ -114,6 +117,7 @@ class MemoryStore:
         if c is None or c.status != expect:
             return False
         self.claims[claim_id] = replace(c, **fields)
+        self._touch(claim_id)
         return True
 
     async def claims_by_status(self, status, received_before_ms=None, limit=500, skip=()):
@@ -121,6 +125,29 @@ class MemoryStore:
         rows = [c for c in self.claims.values() if c.status == status and c.id not in skip
                 and (received_before_ms is None or c.received_ms < received_before_ms)]
         return [replace(c) for c in sorted(rows, key=lambda c: (c.bucket, c.id))[:limit]]
+
+    async def judge_repeats(self, owner, event_type, doc_hash, since_ms, judged_since_ms,
+                            exclude_id, reasons):
+        return sum(1 for c in await self.claims_of_types(since_ms, [event_type])
+                   if c.id != exclude_id and (c.coldkey or c.hotkey) == owner
+                   and c.doc_hash == doc_hash and (c.judged_ms or 0) >= judged_since_ms
+                   and c.reason in reasons)
+
+    def _touch(self, claim_id):
+        import time
+        self.changed[claim_id] = max(time.time_ns() // 1_000_000,
+                                     max(self.changed.values(), default=0))
+
+    async def claim_changes(self, hotkey, after, until_ms, limit):
+        rows = sorted((ms, cid) for cid, ms in self.changed.items()
+                      if self.claims[cid].hotkey == hotkey and (ms, cid) > tuple(after)
+                      and ms < until_ms)
+        return [(cid, ms) for ms, cid in rows[:limit]]
+
+    async def claim_heads(self, status, limit=500, skip=()):
+        return [ClaimHead(c.id, c.event_id, c.source_url, c.received_ms,
+                          (c.payload or {}).get("event_date"))
+                for c in await self.claims_by_status(status, limit=limit, skip=skip)]
 
     async def claims_ahead(self, claim, since_ms):
         return sum(_counts(c, claim, since_ms) for c in self.claims.values())
@@ -186,18 +213,24 @@ class MemoryStore:
                 out.setdefault(c.bucket, []).append(c.id)
         return out
 
-    async def take_jobs(self, kinds, limit, lease_ms, now_ms, skip_hotkeys=()):
+    async def take_jobs(self, kinds, limit, lease_ms, now_ms, skip_hotkeys=(), per_hotkey=0):
         skip, rank, due = set(skip_hotkeys), {}, []
-        for job in sorted(self.jobs.values(), key=lambda j: j.id):
+
+        def bucket(j):
+            c = self.claims.get(j.claim_id)
+            return c.bucket if c else 0
+
+        for job in sorted(self.jobs.values(), key=lambda j: (bucket(j), j.id)):
             stale = job.status == "running" and self._locked.get(job.id, 0) < now_ms - lease_ms
             claim = self.claims.get(job.claim_id)
             hotkey = claim.hotkey if claim else None
             if (job.kind in kinds and job.run_ms <= now_ms and (job.status == "pending" or stale)
                     and hotkey not in skip):
                 rank[hotkey] = n = rank.get(hotkey, 0) + 1
-                due.append((n if hotkey else 0, job.id, job))
+                n = n if hotkey else 0
+                due.append((int(n > per_hotkey) if per_hotkey else n, bucket(job), job.id, job))
         taken = []
-        for _, _, job in sorted(due, key=lambda d: d[:2])[:limit]:
+        for *_, job in sorted(due, key=lambda d: d[:3])[:limit]:
             job.status, job.attempts = "running", job.attempts + 1
             self._locked[job.id] = now_ms
             taken.append(replace(job))
@@ -218,6 +251,12 @@ class MemoryStore:
         job = Job(id=next(self._ids), kind=kind, claim_id=claim_id, run_ms=run_ms)
         self.jobs[job.id] = job
         return replace(job)
+
+    async def add_job_once(self, kind, claim_id, run_ms):
+        if any(j.kind == kind and j.claim_id == claim_id and j.status in ("pending", "running")
+               for j in self.jobs.values()):
+            return None
+        return await self.add_job(kind, claim_id, run_ms)
 
     async def append_ledger(self, row):
         row = replace(row, id=next(self._ids))
@@ -340,7 +379,7 @@ class MemoryStore:
         self.events[rec.id] = rec
         return replace(rec)
 
-    async def prize_docs(self, since_ms):
+    async def prize_docs(self, since_ms, probe=None):
         return [c.doc_hash for c in self.claims.values()
                 if c.doc_hash and c.route in PRIZE_ROUTES and c.status in WON
                 and c.received_ms >= since_ms]
@@ -361,6 +400,18 @@ class MemoryStore:
     async def fetches_since(self, since_ms, limit=100_000):
         rows = [f for f in self.fetches if f.fetched_ms is not None and f.fetched_ms >= since_ms]
         return [replace(f) for f in rows[-limit:]]
+
+    async def won_by_host(self, since_ms, hour_ms):
+        from urllib.parse import urlsplit
+        out: Dict[Tuple[str, str], List[int]] = {}
+        for c in self.claims.values():
+            if (c.status in WON and c.route in PRIZE_ROUTES and c.verified_ms is not None
+                    and c.verified_ms >= since_ms):
+                n = out.setdefault(((urlsplit(c.source_url).hostname or "").lower(),
+                                    c.event_type), [0, 0])
+                n[0] += c.verified_ms >= hour_ms
+                n[1] += 1
+        return [(h, t, a, b) for (h, t), (a, b) in out.items()]
 
     async def held_claims(self, limit=500):
         rows = [c for c in self.claims.values() if c.held and c.status in PASSED]

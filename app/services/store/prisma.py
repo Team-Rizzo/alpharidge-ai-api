@@ -11,7 +11,7 @@ from app.services.entities import canonical_id, record_from, refreshes
 from app.utils.clock import ms as _ms
 from app.services.store.rows import (
     INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
+    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
     Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow, ReverifyRow,
     ScoopCandidateRow,
     SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
@@ -186,6 +186,38 @@ class PrismaStore:
             where=where, order=[{"receiptBucket": "asc"}, {"id": "asc"}], take=limit)
         return [_claim_from(m) for m in rows]
 
+    async def judge_repeats(self, owner, event_type, doc_hash, since_ms, judged_since_ms,
+                            exclude_id, reasons):
+        rows = await self.db.query_raw(
+            'SELECT count(*) AS n FROM "claim" WHERE event_type = $1 '
+            'AND received_at >= to_timestamp($2::double precision / 1000) AND id <> $3::bigint '
+            'AND COALESCE(coldkey, hotkey) = $4 AND doc_hash = $5 '
+            'AND judged_at >= to_timestamp($6::double precision / 1000) '
+            "AND reason = ANY(string_to_array($7, ','))",
+            event_type, since_ms, exclude_id, owner, doc_hash, judged_since_ms, ",".join(reasons))
+        return int(rows[0]["n"]) if rows else 0
+
+    async def claim_changes(self, hotkey, after, until_ms, limit):
+        rows = await self.db.query_raw(
+            'SELECT id, ms FROM (SELECT id, (extract(epoch FROM updated_at) * 1000)::bigint AS ms '
+            'FROM "claim" WHERE hotkey = $1 AND updated_at >= to_timestamp($2::double precision '
+            '/ 1000) - interval \'1 millisecond\' AND updated_at < to_timestamp($4::double '
+            'precision / 1000)) c WHERE (ms, id) > ($2::bigint, $3::bigint) '
+            'ORDER BY ms, id LIMIT $5',
+            hotkey, int(after[0]), int(after[1]), int(until_ms), int(limit))
+        return [(int(r["id"]), int(r["ms"])) for r in rows]
+
+    async def claim_heads(self, status, limit=500, skip=()):
+        rows = await self.db.query_raw(
+            'SELECT id, event_id, source_url, '
+            '(extract(epoch FROM received_at) * 1000)::bigint AS received_ms, '
+            "payload->>'event_date' AS event_date FROM \"claim\" WHERE status = $1 "
+            "AND id <> ALL(string_to_array($2, ',')::bigint[]) "
+            'ORDER BY receipt_bucket, id LIMIT $3',
+            status, ",".join(str(int(i)) for i in skip), limit)
+        return [ClaimHead(int(r["id"]), int(r["event_id"]) if r["event_id"] is not None else None,
+                          r["source_url"], int(r["received_ms"]), r["event_date"]) for r in rows]
+
     async def claims_ahead(self, claim, since_ms):
         at = _dt(claim.received_ms)
         return await self.db.claim.count(where={
@@ -284,22 +316,24 @@ class PrismaStore:
             out.setdefault(int(r["bucket"]), []).append(int(r["id"]))
         return out
 
-    async def take_jobs(self, kinds, limit, lease_ms, now_ms, skip_hotkeys=()):
+    async def take_jobs(self, kinds, limit, lease_ms, now_ms, skip_hotkeys=(), per_hotkey=0):
         if not kinds:
             return []
         rows = await self.db.query_raw(
             'UPDATE "job" SET status = \'running\', locked_at = now(), attempts = attempts + 1 '
             'WHERE id IN (SELECT j.id FROM "job" j JOIN (SELECT d.id, CASE WHEN c.hotkey IS NULL '
-            'THEN 0 ELSE row_number() OVER (PARTITION BY c.hotkey ORDER BY d.id) END AS n '
+            'THEN 0 ELSE row_number() OVER (PARTITION BY c.hotkey '
+            'ORDER BY c.receipt_bucket, d.id) END AS n, COALESCE(c.receipt_bucket, 0) AS b '
             'FROM "job" d LEFT JOIN "claim" c ON c.id = d.claim_id '
             'WHERE d.kind = ANY(string_to_array($1, \',\')) '
             "AND d.run_at <= to_timestamp($4::double precision / 1000) "
             "AND (d.status = 'pending' OR (d.status = 'running' "
             'AND d.locked_at < to_timestamp($2::double precision / 1000))) '
             'AND (c.hotkey IS NULL OR c.hotkey <> ALL(string_to_array($5, \',\')))) r '
-            'ON r.id = j.id ORDER BY r.n, j.id LIMIT $3 FOR UPDATE OF j SKIP LOCKED) '
+            'ON r.id = j.id ORDER BY CASE WHEN $6::int > 0 THEN (r.n > $6::int)::int ELSE r.n END, '
+            'r.b, j.id LIMIT $3 FOR UPDATE OF j SKIP LOCKED) '
             'RETURNING id, kind, claim_id, attempts',
-            ",".join(kinds), now_ms - lease_ms, limit, now_ms, ",".join(skip_hotkeys))
+            ",".join(kinds), now_ms - lease_ms, limit, now_ms, ",".join(skip_hotkeys), per_hotkey)
         return [Job(id=int(r["id"]), kind=r["kind"],
                     claim_id=int(r["claim_id"]) if r["claim_id"] is not None else None,
                     attempts=int(r["attempts"]), status="running") for r in rows]
@@ -317,6 +351,16 @@ class PrismaStore:
         m = await self.db.job.create(data={"kind": kind, "claimId": claim_id,
                                            "runAt": _dt(run_ms)})
         return Job(id=m.id, kind=m.kind, claim_id=m.claimId, run_ms=run_ms)
+
+    async def add_job_once(self, kind, claim_id, run_ms):
+        rows = await self.db.query_raw(
+            'INSERT INTO "job" (kind, claim_id, run_at) SELECT $1, $2::bigint, '
+            'to_timestamp($3::double precision / 1000) WHERE NOT EXISTS (SELECT 1 FROM "job" '
+            "WHERE kind = $1 AND claim_id = $2::bigint AND status IN ('pending', 'running')) "
+            'RETURNING id', kind, claim_id, run_ms)
+        if not rows:
+            return None
+        return Job(id=int(rows[0]["id"]), kind=kind, claim_id=claim_id, run_ms=run_ms)
 
     async def append_ledger(self, row):
         from prisma import Json
@@ -527,11 +571,23 @@ class PrismaStore:
             raise DuplicateEvent(rec.fingerprint)
         return _event_from(rows[0])
 
-    async def prize_docs(self, since_ms):
-        rows = await self.db.claim.find_many(where={
-            "docHash": {"not": None}, "route": {"in": list(PRIZE_ROUTES)},
-            "status": {"in": list(WON)}, "receivedAt": {"gte": _dt(since_ms)}})
-        return [m.docHash for m in rows]
+    async def prize_docs(self, since_ms, probe=None):
+        sql = ('SELECT doc_hash FROM "claim" WHERE doc_hash IS NOT NULL '
+               "AND route = ANY(string_to_array($1, ',')) "
+               "AND status = ANY(string_to_array($2, ',')) "
+               'AND received_at >= to_timestamp($3::double precision / 1000)')
+        args = [",".join(PRIZE_ROUTES), ",".join(WON), since_ms]
+        if probe is not None:
+            # Only rows that can match: the same URL hash, or at the same length the same lead
+            # or one of the probe's minhash slots.
+            url, lead, length, slots = probe
+            sql += (" AND (left(doc_hash, 16) = $4::text OR (length(doc_hash) = $6::int AND ("
+                    "($5::text <> '' AND substr(doc_hash, 17, 16) = $5::text) OR EXISTS ("
+                    "SELECT 1 FROM unnest(string_to_array($7::text, ',')) WITH ORDINALITY "
+                    "AS s(v, i) WHERE substr(doc_hash, 25 + 8 * i::int, 8) = s.v))))")
+            args += [url, lead, length, ",".join(slots)]
+        rows = await self.db.query_raw(sql, *args)
+        return [r["doc_hash"] for r in rows]
 
     async def add_source_fetch(self, row):
         fields = {k: getattr(row, k) for k in (*_FETCH_FIELDS, "spans", "published_ms",
@@ -547,6 +603,16 @@ class PrismaStore:
         rows = await self.db.sourcefetch.find_many(where={"claimId": claim_id},
                                                    order={"id": "asc"})
         return [_fetch_from(m) for m in rows]
+
+    async def won_by_host(self, since_ms, hour_ms):
+        rows = await self.db.query_raw(
+            "SELECT lower(substring(source_url from '^[A-Za-z]+://([^/:?#]+)')) AS host, "
+            "event_type, count(*) FILTER (WHERE verified_at >= to_timestamp($4::double "
+            "precision / 1000)) AS hour, count(*) AS day FROM \"claim\" "
+            "WHERE route = ANY(string_to_array($1, ',')) AND status = ANY(string_to_array($2, "
+            "',')) AND verified_at >= to_timestamp($3::double precision / 1000) GROUP BY 1, 2",
+            ",".join(PRIZE_ROUTES), ",".join(WON), since_ms, hour_ms)
+        return [(r["host"] or "", r["event_type"], int(r["hour"]), int(r["day"])) for r in rows]
 
     async def fetches_since(self, since_ms, limit=100_000):
         rows = await self.db.sourcefetch.find_many(

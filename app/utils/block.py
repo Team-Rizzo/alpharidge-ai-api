@@ -7,7 +7,7 @@ import math
 import os
 import threading
 import time
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -86,19 +86,126 @@ def _mock_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
     return n, "0x" + hashlib.sha256(f"mock:{n}".encode()).hexdigest()
 
 
+# Tie lookups read block timestamps from the past, which a pruned node no longer holds; they
+# may use their own connection (EL_TIE_NETWORK, such as "archive") and lock.
+TIE_NETWORK = os.getenv("EL_TIE_NETWORK", "").strip()
+TIE_HEAD_CACHE_S = 6
+TIE_STAMPS_MAX = 100_000
+_tie_lock = threading.RLock() if TIE_NETWORK else chain_lock
+_tie_subtensor = None
+# Finalised block number -> (timestamp ms, hash).
+_stamps: Dict[int, Tuple[int, str]] = {}
+_tie_head: Tuple[int, float] = (0, 0.0)
+
+
+def _tie_substrate():
+    global _tie_subtensor
+    if not TIE_NETWORK:
+        return get_subtensor().substrate
+    if _tie_subtensor is None:
+        import bittensor as bt
+
+        _tie_subtensor = bt.Subtensor(network=TIE_NETWORK)
+        logger.info(f"Connected to subtensor for tie blocks (network={TIE_NETWORK})")
+    return _tie_subtensor.substrate
+
+
+def _reset_tie() -> None:
+    global _tie_subtensor
+    if not TIE_NETWORK:
+        reset_subtensor()
+        return
+    old, _tie_subtensor = _tie_subtensor, None
+    if old is not None:
+        try:
+            old.substrate.close()
+        except Exception:
+            pass
+
+
+def compact(data: bytes, i: int) -> Tuple[int, int]:
+    """A SCALE compact integer at `i`, and the offset after it."""
+    mode = data[i] & 3
+    if mode == 0:
+        return data[i] >> 2, i + 1
+    if mode == 1:
+        return int.from_bytes(data[i:i + 2], "little") >> 2, i + 2
+    if mode == 2:
+        return int.from_bytes(data[i:i + 4], "little") >> 2, i + 4
+    n = (data[i] >> 2) + 4
+    return int.from_bytes(data[i + 1:i + 1 + n], "little"), i + 1 + n
+
+
+def inherent_calls(extrinsics) -> list:
+    """(pallet index, call index, first argument as a compact) of each unsigned extrinsic."""
+    out = []
+    for xt in extrinsics:
+        data = bytes.fromhex(str(xt)[2:] if str(xt).startswith("0x") else str(xt))
+        _, i = compact(data, 0)
+        if data[i] & 0x80 or (data[i] & 0x7F) not in (4, 5):
+            continue
+        try:
+            out.append((data[i + 1], data[i + 2], compact(data, i + 3)[0]))
+        except IndexError:
+            continue
+    return out
+
+
+# (pallet index, call index) of Timestamp.set, found on the head block.
+_set_call: Optional[Tuple[int, int]] = None
+
+
+def _body_stamp(sub, block_hash) -> int:
+    """A block's timestamp from its Timestamp.set inherent, read from the raw block body."""
+    global _set_call
+    if _set_call is None:
+        head = sub.get_chain_finalised_head()
+        now = int(sub.query("Timestamp", "Now", block_hash=head).value)
+        found = [(p, c) for p, c, v in inherent_calls(_raw_extrinsics(sub, head)) if v == now]
+        if len(found) != 1:
+            raise RuntimeError("Timestamp.set not found in the head block")
+        _set_call = found[0]
+    got = [v for p, c, v in inherent_calls(_raw_extrinsics(sub, block_hash))
+           if (p, c) == _set_call]
+    if len(got) != 1:
+        raise RuntimeError(f"Timestamp.set not found in block {block_hash}")
+    return got[0]
+
+
+def _raw_extrinsics(sub, block_hash) -> list:
+    return sub.rpc_request("chain_getBlock", [block_hash])["result"]["block"]["extrinsics"]
+
+
 def get_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
     """The first finalised block whose timestamp is at or after `after_ms`, as (number, hash);
     None until there is one."""
+    global _tie_head
     if is_mock():
         return _mock_tie_block(after_ms)
-    with chain_lock:
+    with _tie_lock:
         try:
-            sub = get_subtensor().substrate
+            sub = _tie_substrate()
 
             def stamp(n: int) -> int:
-                return int(sub.query("Timestamp", "Now", block_hash=sub.get_block_hash(n)).value)
+                if n not in _stamps:
+                    if len(_stamps) >= TIE_STAMPS_MAX:
+                        _stamps.clear()
+                    h = sub.get_block_hash(n)
+                    try:
+                        at = int(sub.query("Timestamp", "Now", block_hash=h).value)
+                    except Exception:
+                        at = 0
+                    if at <= 0:
+                        # A pruned node keeps old block bodies but not their state; some
+                        # answer the missing state with an error, some with 0.
+                        at = _body_stamp(sub, h)
+                    _stamps[n] = (at, str(h))
+                return _stamps[n][0]
 
-            head = int(sub.get_block_number(sub.get_chain_finalised_head()))
+            head, read_at = _tie_head
+            if time.monotonic() - read_at >= TIE_HEAD_CACHE_S:
+                head = int(sub.get_block_number(sub.get_chain_finalised_head()))
+                _tie_head = (head, time.monotonic())
             at = stamp(head)
             if at < after_ms:
                 return None
@@ -107,10 +214,11 @@ def get_tie_block(after_ms: int) -> Optional[Tuple[int, str]]:
                 n += 1
             while n > 1 and stamp(n - 1) >= after_ms:
                 n -= 1
-            return n, str(sub.get_block_hash(n))
+            stamp(n)
+            return n, _stamps[n][1]
         except Exception as e:
             logger.warning(f"Could not read the tie block: {e}")
-            reset_subtensor()
+            _reset_tie()
             return None
 
 
