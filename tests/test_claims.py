@@ -491,13 +491,15 @@ async def test_a_held_lookup_keeps_line_order_until_the_hold_ends(store, monkeyp
     assert seen[1:] == [first.id, later.id, other.id]
 
 
-async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch):
+@pytest.mark.parametrize("wait_s", [0, 5])
+async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch, wait_s):
     from types import SimpleNamespace
     from alpharidge_ai.verify.fetch import Paced
     from app.services import novelty, trust, verifier
     from app.services.entities import EntityIndex
 
     monkeypatch.setattr(verifier.get_verifier(), "entities", EntityIndex())
+    monkeypatch.setattr(worker, "ADVANCE_PACE_WAIT_S", wait_s)
     seen, busy = [], [True]
 
     async def apply(store, row, *a, **kw):
@@ -505,7 +507,7 @@ async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch)
 
     async def of_claim(*a, **kw):
         if busy.pop() if busy else False:
-            raise Paced(1.0)
+            raise Paced(0.05)
         return SimpleNamespace(t=0.0, filer=None)
     monkeypatch.setattr(novelty, "apply", apply)
     monkeypatch.setattr(trust, "resolve", lambda *a, **kw: asyncio.sleep(0))
@@ -517,9 +519,11 @@ async def test_a_busy_source_host_holds_the_rest_of_the_type(store, monkeypatch)
                           actors=[{"id_scheme": "other", "id": "acme", "role": "target", "name": "Acme"},
                                   {"id_scheme": "other", "id": "w", "role": "acquirer", "name": "W"}])
     await worker.advance_queued(store, t0 + 2000)
-    assert seen == []
-    await worker.advance_queued(store, t0 + 3000)
-    assert seen == [first.id, later.id]
+    # With time left in the pass the host is waited for, in line order; without, the type waits.
+    assert seen == ([first.id, later.id] if wait_s else [])
+    if not wait_s:
+        await worker.advance_queued(store, t0 + 3000)
+        assert seen == [first.id, later.id]
 
 
 async def test_claims_past_the_in_flight_cap_get_503(client, store, monkeypatch):
