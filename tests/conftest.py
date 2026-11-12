@@ -6,6 +6,8 @@ import pytest
 # Make the `app` package importable from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# The deployment's .env never reaches the tests.
+os.environ["API_SKIP_DOTENV"] = "1"
 # Disabling auth keeps endpoint tests from needing a live metagraph.
 os.environ.setdefault("AUTH_ENABLED", "false")
 # Fixed key so runs are reproducible.
