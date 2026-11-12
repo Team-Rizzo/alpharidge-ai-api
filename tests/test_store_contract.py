@@ -226,3 +226,16 @@ async def test_prize_docs_probe_keeps_every_document_that_matches(store):
         assert (sum(novelty.same_doc(doc, d) for d in probed)
                 == sum(novelty.same_doc(doc, d) for d in every))
         assert sum(novelty.same_doc(doc, d) for d in every) > 0
+
+
+async def test_won_by_host_counts_paid_claims_per_host_and_type(store):
+    host = f"h{uuid.uuid4().hex[:8]}.example.org"
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    for i, (status, at) in enumerate((("provisional", T0 + 10), ("provisional", T0 - 7_000_000),
+                                      ("rejected", T0 + 10), ("settled", T0 + 20))):
+        row = await store.create_claim(replace(claim(hk), source_url=f"https://{host}/p{i}"))
+        assert await store.update_claim(row.id, "received", status=status, route="event",
+                                        verified_ms=at)
+    got = [r for r in await store.won_by_host(T0 - 86_400_000, T0 - 3_600_000)
+           if r[0] == host]
+    assert got == [(host, "merger_acquisition", 2, 3)]

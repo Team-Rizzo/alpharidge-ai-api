@@ -604,6 +604,16 @@ class PrismaStore:
                                                    order={"id": "asc"})
         return [_fetch_from(m) for m in rows]
 
+    async def won_by_host(self, since_ms, hour_ms):
+        rows = await self.db.query_raw(
+            "SELECT lower(substring(source_url from '^[A-Za-z]+://([^/:?#]+)')) AS host, "
+            "event_type, count(*) FILTER (WHERE verified_at >= to_timestamp($4::double "
+            "precision / 1000)) AS hour, count(*) AS day FROM \"claim\" "
+            "WHERE route = ANY(string_to_array($1, ',')) AND status = ANY(string_to_array($2, "
+            "',')) AND verified_at >= to_timestamp($3::double precision / 1000) GROUP BY 1, 2",
+            ",".join(PRIZE_ROUTES), ",".join(WON), since_ms, hour_ms)
+        return [(r["host"] or "", r["event_type"], int(r["hour"]), int(r["day"])) for r in rows]
+
     async def fetches_since(self, since_ms, limit=100_000):
         rows = await self.db.sourcefetch.find_many(
             where={"fetchedAt": {"gte": _dt(since_ms)}}, order={"id": "desc"}, take=limit)

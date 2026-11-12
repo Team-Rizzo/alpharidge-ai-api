@@ -401,6 +401,18 @@ class MemoryStore:
         rows = [f for f in self.fetches if f.fetched_ms is not None and f.fetched_ms >= since_ms]
         return [replace(f) for f in rows[-limit:]]
 
+    async def won_by_host(self, since_ms, hour_ms):
+        from urllib.parse import urlsplit
+        out: Dict[Tuple[str, str], List[int]] = {}
+        for c in self.claims.values():
+            if (c.status in WON and c.route in PRIZE_ROUTES and c.verified_ms is not None
+                    and c.verified_ms >= since_ms):
+                n = out.setdefault(((urlsplit(c.source_url).hostname or "").lower(),
+                                    c.event_type), [0, 0])
+                n[0] += c.verified_ms >= hour_ms
+                n[1] += 1
+        return [(h, t, a, b) for (h, t), (a, b) in out.items()]
+
     async def held_claims(self, limit=500):
         rows = [c for c in self.claims.values() if c.held and c.status in PASSED]
         return [replace(c) for c in sorted(rows, key=lambda c: c.id)[:limit]]

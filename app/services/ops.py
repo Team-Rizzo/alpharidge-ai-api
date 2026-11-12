@@ -113,6 +113,29 @@ async def _concentration(store: Store, head: Optional[int]) -> List[dict]:
                               or len(groups[ck]) >= many)]
 
 
+def _source_limits(host: str) -> tuple:
+    for part in EVENT_LANE["ALARM_SOURCE_HOSTS"].split(","):
+        name, _, limits = part.strip().partition("=")
+        hour, _, day = limits.partition("/")
+        if name.strip().lower() == host and hour.strip().isdigit() and day.strip().isdigit():
+            return int(hour), int(day)
+    return EVENT_LANE["ALARM_SOURCE_HOUR"], EVENT_LANE["ALARM_SOURCE_DAY"]
+
+
+async def _sources(store: Store, now_ms: int) -> List[dict]:
+    """A host and type paid more often than an event source should be: a feed of items
+    claimed one by one, for the operator to review."""
+    out = []
+    for host, event_type, hour, day in await store.won_by_host(now_ms - DAY_MS,
+                                                               now_ms - HOUR_MS):
+        per_hour, per_day = _source_limits(host)
+        if hour > per_hour or day > per_day:
+            out.append({"kind": "source_volume", "host": host, "event_type": event_type,
+                        "paid_hour": hour, "paid_day": day,
+                        "limits": {"hour": per_hour, "day": per_day}})
+    return sorted(out, key=lambda a: -a["paid_day"])
+
+
 async def _categories(store: Store, head: Optional[int]) -> List[dict]:
     """Window rows in a category that is not open."""
     if head is None:
@@ -268,7 +291,8 @@ async def _audit(store: Store, now_ms: int) -> List[dict]:
 async def alarms(store: Store, now_ms: int, head: Optional[int]) -> dict:
     metric = staleness(head, await store.last_attestation_epoch(ledger.LEDGER_SIGNER))
     out = [*await _reverify(store), *await judge.failing(store, now_ms),
-           *await _fetches(store, now_ms), *await _concentration(store, head),
+           *await _fetches(store, now_ms), *await _sources(store, now_ms),
+           *await _concentration(store, head),
            *await _gaps(store, now_ms), *_stale(metric),
            *await _missed(store, head),
            *await _categories(store, head), *await _notices(store, now_ms),

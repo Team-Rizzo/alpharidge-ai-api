@@ -119,6 +119,11 @@ EVENT_LANE = {
     "TICK_LOG_S": _el("TICK_LOG_S", 0),
     "PROFILE_S": _el("PROFILE_S", 0),
     "PUBLISH_HOLD_S": _el("PUBLISH_HOLD_S", 120),
+    # Paid claims from one host and type in an hour and in a day past which the operator is
+    # alerted; "host=hour/day,..." sets other limits for hosts that publish many events.
+    "ALARM_SOURCE_HOUR": _el("ALARM_SOURCE_HOUR", 20, int),
+    "ALARM_SOURCE_DAY": _el("ALARM_SOURCE_DAY", 50, int),
+    "ALARM_SOURCE_HOSTS": os.getenv("EL_ALARM_SOURCE_HOSTS", ""),
     # Answer key: official feeds, private, used for accuracy only.
     # Set but empty means none.
     "AK_ADAPTERS": tuple(_csv("EL_AK_ADAPTERS") if "EL_AK_ADAPTERS" in os.environ
