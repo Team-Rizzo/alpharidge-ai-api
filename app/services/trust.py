@@ -336,12 +336,13 @@ class Filings:
         acc = hit[1]
         async with self._lock(f"filing:{acc}"):
             if acc not in self._filers:
-                raw = await self.fetcher.filing_index(url)
-                if raw is None:
+                listed = filers(await self.fetcher.filing_index(url) or "")
+                if not listed:
+                    # An index page always lists its filer; a page without one is not kept.
                     return None
                 while len(self._filers) >= TRUST_FILING_CACHE_MAX:
                     del self._filers[next(iter(self._filers))]
-                self._filers[acc] = filers(raw)
+                self._filers[acc] = listed
         found = self._filers[acc]
         for a in mine:
             if getattr(a, "id_scheme", None) == IdScheme.CIK:

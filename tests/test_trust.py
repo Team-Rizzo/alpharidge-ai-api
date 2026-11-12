@@ -250,6 +250,20 @@ async def test_filer_by_cik_or_by_a_name_for_it(monkeypatch):
     assert not trust.names_filer("Cart", "CARTERS INC")
 
 
+async def test_a_filing_index_without_filers_is_read_again(monkeypatch):
+    from alpharidge_ai.schema import Actor
+    monkeypatch.setitem(trust.EVENT_LANE, "AK_SEC_USER_AGENT", "Bot ops@example.com")
+    url = "https://www.sec.gov/Archives/edgar/data/1576885/000162828026070987/doc.htm"
+    index = ("https://www.sec.gov/Archives/edgar/data/1576885/000162828026070987/"
+             "0001628280-26-070987-index.htm")
+    pages = IndexPages({index: "<html>Request Rate Threshold Exceeded</html>"})
+    filings = trust.Filings(pages, sec=pages)
+    actors = [Actor(id_scheme="cik", id="1576885", name="Acumen", role="company")]
+    assert await filings.filer(actors, url, "layoffs") is None
+    pages.pages[index] = _company("Acumen Pharmaceuticals, Inc.", "Filer", "0001576885")
+    assert await filings.filer(actors, url, "layoffs") == "0001576885"
+
+
 def test_a_filer_named_shorter_without_a_cik():
     for name, registered in (("FHLBank Chicago", "Federal Home Loan Bank of Chicago"),
                              ("SST VI", "Strategic Storage Trust VI, Inc."),
