@@ -33,6 +33,11 @@ MIN_VALIDATOR_VERSION = os.getenv("MIN_VALIDATOR_VERSION", "4.0.0")
 # "writer" (the default) runs everything; a "reader" serves only the read routes below, runs
 # no jobs and writes nothing, so several can serve status and dashboard reads beside one writer.
 API_ROLE = os.getenv("API_ROLE", "writer").strip().lower()
+# Database connections per process: EL_DB_CONNECTION_LIMIT (EL_DB_READER_CONNECTION_LIMIT for
+# a reader), and seconds a query waits for a free one; unset keeps Prisma's defaults.
+DB_CONNECTION_LIMIT = os.getenv(
+    "EL_DB_READER_CONNECTION_LIMIT" if API_ROLE == "reader" else "EL_DB_CONNECTION_LIMIT", "")
+DB_POOL_TIMEOUT_S = os.getenv("EL_DB_POOL_TIMEOUT_S", "")
 READER_ROUTES = (r"/health", r"/claims", r"/claims/\d+", r"/events(/.*)?", r"/entities/.+", r"/feed",
                  r"/dashboard/.+")
 

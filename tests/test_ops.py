@@ -301,3 +301,13 @@ async def test_one_host_and_type_paid_too_often_raises_an_alarm(monkeypatch):
     assert [(a["host"], a["paid_hour"], a["paid_day"]) for a in got] == [
         ("journal.example.org", 3, 3)]
     assert got[0]["limits"] == {"hour": 2, "day": 3}
+
+
+def test_the_database_url_carries_the_process_connection_limit():
+    from app.db import pooled_url
+    url = "postgresql://u:p@db:5432/ar?schema=public"
+    assert pooled_url(url) is None
+    got = pooled_url(url, "10", "20")
+    assert got == "postgresql://u:p@db:5432/ar?schema=public&connection_limit=10&pool_timeout=20"
+    assert pooled_url(url + "&connection_limit=99", "10") == (
+        "postgresql://u:p@db:5432/ar?schema=public&connection_limit=10")
