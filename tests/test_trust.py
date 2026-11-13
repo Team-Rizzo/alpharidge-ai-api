@@ -301,9 +301,9 @@ async def test_seed_and_nightly_job():
     assert await trust.seed(store, catalogue=trust.CATALOGUE, now_ms=NOW) == 0
     await trust_nightly.run(store, NOW)
     league = await trust.find(store, "nba.com")
-    wire = await trust.resolve(store, "https://apnews.com/article/x")
+    outlet = await trust.resolve(store, "https://www.aljazeera.com/news/x")
     assert (trust.trust(league, "sports"), trust.trust(league, "finance")) == (1.0, 0.1)
-    assert league.status == trust.ACTIVE and trust.trust(wire, "politics") == 0.7
+    assert league.status == trust.ACTIVE and trust.trust(outlet, "politics") == 0.7
     # Seeded paths only; the rest of the host starts at the base for other sources.
     news = await trust.resolve(store, "https://www.sec.gov/newsroom/press-releases/2026-1")
     rest = await trust.resolve(store, "https://www.sec.gov/comments/s7-1/x.htm")

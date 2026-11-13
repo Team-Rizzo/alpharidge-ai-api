@@ -997,17 +997,6 @@
    ]
   },
   {
-   "host": "businesswire.com",
-   "paths": [
-    "/news/home/"
-   ],
-   "kind": "wire",
-   "categories": [
-    "finance",
-    "technology"
-   ]
-  },
-  {
    "host": "caltech.edu",
    "paths": [
     "/about/news/"
@@ -2493,18 +2482,6 @@
    "kind": "exchange",
    "categories": [
     "finance"
-   ]
-  },
-  {
-   "host": "globenewswire.com",
-   "paths": [
-    "/news-release/",
-    "/en/news-release/"
-   ],
-   "kind": "wire",
-   "categories": [
-    "finance",
-    "technology"
    ]
   },
   {
@@ -8090,21 +8067,6 @@
    "pattern": "sportingnews.com/*/betting/*",
    "kind": "exclude",
    "reason": "betting or fantasy"
-  },
-  {
-   "pattern": "businesswire.com/news/*",
-   "kind": "wire",
-   "reason": "paid release"
-  },
-  {
-   "pattern": "globenewswire.com/news-release/*",
-   "kind": "wire",
-   "reason": "paid release"
-  },
-  {
-   "pattern": "globenewswire.com/*/news-release/*",
-   "kind": "wire",
-   "reason": "paid release"
   },
   {
    "pattern": "prnewswire.com/news-releases/*",

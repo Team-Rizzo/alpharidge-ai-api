@@ -4,7 +4,8 @@
     python scripts/trust.py add example.com/ --trust 0.7 [--category finance] --reason "..."
     python scripts/trust.py add "*.example.com" --trust 0.7 --reason "..."  (host and subdomains)
     python scripts/trust.py set example.org --trust 0.8 --category finance --reason "..."
-    python scripts/trust.py ban example.com --reason "..."
+    python scripts/trust.py suspend example.com --reason "..."  (no clawback)
+    python scripts/trust.py ban example.com --reason "..."  (claws back open prizes)
     python scripts/trust.py unban example.com --reason "..."
     python scripts/trust.py rule "example.com/blogs/*" --kind exclude --reason "..."
     python scripts/trust.py why example.org
@@ -84,8 +85,8 @@ async def main_async(args) -> None:
             s = await tr.set_trust(store, await _source(store, args.source), args.trust,
                                    args.reason, actor, args.category)
             print(f"{tr.label(s)} {s.category_trust}")
-        elif args.cmd in ("ban", "unban"):
-            status = tr.BANNED if args.cmd == "ban" else tr.PENDING
+        elif args.cmd in ("suspend", "ban", "unban"):
+            status = {"suspend": tr.SUSPENDED, "ban": tr.BANNED}.get(args.cmd, tr.PENDING)
             s = await tr.set_status(store, await _source(store, args.source), status,
                                     args.reason, actor)
             print(f"{tr.label(s)} {s.status}")
@@ -120,6 +121,7 @@ def main() -> None:
         c = change(name, "source")
         c.add_argument("--trust", type=float, required=True)
         c.add_argument("--category", action="append", default=[])
+    change("suspend", "source")
     change("ban", "source")
     change("unban", "source")
     r = change("rule", "pattern")
