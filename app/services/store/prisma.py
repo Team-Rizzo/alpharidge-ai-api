@@ -261,13 +261,15 @@ class PrismaStore:
         found = {m.id: m for m in await self.db.claim.find_many(where={"id": {"in": ids}})}
         return [_claim_from(found[i]) for i in ids if i in found]
 
-    async def quality_outcomes(self, since_ms, junk):
+    async def quality_outcomes(self, since_ms, junk, until_ms=None):
         rows = await self.db.query_raw(
             'SELECT COALESCE(coldkey, hotkey) AS owner, status = ANY(string_to_array($2, \',\')) '
             'AS passed FROM "claim" WHERE judged_at >= to_timestamp($1::double precision / 1000) '
+            'AND judged_at < to_timestamp($4::double precision / 1000) '
             'AND (status = ANY(string_to_array($2, \',\')) OR (status = \'rejected\' '
             'AND reason = ANY(string_to_array($3, \',\')))) ORDER BY judged_at, id',
-            since_ms, ",".join(PASSED), ",".join(junk))
+            since_ms, ",".join(PASSED), ",".join(junk),
+            until_ms if until_ms is not None else 2 ** 52)
         return [(r["owner"], bool(r["passed"])) for r in rows]
 
     async def hotkey_stats(self, since_ms, hotkeys=None):
@@ -481,6 +483,11 @@ class PrismaStore:
         return {"perMinerPoints": _json(m.perMinerPoints), "totalPoints": m.totalPoints,
                 "merkleRoot": m.merkleRoot, "signature": m.signature, "capacity": m.capacity,
                 "leafCount": m.leafCount}
+
+    async def attestation_issued_ms(self, signer, epoch):
+        m = await self.db.attestation.find_unique(where={"uq_attestation_validator_epoch": {
+            "validatorHotkey": signer, "epoch": int(epoch)}})
+        return _ms(m.issuedAt) if m is not None and m.capacity is not None else None
 
     async def put_attestation(self, signer, epoch, body):
         from prisma import Json

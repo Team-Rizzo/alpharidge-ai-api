@@ -245,7 +245,7 @@ EDGAR records are identity only and count toward accuracy; they never prove a cl
 | Config | `GET /config/subnet`: served validator settings and the minimum validator version | Validator (signed) |
 | Misc | `/health`, `/validators/versions` (internal), and `/v2` (410 Gone) | — |
 
-`GET /dashboard/quality[?coldkey=]` gives each scored coldkey's quality `q`, its weight multiplier and the paid and junk claims that counted, with the rule's constants (see the subnet's docs/miner.md). `GET /ledger/quality?from_ms=` serves validators the same outcomes, `(owner index, passed)` in judged order, from the start they ask for.
+`GET /dashboard/quality[?coldkey=]` gives each scored coldkey's quality `q`, its weight multiplier and the paid and junk claims that counted, with the rule's constants (see the subnet's docs/miner.md). `GET /ledger/quality?from_ms=&epoch=` serves validators the same outcomes, `(owner index, passed)` in judged order, from the start they ask for and, with an epoch, judged before that epoch's points were signed (`409 epoch_unsigned` before then); an epoch's answer is kept for 3 h, so both validators score it alike.
 
 `GET /dashboard/mechanism` gives the capacity `C` in force, the open categories, the window, the epoch length and the last signed total. `GET /dashboard/sources` is the trusted list: each source whose pages can win, with its trust per category, its kind (`official`, `outlet`, `wire`), `official_for` on a company's or club's own site, and the page rules (excluded and listing pages) that apply on any source.
 

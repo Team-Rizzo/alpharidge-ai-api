@@ -71,15 +71,21 @@ async def get_points(epoch: int, _: str = Depends(get_validator_hotkey),
 
 
 @router.get("/ledger/quality")
-async def get_quality(from_ms: Optional[int] = None, _: str = Depends(get_validator_hotkey),
-                      store: Store = Depends(get_store)):
-    """Each judged claim since from_ms that was paid or junk, as (owner index, passed), in
-    judged order."""
+async def get_quality(from_ms: Optional[int] = None, epoch: Optional[int] = None,
+                      _: str = Depends(get_validator_hotkey), store: Store = Depends(get_store)):
+    """Each claim judged from from_ms that was paid or junk, as (owner index, passed), in
+    judged order; with an epoch, only those judged before its points were signed, so every
+    validator scores that epoch alike."""
     since = config.EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else max(0, from_ms)
+    until = None
+    if epoch is not None:
+        until = await store.attestation_issued_ms(ledger.LEDGER_SIGNER, epoch)
+        if until is None:
+            raise HTTPException(status_code=409, detail="epoch_unsigned")
     owners: dict = {}
     rows = [[owners.setdefault(o, len(owners)), int(p)]
-            for o, p in await quality.outcomes(store, since)]
-    return {"from_ms": since, "owners": list(owners), "outcomes": rows}
+            for o, p in await quality.outcomes(store, since, until)]
+    return {"from_ms": since, "until_ms": until, "owners": list(owners), "outcomes": rows}
 
 
 @router.get("/ledger/leaves")

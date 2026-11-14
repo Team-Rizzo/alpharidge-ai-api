@@ -253,3 +253,17 @@ async def test_quality_outcomes_are_passes_and_junk_in_judged_order(store):
     got = [x for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"))
            if x[0] == ck]
     assert got == [(ck, False), (ck, True), (ck, True)]
+    got = [x for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"),
+                                                   T0 + 4) if x[0] == ck]
+    assert got == [(ck, False), (ck, True)]
+
+
+async def test_an_attestation_keeps_its_issue_time(store):
+    signer, epoch = "contract-signer-" + uuid.uuid4().hex[:8], 7
+    assert await store.attestation_issued_ms(signer, epoch) is None
+    body = {"perMinerPoints": {}, "totalPoints": 0.0, "merkleRoot": "00", "signature": "00",
+            "capacity": 1.0, "leafCount": 0}
+    await store.put_attestation(signer, epoch, body)
+    first = await store.attestation_issued_ms(signer, epoch)
+    await store.put_attestation(signer, epoch, body)
+    assert first is not None and await store.attestation_issued_ms(signer, epoch) == first

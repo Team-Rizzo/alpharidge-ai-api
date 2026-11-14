@@ -9,22 +9,30 @@ from app.config import EVENT_LANE
 from app.services.store import Store
 
 CACHE_S = 60
+# An epoch's outcomes are kept for this long, so a later status change (a clawback, a scoop
+# confirmed) cannot give the second validator another answer than the first.
+EPOCH_CACHE_S = 3 * 3600
 
-_cache: Dict[int, Tuple[float, List[Tuple[str, bool]]]] = {}
+_cache: Dict[Tuple[int, Optional[int]], Tuple[float, List[Tuple[str, bool]]]] = {}
 
 
-async def outcomes(store: Store, from_ms: Optional[int] = None) -> List[Tuple[str, bool]]:
-    """(owner, passed) for each paid or junk claim judged since from_ms (default
-    QUALITY_FROM_MS), in judged order."""
-    since = EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else int(from_ms)
-    at, rows = _cache.get(since, (0.0, None))
-    if rows is None or time.monotonic() - at >= CACHE_S:
-        rows = await store.quality_outcomes(since, JUNK)
-        for k in [k for k in _cache if k != since]:
-            if time.monotonic() - _cache[k][0] >= CACHE_S:
+async def outcomes(store: Store, from_ms: Optional[int] = None,
+                   until_ms: Optional[int] = None) -> List[Tuple[str, bool]]:
+    """(owner, passed) for each paid or junk claim judged from from_ms (default
+    QUALITY_FROM_MS) and before until_ms, in judged order."""
+    key = (EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else int(from_ms), until_ms)
+    at, rows = _cache.get(key, (0.0, None))
+    if rows is None or time.monotonic() - at >= _ttl(key):
+        rows = await store.quality_outcomes(key[0], JUNK, until_ms)
+        for k in [k for k in _cache if k != key]:
+            if time.monotonic() - _cache[k][0] >= _ttl(k):
                 del _cache[k]
-        _cache[since] = (time.monotonic(), rows)
+        _cache[key] = (time.monotonic(), rows)
     return rows
+
+
+def _ttl(key: Tuple[int, Optional[int]]) -> float:
+    return CACHE_S if key[1] is None else EPOCH_CACHE_S
 
 
 async def multipliers(store: Store) -> Dict[str, float]:

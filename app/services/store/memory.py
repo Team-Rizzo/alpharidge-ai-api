@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import time
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Tuple
 
@@ -58,6 +59,7 @@ class MemoryStore:
     fact_rows: List[EventFactRow] = field(default_factory=list)
     stage_rows: Dict[Tuple[int, str], Tuple[Optional[int], int]] = field(default_factory=dict)
     attestations: Dict[Tuple[str, int], dict] = field(default_factory=dict)
+    attestation_ms: Dict[Tuple[str, int], int] = field(default_factory=dict)
     reverify: Dict[Tuple[int, str], ReverifyRow] = field(default_factory=dict)
     pulls: List[Tuple[str, int, int]] = field(default_factory=list)
     reports: Dict[Tuple[str, int], int] = field(default_factory=dict)
@@ -174,9 +176,9 @@ class MemoryStore:
                 out.append(c)
         return [replace(c) for c in sorted(out, key=lambda c: (c.bucket, c.id))[:limit]]
 
-    async def quality_outcomes(self, since_ms, junk):
+    async def quality_outcomes(self, since_ms, junk, until_ms=None):
         rows = [c for c in self.claims.values() if c.judged_ms is not None
-                and c.judged_ms >= since_ms
+                and c.judged_ms >= since_ms and (until_ms is None or c.judged_ms < until_ms)
                 and (c.status in PASSED or (c.status == "rejected" and c.reason in junk))]
         return [(c.coldkey or c.hotkey, c.status in PASSED)
                 for c in sorted(rows, key=lambda c: (c.judged_ms, c.id))]
@@ -338,6 +340,10 @@ class MemoryStore:
 
     async def put_attestation(self, signer, epoch, body):
         self.attestations.setdefault((signer, epoch), json.loads(json.dumps(body)))
+        self.attestation_ms.setdefault((signer, epoch), int(time.time() * 1000))
+
+    async def attestation_issued_ms(self, signer, epoch):
+        return self.attestation_ms.get((signer, epoch))
 
     async def put_reverify(self, row):
         key = (row.claim_id, row.validator)

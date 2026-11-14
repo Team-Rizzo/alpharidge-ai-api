@@ -38,6 +38,13 @@ async def test_outcomes_are_served_from_the_asked_start():
     assert body["owners"] == ["ck"] and body["outcomes"] == [[0, 1], [0, 0]]
     body = client.get("/ledger/quality", params={"from_ms": T0 + 1}).json()
     assert body["from_ms"] == T0 + 1 and body["outcomes"] == [[0, 0]]
+    # An epoch's outcomes stop where its points were signed, whenever they are asked for.
+    assert client.get("/ledger/quality", params={"epoch": 7}).status_code == 409
+    await store.put_attestation(ledger_router.ledger.LEDGER_SIGNER, 7, {"capacity": 1.0})
+    store.attestation_ms[(ledger_router.ledger.LEDGER_SIGNER, 7)] = T0 + 1
+    await _judged(store, "hk", "ck", [("provisional", None)])
+    body = client.get("/ledger/quality", params={"epoch": 7}).json()
+    assert body["until_ms"] == T0 + 1 and body["outcomes"] == [[0, 1], [0, 1]]
 
 
 async def test_the_dashboard_shows_each_coldkeys_standing():
