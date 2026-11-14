@@ -7,13 +7,14 @@ from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from alpharidge_ai.mechanism import quality as qm
 from alpharidge_ai.schema import EventType
 from app import config
 from app.config import EVENT_LANE
 from app.routers.auth import authenticate
 from app.routers.claims import _can_read, get_store
 from app.routers.product import get_entities, parse_time
-from app.services import budget, judge, ledger, line, ops, product, scoops, trust
+from app.services import budget, judge, ledger, line, ops, product, quality, scoops, trust
 from app.services.entities import EntityIndex
 from app.services.store import INTAKE_REJECTS, ClaimRow, MinerStats, SourceFetchRow, Store
 from app.utils import block
@@ -67,7 +68,7 @@ async def dashboard_miners(window: str = "24h", category: Optional[str] = None,
     for hk in carried:
         stats.setdefault(hk, MinerStats())
     hotkeys = sorted(stats)
-    week = await store.hotkey_stats(now - _WINDOWS_MS["7d"], hotkeys)
+    limits = await budget.limits(store, hotkeys, now)
     recent = await store.miner_stats(until - budget.window_ms(), until)
     scoops = (await budget.scoop_allowances(store, hotkeys, now)
               if EVENT_LANE["SCOOPS"] else None)
@@ -83,7 +84,7 @@ async def dashboard_miners(window: str = "24h", category: Optional[str] = None,
         miners.append({
             "hotkey": hk, "claims": s.claims, "verified": s.verified,
             "rejected": dict(sorted(s.rejected.items())),
-            "budget": {"used": used, "limit": budget.budget_from(week.get(hk)),
+            "budget": {"used": used, "limit": limits[hk],
                        **({"scoops": scoops[hk]} if scoops is not None else {})},
             "points": points,
             "carried": round(carried.get(hk, 0.0), 6),
@@ -110,6 +111,20 @@ async def dashboard_mechanism(store: Store = Depends(get_store)):
             "epoch_seconds": blocks * ledger.SECONDS_PER_BLOCK,
             "window_hours": round(p.window * blocks * ledger.SECONDS_PER_BLOCK / 3600, 3),
             "last_signed": {"epoch": last, "total_points": att["totalPoints"]} if att else None}
+
+
+@router.get("/quality")
+async def dashboard_quality(coldkey: Optional[str] = None, store: Store = Depends(get_store)):
+    """Each scored coldkey's quality q, its multiplier and the claims that counted, with the
+    rule's constants. A coldkey with no counted claim is at the start."""
+    rows = await quality.standing(store)
+    if coldkey is not None:
+        rows = {coldkey: rows.get(coldkey) or {"q": qm.START, "multiplier": qm.multiplier(
+            qm.START), "paid": 0, "junk": 0}}
+    return {"from_ms": EVENT_LANE["QUALITY_FROM_MS"],
+            "rule": {"half_life": qm.HALF_LIFE, "start": qm.START, "zero": qm.ZERO,
+                     "full": qm.FULL, "junk": list(qm.JUNK)},
+            "coldkeys": [{"coldkey": ck, **v} for ck, v in sorted(rows.items())]}
 
 
 SOURCES_CACHE_S = 300

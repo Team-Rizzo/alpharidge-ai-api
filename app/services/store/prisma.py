@@ -261,6 +261,15 @@ class PrismaStore:
         found = {m.id: m for m in await self.db.claim.find_many(where={"id": {"in": ids}})}
         return [_claim_from(found[i]) for i in ids if i in found]
 
+    async def quality_outcomes(self, since_ms, junk):
+        rows = await self.db.query_raw(
+            'SELECT COALESCE(coldkey, hotkey) AS owner, status = ANY(string_to_array($2, \',\')) '
+            'AS passed FROM "claim" WHERE judged_at >= to_timestamp($1::double precision / 1000) '
+            'AND (status = ANY(string_to_array($2, \',\')) OR (status = \'rejected\' '
+            'AND reason = ANY(string_to_array($3, \',\')))) ORDER BY judged_at, id',
+            since_ms, ",".join(PASSED), ",".join(junk))
+        return [(r["owner"], bool(r["passed"])) for r in rows]
+
     async def hotkey_stats(self, since_ms, hotkeys=None):
         sql = ('SELECT hotkey, count(*) FILTER (WHERE status = ANY(string_to_array($2, \',\'))) '
                'AS passes '

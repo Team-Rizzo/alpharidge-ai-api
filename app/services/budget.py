@@ -3,6 +3,7 @@
 from typing import Dict, Iterable, Optional, Tuple
 
 from app.config import EVENT_LANE
+from app.services import quality
 from app.services.store import ClaimRow, HotkeyStats, Store
 from app.utils import hotkey_whitelist
 from app.utils.clock import DAY_MS, HOUR_MS
@@ -18,7 +19,7 @@ SCOOP_ALLOW_WINDOW_D = 30
 
 async def budget(store: Store, hotkey: str, now_ms: int) -> int:
     stats = (await store.hotkey_stats(now_ms - 7 * DAY_MS, [hotkey])).get(hotkey)
-    return budget_from(stats)
+    return (await _by_quality(store, {hotkey: budget_from(stats)}))[hotkey]
 
 
 def budget_from(stats: Optional[HotkeyStats]) -> int:
@@ -34,7 +35,18 @@ def window_ms() -> int:
 async def limits(store: Store, hotkeys: Iterable[str], now_ms: int) -> Dict[str, int]:
     hotkeys = list(hotkeys)
     stats = await store.hotkey_stats(now_ms - 7 * DAY_MS, hotkeys) if hotkeys else {}
-    return {hk: budget_from(stats.get(hk)) for hk in hotkeys}
+    return await _by_quality(store, {hk: budget_from(stats.get(hk)) for hk in hotkeys})
+
+
+async def _by_quality(store: Store, limits: Dict[str, int]) -> Dict[str, int]:
+    """With QUALITY_BUDGET on, each limit above QUALITY_BUDGET_MIN scaled by the multiplier of
+    the hotkey's coldkey."""
+    if not EVENT_LANE["QUALITY_BUDGET"] or not limits:
+        return limits
+    m = await quality.multipliers(store)
+    floor = EVENT_LANE["QUALITY_BUDGET_MIN"]
+    return {hk: v if v <= floor else floor + int((v - floor) * m.get(
+        hotkey_whitelist.coldkey_of(hk), 1.0)) for hk, v in limits.items()}
 
 
 async def exhausted(store: Store, hotkey: str, limit: int, now_ms: int) -> Optional[int]:

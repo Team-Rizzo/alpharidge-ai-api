@@ -92,6 +92,7 @@ Everything is read from the environment, with `.env` in the repo root loaded at 
 | `EL_SCOOPS` | An untrusted page can be held for up to 72 h as a scoop until a trusted page confirms it (default `true`; `false` turns scoops off) |
 | `EL_SCAN_FEEDS` | The feed list sent to listed validators with the open scoops (default `app/data/scan_feeds.json`) |
 | `EL_CHECK_BUDGET_BASE` | Daily checks per hotkey before verified claims add to it |
+| `EL_QUALITY_FROM_MS`, `EL_QUALITY_BUDGET`, `EL_QUALITY_BUDGET_MIN` | Coldkey quality is scored from claims judged since `EL_QUALITY_FROM_MS` (shown on `/dashboard/quality`); with `EL_QUALITY_BUDGET` on, each hotkey's check budget above `EL_QUALITY_BUDGET_MIN` (default 20) is scaled by its coldkey's multiplier |
 | `EL_RATE_LIMIT_ENABLED` | Per-IP rate limits (behind a reverse proxy, pass the client address through) |
 | `EL_FETCH_TIMEOUT_S`, `EL_FETCH_RETRY`, `EL_FETCH_PUBLIC_ONLY`, `EL_DOMAIN_RPS`, `EL_FETCH_CONCURRENCY`, `EL_USER_AGENT_CONTACT` | Fetching (15 s a request, 5 s to connect, as validators); the user agent is `AlphaRidgeBot/<version> (+<contact>)`. The contact is a URL or email the operator chooses |
 | `EL_SETTLE_DELAY_H`, `EL_SETTLE_EVERY_S`, `EL_WORKER_INTERVAL_S` | Settlement and worker timing (a signed profile's `ledger.settle_delay_h` overrides `EL_SETTLE_DELAY_H`) |
@@ -234,15 +235,17 @@ EDGAR records are identity only and count toward accuracy; they never prove a cl
 | Area | Routes | Caller |
 |---|---|---|
 | Claims | `POST /claims`, `GET /claims/{id}` | Miner (signed) |
-| Ledger | `GET /ledger/points`, `/ledger/leaves`, `/ledger/sample`, `POST /ledger/reverify` | Validator (signed) |
+| Ledger | `GET /ledger/points`, `/ledger/leaves`, `/ledger/sample`, `/ledger/quality`, `POST /ledger/reverify` | Validator (signed) |
 | Scoops | `GET /scoops/open`, `POST /scoops/confirm` | Listed validator (signed) |
 | Page judge | `GET /judge/pending`, `POST /judge/verdicts` | Listed validator (signed) |
 | Product | `GET /events`, `/events/{id}`, `/entities/{id}`, `/feed` | API key, or signed miner/validator |
-| Dashboard | `GET /dashboard/miners`, `/dashboard/items`, `/dashboard/validators`, `/dashboard/mechanism`, `/dashboard/sources` | Public, rate-limited |
+| Dashboard | `GET /dashboard/miners`, `/dashboard/items`, `/dashboard/validators`, `/dashboard/mechanism`, `/dashboard/sources`, `/dashboard/quality` | Public, rate-limited |
 | Operator | `/ops/*` | `OPERATOR_HOTKEYS` |
 | Mechanism | `GET /mechanism/profile` | Validator |
 | Config | `GET /config/subnet`: served validator settings and the minimum validator version | Validator (signed) |
 | Misc | `/health`, `/validators/versions` (internal), and `/v2` (410 Gone) | — |
+
+`GET /dashboard/quality[?coldkey=]` gives each scored coldkey's quality `q`, its weight multiplier and the paid and junk claims that counted, with the rule's constants (see the subnet's docs/miner.md). `GET /ledger/quality?from_ms=` serves validators the same outcomes, `(owner index, passed)` in judged order, from the start they ask for.
 
 `GET /dashboard/mechanism` gives the capacity `C` in force, the open categories, the window, the epoch length and the last signed total. `GET /dashboard/sources` is the trusted list: each source whose pages can win, with its trust per category, its kind (`official`, `outlet`, `wire`), `official_for` on a company's or club's own site, and the page rules (excluded and listing pages) that apply on any source.
 

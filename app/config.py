@@ -129,6 +129,13 @@ EVENT_LANE = {
     "ALARM_SOURCE_HOUR": _el("ALARM_SOURCE_HOUR", 20, int),
     "ALARM_SOURCE_DAY": _el("ALARM_SOURCE_DAY", 50, int),
     "ALARM_SOURCE_HOSTS": os.getenv("EL_ALARM_SOURCE_HOSTS", ""),
+    # Coldkey quality (alpharidge_ai.mechanism.quality), scored from claims judged since
+    # QUALITY_FROM_MS for the budget and the dashboard (validators ask from their own start).
+    # QUALITY_BUDGET scales each hotkey's check budget by its coldkey's multiplier, down to
+    # QUALITY_BUDGET_MIN.
+    "QUALITY_FROM_MS": _el("QUALITY_FROM_MS", 0, int),
+    "QUALITY_BUDGET": _flag(os.getenv("EL_QUALITY_BUDGET", "")),
+    "QUALITY_BUDGET_MIN": _el("QUALITY_BUDGET_MIN", 20, int),
     # Answer key: official feeds, private, used for accuracy only.
     # Set but empty means none.
     "AK_ADAPTERS": tuple(_csv("EL_AK_ADAPTERS") if "EL_AK_ADAPTERS" in os.environ

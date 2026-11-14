@@ -12,7 +12,7 @@ from alpharidge_ai.ledger.attestation import CLOSE_GRACE_BLOCKS
 from app import config
 from app.routers.auth import get_validator_hotkey
 from app.routers.claims import get_store
-from app.services import ledger, product, trust
+from app.services import ledger, product, quality, trust
 from app.services.store import LedgerRow, ReverifyRow, Store
 from app.utils import block
 from app.utils.clock import iso as _iso, now_ms as _now_ms
@@ -68,6 +68,18 @@ async def get_points(epoch: int, _: str = Depends(get_validator_hotkey),
         raise HTTPException(status_code=410, detail="epoch_too_old")
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.get("/ledger/quality")
+async def get_quality(from_ms: Optional[int] = None, _: str = Depends(get_validator_hotkey),
+                      store: Store = Depends(get_store)):
+    """Each judged claim since from_ms that was paid or junk, as (owner index, passed), in
+    judged order."""
+    since = config.EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else max(0, from_ms)
+    owners: dict = {}
+    rows = [[owners.setdefault(o, len(owners)), int(p)]
+            for o, p in await quality.outcomes(store, since)]
+    return {"from_ms": since, "owners": list(owners), "outcomes": rows}
 
 
 @router.get("/ledger/leaves")

@@ -239,3 +239,17 @@ async def test_won_by_host_counts_paid_claims_per_host_and_type(store):
     got = [r for r in await store.won_by_host(T0 - 86_400_000, T0 - 3_600_000)
            if r[0] == host]
     assert got == [(host, "merger_acquisition", 2, 3)]
+
+
+async def test_quality_outcomes_are_passes_and_junk_in_judged_order(store):
+    ck, hk = "contract-ck-" + uuid.uuid4().hex[:8], "contract-" + uuid.uuid4().hex[:12]
+    done = [("provisional", None, 3), ("rejected", "judge_reject", 1), ("rejected", "known_event", 2),
+            ("settled", None, 4), ("rejected", "not_an_event", 0)]
+    for status, reason, at in done:
+        row = await store.create_claim(claim(hk, coldkey=ck))
+        assert await store.update_claim(row.id, "received", status=status, reason=reason,
+                                        judged_ms=T0 + at)
+    await store.create_claim(claim(hk, coldkey=ck))
+    got = [x for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"))
+           if x[0] == ck]
+    assert got == [(ck, False), (ck, True), (ck, True)]

@@ -174,6 +174,13 @@ class MemoryStore:
                 out.append(c)
         return [replace(c) for c in sorted(out, key=lambda c: (c.bucket, c.id))[:limit]]
 
+    async def quality_outcomes(self, since_ms, junk):
+        rows = [c for c in self.claims.values() if c.judged_ms is not None
+                and c.judged_ms >= since_ms
+                and (c.status in PASSED or (c.status == "rejected" and c.reason in junk))]
+        return [(c.coldkey or c.hotkey, c.status in PASSED)
+                for c in sorted(rows, key=lambda c: (c.judged_ms, c.id))]
+
     async def hotkey_stats(self, since_ms, hotkeys=None):
         wanted = set(hotkeys) if hotkeys is not None else None
         out: Dict[str, HotkeyStats] = {}
