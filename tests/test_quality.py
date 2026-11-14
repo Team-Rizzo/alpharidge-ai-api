@@ -50,7 +50,7 @@ async def test_outcomes_are_served_from_the_asked_start():
 async def test_the_dashboard_shows_each_coldkeys_standing():
     store = MemoryStore()
     await _judged(store, "spam", "ck-spam", [("rejected", "unsupported")] * 60)
-    await _judged(store, "good", "ck-good", [("provisional", None)] * 3)
+    await _judged(store, "good", "ck-good", [("provisional", None)] * 5)
     app = FastAPI()
     app.include_router(dashboard_router.router)
     app.dependency_overrides[claims_router.get_store] = lambda: store
@@ -59,9 +59,9 @@ async def test_the_dashboard_shows_each_coldkeys_standing():
     assert body["rule"]["half_life"] == 50 and body["rule"]["full"] == 0.25
     got = {r["coldkey"]: r for r in body["coldkeys"]}
     assert got["ck-spam"]["multiplier"] == 0 and got["ck-spam"]["junk"] == 60
-    assert got["ck-good"]["multiplier"] == 1 and got["ck-good"]["paid"] == 3
+    assert got["ck-good"]["multiplier"] == 1 and got["ck-good"]["paid"] == 5
     new = client.get("/dashboard/quality", params={"coldkey": "ck-new"}).json()["coldkeys"]
-    assert new == [{"coldkey": "ck-new", "q": 0.3, "multiplier": 1.0, "paid": 0, "junk": 0}]
+    assert new == [{"coldkey": "ck-new", "q": 0.2, "multiplier": 0.5, "paid": 0, "junk": 0}]
 
 
 async def test_the_budget_scales_by_quality_only_with_the_flag(monkeypatch):
@@ -74,5 +74,5 @@ async def test_the_budget_scales_by_quality_only_with_the_flag(monkeypatch):
     assert base["spam"] == 200 and base["new"] == 200
     monkeypatch.setitem(budget.EVENT_LANE, "QUALITY_BUDGET", True)
     got = await budget.limits(store, ["spam", "good", "new"], T0 + 1000)
-    assert got == {"spam": 20, "good": base["good"], "new": 200}
+    assert got == {"spam": 20, "good": base["good"], "new": 110}
     assert await budget.budget(store, "spam", T0 + 1000) == 20

@@ -2,6 +2,8 @@
 
 from typing import Dict, Iterable, Optional, Tuple
 
+from alpharidge_ai.mechanism.quality import START, multiplier
+
 from app.config import EVENT_LANE
 from app.services import quality
 from app.services.store import ClaimRow, HotkeyStats, Store
@@ -40,13 +42,14 @@ async def limits(store: Store, hotkeys: Iterable[str], now_ms: int) -> Dict[str,
 
 async def _by_quality(store: Store, limits: Dict[str, int]) -> Dict[str, int]:
     """With QUALITY_BUDGET on, each limit above QUALITY_BUDGET_MIN scaled by the multiplier of
-    the hotkey's coldkey."""
+    the hotkey's coldkey (the start value's for a coldkey not scored yet)."""
     if not EVENT_LANE["QUALITY_BUDGET"] or not limits:
         return limits
     m = await quality.multipliers(store)
+    new = multiplier(START)
     floor = EVENT_LANE["QUALITY_BUDGET_MIN"]
     return {hk: v if v <= floor else floor + int((v - floor) * m.get(
-        hotkey_whitelist.coldkey_of(hk), 1.0)) for hk, v in limits.items()}
+        hotkey_whitelist.coldkey_of(hk), new)) for hk, v in limits.items()}
 
 
 async def exhausted(store: Store, hotkey: str, limit: int, now_ms: int) -> Optional[int]:

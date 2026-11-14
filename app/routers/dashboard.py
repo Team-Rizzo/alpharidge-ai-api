@@ -119,8 +119,8 @@ async def dashboard_quality(coldkey: Optional[str] = None, store: Store = Depend
     rule's constants. A coldkey with no counted claim is at the start."""
     rows = await quality.standing(store)
     if coldkey is not None:
-        rows = {coldkey: rows.get(coldkey) or {"q": qm.START, "multiplier": qm.multiplier(
-            qm.START), "paid": 0, "junk": 0}}
+        rows = {coldkey: rows.get(coldkey) or {"q": qm.START, "multiplier": round(qm.multiplier(
+            qm.START), 4), "paid": 0, "junk": 0}}
     return {"from_ms": EVENT_LANE["QUALITY_FROM_MS"],
             "rule": {"half_life": qm.HALF_LIFE, "start": qm.START, "zero": qm.ZERO,
                      "full": qm.FULL, "junk": list(qm.JUNK)},
