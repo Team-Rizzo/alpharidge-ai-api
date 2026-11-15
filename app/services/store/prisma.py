@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from app.services.entities import canonical_id, record_from, refreshes
 from app.utils.clock import ms as _ms
 from app.services.store.rows import (
-    INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
+    INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
     ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
     Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow, ReverifyRow,
     ScoopCandidateRow,
@@ -263,14 +263,18 @@ class PrismaStore:
 
     async def quality_outcomes(self, since_ms, junk, until_ms=None):
         rows = await self.db.query_raw(
-            'SELECT COALESCE(coldkey, hotkey) AS owner, status = ANY(string_to_array($2, \',\')) '
-            'AS passed FROM "claim" WHERE judged_at >= to_timestamp($1::double precision / 1000) '
-            'AND judged_at < to_timestamp($4::double precision / 1000) '
-            'AND (status = ANY(string_to_array($2, \',\')) OR (status = \'rejected\' '
-            'AND reason = ANY(string_to_array($3, \',\')))) ORDER BY judged_at, id',
-            since_ms, ",".join(PASSED), ",".join(junk),
+            'SELECT c.id::bigint AS id, COALESCE(c.coldkey, c.hotkey) AS owner, '
+            'c.status = ANY(string_to_array($2, \',\')) AS passed FROM "claim" c '
+            'WHERE c.judged_at >= to_timestamp($1::double precision / 1000) '
+            'AND c.judged_at < to_timestamp($4::double precision / 1000) '
+            'AND (c.status = ANY(string_to_array($2, \',\')) OR (c.status = \'rejected\' '
+            'AND (c.reason = ANY(string_to_array($3, \',\')) OR (c.reason = \'judge_unclear\' '
+            'AND EXISTS (SELECT 1 FROM source_fetch sf WHERE sf.claim_id = c.id '
+            'AND sf.check_result -> \'judge\' ->> \'type_none\' = \'true\'))))) '
+            'ORDER BY c.judged_at, c.id',
+            since_ms, ",".join(QUALITY_PAID), ",".join(junk),
             until_ms if until_ms is not None else 2 ** 52)
-        return [(r["owner"], bool(r["passed"])) for r in rows]
+        return [(r["owner"], bool(r["passed"]), int(r["id"])) for r in rows]
 
     async def hotkey_stats(self, since_ms, hotkeys=None):
         sql = ('SELECT hotkey, count(*) FILTER (WHERE status = ANY(string_to_array($2, \',\'))) '

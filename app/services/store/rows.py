@@ -17,6 +17,9 @@ PRIZE_ROUTES = ("event", "scoop")
 WON = ("verified", "provisional", "settled")
 # Claims that count as passes for the check budget.
 PASSED = ("provisional", "settled")
+# Quality counts a claim clawed back later as paid where it was decided, so the claims after
+# it keep their locked pay.
+QUALITY_PAID = PASSED + ("clawed_back",)
 # Scoop outcomes that count against a hotkey's scoop record.
 SCOOP_MISSES = ("scoop_unconfirmed", "scoop_mismatch")
 
@@ -401,7 +404,10 @@ class Store(Protocol):
     async def admissible_claims(self, limits: Dict[str, int], since_ms: int,
                                 limit: int) -> List[ClaimRow]: ...
     async def quality_outcomes(self, since_ms: int, junk: Sequence[str],
-                               until_ms: Optional[int] = None) -> List[Tuple[str, bool]]: ...
+                               until_ms: Optional[int] = None) -> List[Tuple[str, bool, int]]:
+        """(owner, paid, claim id) for each claim decided in [since_ms, until_ms) that was
+        paid (clawed back later included) or rejected as junk: a junk reason, or judge_unclear
+        whose judge found none of the claim's types; in decision order."""
 
     async def hotkey_stats(self, since_ms: int,
                            hotkeys: Optional[Iterable[str]] = None) -> Dict[str, HotkeyStats]: ...

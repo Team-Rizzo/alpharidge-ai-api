@@ -35,33 +35,48 @@ async def test_outcomes_are_served_from_the_asked_start():
     app.dependency_overrides[ledger_router.get_validator_hotkey] = lambda: "vali"
     client = TestClient(app)
     body = client.get("/ledger/quality").json()
-    assert body["owners"] == ["ck"] and body["outcomes"] == [[0, 1], [0, 0]]
+    ids = [c for _, _, c in body["outcomes"]]
+    assert body["owners"] == ["ck"] and [r[:2] for r in body["outcomes"]] == [[0, 1], [0, 0]]
     body = client.get("/ledger/quality", params={"from_ms": T0 + 1}).json()
-    assert body["from_ms"] == T0 + 1 and body["outcomes"] == [[0, 0]]
+    assert body["from_ms"] == T0 + 1 and body["outcomes"] == [[0, 0, ids[1]]]
     # An epoch's outcomes stop where its points were signed, whenever they are asked for.
     assert client.get("/ledger/quality", params={"epoch": 7}).status_code == 409
     await store.put_attestation(ledger_router.ledger.LEDGER_SIGNER, 7, {"capacity": 1.0})
     store.attestation_ms[(ledger_router.ledger.LEDGER_SIGNER, 7)] = T0 + 1
     await _judged(store, "hk", "ck", [("provisional", None)])
     body = client.get("/ledger/quality", params={"epoch": 7}).json()
-    assert body["until_ms"] == T0 + 1 and body["outcomes"] == [[0, 1], [0, 1]]
+    assert body["until_ms"] == T0 + 1 and [r[:2] for r in body["outcomes"]] == [[0, 1], [0, 1]]
 
 
 async def test_the_dashboard_shows_each_coldkeys_standing():
     store = MemoryStore()
-    await _judged(store, "spam", "ck-spam", [("rejected", "unsupported")] * 60)
-    await _judged(store, "good", "ck-good", [("provisional", None)] * 5)
+    await _judged(store, "spam", "ck-spam", [("rejected", "unsupported")] * 120)
+    await _judged(store, "good", "ck-good", [("provisional", None)] * 300)
     app = FastAPI()
     app.include_router(dashboard_router.router)
     app.dependency_overrides[claims_router.get_store] = lambda: store
     client = TestClient(app)
     body = client.get("/dashboard/quality").json()
-    assert body["rule"]["half_life"] == 50 and body["rule"]["full"] == 0.25
+    assert body["rule"]["half_life"] == 50 and body["rule"]["pay_full"] == 0.9
     got = {r["coldkey"]: r for r in body["coldkeys"]}
-    assert got["ck-spam"]["multiplier"] == 0 and got["ck-spam"]["junk"] == 60
-    assert got["ck-good"]["multiplier"] == 1 and got["ck-good"]["paid"] == 5
+    assert got["ck-spam"]["pay_multiplier"] == 0 and got["ck-spam"]["multiplier"] == 0
+    assert got["ck-spam"]["junk"] == 120
+    assert got["ck-good"]["pay_multiplier"] == 1 and got["ck-good"]["paid"] == 300
     new = client.get("/dashboard/quality", params={"coldkey": "ck-new"}).json()["coldkeys"]
-    assert new == [{"coldkey": "ck-new", "q": 0.2, "multiplier": 0.5, "paid": 0, "junk": 0}]
+    assert new == [{"coldkey": "ck-new", "q": 0.3, "pay_multiplier": 0.25, "multiplier": 1.0,
+                    "paid": 0, "junk": 0}]
+
+
+async def test_a_clawed_back_claim_keeps_its_place_and_a_typeless_unclear_is_junk():
+    from app.services.store import SourceFetchRow
+    store = MemoryStore()
+    await _judged(store, "hk", "ck", [("clawed_back", None), ("rejected", "judge_unclear"),
+                                      ("rejected", "judge_unclear")])
+    ids = sorted(store.claims)
+    await store.add_source_fetch(SourceFetchRow(claim_id=ids[1], verdict="rejected",
+                                                check={"judge": {"type_none": True}}))
+    got = await quality.outcomes(store, T0)
+    assert got == [("ck", True, ids[0]), ("ck", False, ids[1])]
 
 
 async def test_the_budget_scales_by_quality_only_with_the_flag(monkeypatch):
@@ -74,5 +89,5 @@ async def test_the_budget_scales_by_quality_only_with_the_flag(monkeypatch):
     assert base["spam"] == 200 and base["new"] == 200
     monkeypatch.setitem(budget.EVENT_LANE, "QUALITY_BUDGET", True)
     got = await budget.limits(store, ["spam", "good", "new"], T0 + 1000)
-    assert got == {"spam": 20, "good": base["good"], "new": 110}
+    assert got == {"spam": 20, "good": base["good"], "new": 200}
     assert await budget.budget(store, "spam", T0 + 1000) == 20

@@ -250,12 +250,29 @@ async def test_quality_outcomes_are_passes_and_junk_in_judged_order(store):
         assert await store.update_claim(row.id, "received", status=status, reason=reason,
                                         judged_ms=T0 + at)
     await store.create_claim(claim(hk, coldkey=ck))
-    got = [x for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"))
+    got = [x[:2] for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"))
            if x[0] == ck]
     assert got == [(ck, False), (ck, True), (ck, True)]
-    got = [x for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"),
-                                                   T0 + 4) if x[0] == ck]
+    got = [x[:2] for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"),
+                                                       T0 + 4) if x[0] == ck]
     assert got == [(ck, False), (ck, True)]
+
+
+async def test_quality_keeps_a_clawed_claim_and_counts_a_typeless_unclear_as_junk(store):
+    ck, hk = "contract-ck-" + uuid.uuid4().hex[:8], "contract-" + uuid.uuid4().hex[:12]
+    ids = []
+    for status, reason, at in [("clawed_back", None, 1), ("rejected", "judge_unclear", 2),
+                               ("rejected", "judge_unclear", 3)]:
+        row = await store.create_claim(claim(hk, coldkey=ck))
+        assert await store.update_claim(row.id, "received", status=status, reason=reason,
+                                        judged_ms=T0 + at)
+        ids.append(row.id)
+    await store.add_source_fetch(SourceFetchRow(claim_id=ids[1], verdict="rejected",
+                                                check={"judge": {"type_none": True}}))
+    await store.add_source_fetch(SourceFetchRow(claim_id=ids[2], verdict="rejected",
+                                                check={"judge": {"outcome": "unclear"}}))
+    got = [x for x in await store.quality_outcomes(T0, ("judge_reject",)) if x[0] == ck]
+    assert got == [(ck, True, ids[0]), (ck, False, ids[1])]
 
 
 async def test_an_attestation_keeps_its_issue_time(store):

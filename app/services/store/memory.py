@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app.services.entities import EntityRecord, refreshes
 from app.services.store.rows import (
-    INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
+    INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
     ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
@@ -177,10 +177,13 @@ class MemoryStore:
         return [replace(c) for c in sorted(out, key=lambda c: (c.bucket, c.id))[:limit]]
 
     async def quality_outcomes(self, since_ms, junk, until_ms=None):
+        none = {f.claim_id for f in self.fetches
+                if ((f.check or {}).get("judge") or {}).get("type_none")}
         rows = [c for c in self.claims.values() if c.judged_ms is not None
                 and c.judged_ms >= since_ms and (until_ms is None or c.judged_ms < until_ms)
-                and (c.status in PASSED or (c.status == "rejected" and c.reason in junk))]
-        return [(c.coldkey or c.hotkey, c.status in PASSED)
+                and (c.status in QUALITY_PAID or (c.status == "rejected" and (
+                    c.reason in junk or (c.reason == "judge_unclear" and c.id in none))))]
+        return [(c.coldkey or c.hotkey, c.status in QUALITY_PAID, c.id)
                 for c in sorted(rows, key=lambda c: (c.judged_ms, c.id))]
 
     async def hotkey_stats(self, since_ms, hotkeys=None):
