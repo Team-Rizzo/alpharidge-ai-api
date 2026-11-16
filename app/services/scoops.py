@@ -9,9 +9,11 @@ from datetime import datetime, time, timedelta, timezone
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
-from alpharidge_ai.schema import Actor, Claim, IdScheme, confirm_claim, judged, renamed
+from alpharidge_ai.schema import (Actor, Claim, IdScheme, category_of, confirm_claim, judged,
+                                  renamed)
 from alpharidge_ai.verify.check import PIVOT_SLOTS, pick_quote
 from app import ROOT
+from app.config import CATEGORIES, EVENT_LANE
 from app.services import intake, judge as judges, ledger, novelty, trust
 from app.services.entities import LINKED, SEC_NAMES
 from app.services.store import ClaimRow, Job, ScoopCandidateRow, Store
@@ -47,6 +49,30 @@ def feeds() -> Tuple[dict, ...]:
         return ()
     return tuple({"url": r["url"], "kind": r.get("kind", "rss")} for r in rows
                  if isinstance(r, dict) and isinstance(r.get("url"), str))
+
+
+def stale(claim: Claim, received_ms: int, published: Optional[datetime]) -> bool:
+    """The scoop's event day, or its page, ended more than SCOOP_FRESH_H before receipt."""
+    hours = EVENT_LANE["SCOOP_FRESH_H"]
+    if not hours:
+        return False
+    cutoff = received_ms - int(hours * HOUR_MS)
+    day_end = datetime.combine(claim.event_date + timedelta(days=1), time(), timezone.utc)
+    return _ms(day_end) < cutoff or (published is not None and _ms(published) < cutoff)
+
+
+async def category_trust(store: Store, v, entities, claim: Claim, source, url: str):
+    """A confirming page's trust and the category it is in: the claim's type's category, else
+    the source's best category when that is higher."""
+    category = category_of(claim.event_type).value
+    ct = await trust.of_claim(store, v.registry, entities, claim, source, category, url)
+    if ct.t >= trust.PRIZE_TRUST_MIN or source is None:
+        return ct, category
+    best = max(CATEGORIES, key=lambda c: trust.trust(source, c))
+    if best == category:
+        return ct, category
+    other = await trust.of_claim(store, v.registry, entities, claim, source, best, url)
+    return (other, best) if other.t > ct.t else (ct, category)
 
 
 def since(claim: Claim) -> datetime:
@@ -185,6 +211,14 @@ async def contested(store: Store, scoop: ClaimRow, claim: Claim, entities,
     return sorted(out, key=int)
 
 
+async def first_seen(store: Store, scoop: ClaimRow) -> Optional[int]:
+    """When a trusted page about the scoop's event was first out: the earliest receipt or
+    page publish time of another checked claim on the event at trust that can win it."""
+    if scoop.event_id is None:
+        return None
+    return await store.first_trusted_ms(scoop.event_id, scoop.id, trust.PRIZE_TRUST_MIN)
+
+
 class Wait(Exception):
     """The judge cannot answer now; the candidate is tried again later."""
 
@@ -226,12 +260,11 @@ async def check_one(store: Store, scoop: ClaimRow, cand: ScoopCandidateRow, v, r
     written = {k: v for k, v in pairs if v and v != k}
     source = await trust.resolve(store, url, now_ms)
     theirs = await store.get_source(scoop.source_id) if scoop.source_id is not None else None
-    ct = await trust.of_claim(store, v.registry, resolver.index(), found, source,
-                              scoop.category, url)
+    ct, category = await category_trust(store, v, resolver.index(), found, source, url)
     if ct.t < trust.PRIZE_TRUST_MIN:
         return "low_trust"
     if theirs is None or source.owner_id == theirs.owner_id or not (
-            ct.primary or await trust.counts_as_owner(store, source, scoop.category)):
+            ct.primary or await trust.counts_as_owner(store, source, category)):
         return "same_owner"
     at = datetime.fromtimestamp(cand.found_ms / 1000, tz=timezone.utc)
     result = v.check(found, page, at)
@@ -258,11 +291,13 @@ async def check_one(store: Store, scoop: ClaimRow, cand: ScoopCandidateRow, v, r
     if published is None:
         return "undated"
     rivals = await contested(store, scoop, claim, resolver.index(), now_ms)
+    seen = await first_seen(store, scoop)
     confirm = {"url": cand.url, "final_url": page.final_url or None,
                "content_hash": page.content_hash, "published_at": iso(published),
                "quote": quote, "claim": found.model_dump(mode="json", exclude_none=True),
                "trust": ct.t, "judge": record, "by": cand.validator,
-               "found_at": iso(cand.found_ms), **({"contested": rivals} if rivals else {})}
+               "found_at": iso(cand.found_ms), **({"contested": rivals} if rivals else {}),
+               **({"first_seen": iso(seen)} if seen is not None and seen < published else {})}
     await resolver.confirm_scoop(store, scoop, found, confirm, ct.t, now_ms, head)
     if scoop.event_id is not None:
         # The confirming page's owner counts toward the event's `confirmed` label.

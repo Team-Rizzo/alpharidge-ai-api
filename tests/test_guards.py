@@ -8,6 +8,7 @@ import pytest
 from alpharidge_ai.mechanism.pools import window_points
 from alpharidge_ai.mechanism.settlement import settle
 from alpharidge_ai.schema import Category, EventType, category_of
+from alpharidge_ai.schema import types as pay_rules
 from app.config import EVENT_LANE
 from alpharidge_ai.verify.check import verdict_hash
 from app.routers import ledger as ledger_router
@@ -15,6 +16,7 @@ from alpharidge_ai.judge.client import ScriptedJudge
 from app.services import budget, ledger, ops, points, scoops
 from app.services.entities import EntityIndex, EntityRecord
 from app.utils import hotkey_whitelist
+from app.utils.clock import iso
 
 from .pipeline import HOUR_MS, T0, Lane
 
@@ -248,13 +250,13 @@ async def test_a_scoop_is_paid_once_a_trusted_page_confirms_it():
     lane = Lane(check=True)
     await lane.sources()
 
-    async def held(name, t, facts=()):
+    async def held(name, t, facts=(), out_after=30_000):
         kw = dict(headline=f"{name} deal", actors=actors(f"Q{name}1", f"Q{name}2"),
                   facts=list(facts))
         s = await lane.submit("m4", t, source_url=f"https://lowblog.net/{name}", **kw)
         await lane.step(t + 1000)
         url = f"https://newsone.com/{name}"
-        lane.page(url, published_ms=t)
+        lane.page(url, published_ms=t + out_after)
         c = await lane.submit("m5", t + 60_000, source_url=url, **kw)
         await lane.step(t + 61_000)
         assert (lane.store.claims[s.id].status, lane.store.claims[c.id].status) == (
@@ -300,6 +302,7 @@ async def test_a_scoop_is_paid_once_a_trusted_page_confirms_it():
     assert row.points == pytest.approx(ledger.PROVISIONAL_SHARE * points.factors(
         "merger_acquisition", "scoop", t, row.factors["A"]).product)
     assert [f.status for f in lane.store.fact_rows if f.claim_id == s.id] == ["accepted"]
+
     seen = {"confirm_content_hash": record["confirm"]["content_hash"]}
     assert await ledger_router.record_reverify(lane.store, s.id, "v2", 0, "agree", seen) \
         == "agree"
@@ -312,6 +315,17 @@ async def test_a_scoop_is_paid_once_a_trusted_page_confirms_it():
     await lane.step(START + 380_000)
     assert (lane.store.claims[c.id].status, lane.store.claims[c.id].reason) == (
         "rejected", "known_event")
+
+    # A trusted page about it was out before the scoop's receipt, though the page that
+    # confirms it came later: first in, paid the event rate.
+    s, c = await held("E", START + 400_000, out_after=-5_000)
+    _, late = await found(lane, s, "https://wiretwo.org/E", START + 450_000, START + 470_000,
+                          deal_page("Company QE1", "Company QE2"))
+    assert (late.status, late.route) == ("provisional", "scoop")
+    record = ledger.judge_record(await lane.store.source_fetches(s.id))
+    assert record["confirm"]["first_seen"] == iso(START + 395_000)
+    (row,) = [r for r in lane.store.ledger if r.claim_id == s.id]
+    assert row.factors["base"] == points.price("merger_acquisition")
 
 
 @pytest.mark.usefixtures("scoops_on")
@@ -448,7 +462,8 @@ async def test_a_trusted_claim_after_a_failed_scoop_takes_the_event():
 
 
 @pytest.mark.usefixtures("scoops_on")
-async def test_a_hotkey_that_misses_its_scoops_is_turned_away_before_the_judge():
+async def test_a_hotkey_that_misses_its_scoops_is_turned_away_before_the_judge(monkeypatch):
+    monkeypatch.setitem(EVENT_LANE, "SCOOP_OPEN_BASE", 100)
     lane = Lane(check=True)
     await lane.sources()
     for i in range(budget.SCOOP_ALLOW_MIN_JUDGED):
@@ -459,9 +474,11 @@ async def test_a_hotkey_that_misses_its_scoops_is_turned_away_before_the_judge()
     await lane.settle(START + 73 * HOUR_MS)
     calls = lane.panel.judge.calls
     later = await lane.submit("m4", START + 74 * HOUR_MS, headline="Later",
-                              actors=actors("QL1", "QL2"), source_url="https://lowblog.net/l")
+                              actors=actors("QL1", "QL2"), source_url="https://lowblog.net/l",
+                              event_date="2026-10-16")
     other = await lane.submit("m6", START + 74 * HOUR_MS, headline="Other",
-                              actors=actors("QO1", "QO2"), source_url="https://lowblog.net/o")
+                              actors=actors("QO1", "QO2"), source_url="https://lowblog.net/o",
+                              event_date="2026-10-16")
     await lane.step(START + 74 * HOUR_MS + 1000)
     assert lane.store.claims[s.id].reason == "scoop_unconfirmed"
     assert (lane.store.claims[later.id].reason, lane.store.claims[other.id].status) == (
@@ -603,7 +620,7 @@ async def test_an_unread_scoop_is_held_on_its_receipt_and_paid_on_the_trusted_pa
         await lane.step(t + 1000)
         return lane.store.claims[s.id]
 
-    s = await unread("W", "https://lowblog.net/W", START, event_date="2026-10-10")
+    s = await unread("W", "https://lowblog.net/W", START)
     assert (s.status, s.route) == ("verified", "scoop")
     assert lane.panel.items == []
     (f,) = await lane.store.source_fetches(s.id)
@@ -615,8 +632,8 @@ async def test_an_unread_scoop_is_held_on_its_receipt_and_paid_on_the_trusted_pa
     assert record[UNREAD] is True and record["confirm"]["url"] == "https://wiretwo.org/W"
     (row,) = [r for r in lane.store.ledger if r.claim_id == s.id]
     assert row.factors["verdict"] == verdict_hash(record)
-    assert row.factors["base"] == points.SCOOP_PREMIUM * points.price("merger_acquisition")
-    assert row.factors["A"] == round(points.age(date(2026, 10, 10), START), 6) < 1
+    assert row.factors["base"] == pay_rules.SCOOP_PREMIUM * points.price("merger_acquisition")
+    assert row.factors["A"] == 1.0
 
     old = await unread("O", "https://lowblog.net/O", START + 1, event_date="2026-09-01")
     assert (old.status, old.reason) == ("rejected", "stale_date")
@@ -733,11 +750,13 @@ OUTCOMES = {
 @pytest.mark.usefixtures("scoops_on")
 @pytest.mark.parametrize("event_type", list(OUTCOMES))
 @pytest.mark.parametrize("days_apart", [0, 14])
-async def test_opposite_scoops_on_open_ended_types(event_type, days_apart):
+async def test_opposite_scoops_on_open_ended_types(event_type, days_apart, monkeypatch):
     """Inside the type's window the second is held on the same event, dated apart on its own;
     either way both are held and contest each other."""
     from datetime import date, timedelta
     from alpharidge_ai.schema import Claim
+
+    monkeypatch.setitem(EVENT_LANE, "SCOOP_FRESH_H", 0)
 
     lane = Lane(check=True)
     await lane.sources()

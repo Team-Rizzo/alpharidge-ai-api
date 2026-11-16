@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from app.services.entities import canonical_id, record_from, refreshes
 from app.utils.clock import ms as _ms
 from app.services.store.rows import (
-    INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
+    BEHIND, CHECKED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
     ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
     Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow, ReverifyRow,
     ScoopCandidateRow,
@@ -302,6 +302,27 @@ class PrismaStore:
             "GROUP BY COALESCE(coldkey, hotkey)",
             ",".join(owners), since_ms, ",".join(PASSED), ",".join(SCOOP_MISSES))
         return {r["owner"]: (int(r["hits"]), int(r["judged"])) for r in rows}
+
+    async def open_scoops(self, owners):
+        owners = list(owners)
+        if not owners:
+            return {}
+        rows = await self.db.query_raw(
+            'SELECT COALESCE(coldkey, hotkey) AS owner, count(*) AS n FROM "claim" '
+            "WHERE status = 'verified' AND route = 'scoop' "
+            "AND COALESCE(coldkey, hotkey) = ANY(string_to_array($1, ',')) "
+            "GROUP BY COALESCE(coldkey, hotkey)", ",".join(owners))
+        return {r["owner"]: int(r["n"]) for r in rows}
+
+    async def first_trusted_ms(self, event_id, exclude_id, trust_min):
+        rows = await self.db.query_raw(
+            "SELECT (extract(epoch FROM LEAST(min(c.received_at), min(sf.published_at))) * 1000)"
+            "::bigint AS ms FROM \"claim\" c LEFT JOIN \"source_fetch\" sf ON sf.claim_id = c.id "
+            "WHERE c.event_id = $1::int AND c.id <> $2::bigint AND c.trust >= $3::double precision "
+            "AND (c.status = ANY(string_to_array($4, ',')) OR c.reason = ANY(string_to_array($5, ',')))",
+            int(event_id), int(exclude_id), float(trust_min), ",".join(CHECKED), ",".join(BEHIND))
+        ms = rows[0]["ms"] if rows else None
+        return int(ms) if ms is not None else None
 
     async def tie_seeds(self, buckets):
         buckets = sorted(buckets)

@@ -20,6 +20,9 @@ PASSED = ("provisional", "settled")
 # Quality counts a claim clawed back later as paid where it was decided, so the claims after
 # it keep their locked pay.
 QUALITY_PAID = PASSED + ("clawed_back",)
+# Claims whose page passed the check and judge: placed, or behind another claim on the event.
+CHECKED = ("fetched", "verified") + QUALITY_PAID
+BEHIND = ("known_event", "lost_line")
 # Scoop outcomes that count against a hotkey's scoop record.
 SCOOP_MISSES = ("scoop_unconfirmed", "scoop_mismatch")
 
@@ -413,6 +416,12 @@ class Store(Protocol):
                            hotkeys: Optional[Iterable[str]] = None) -> Dict[str, HotkeyStats]: ...
     async def scoop_record(self, since_ms: int,
                            owners: Iterable[str]) -> Dict[str, Tuple[int, int]]: ...
+    async def open_scoops(self, owners: Iterable[str]) -> Dict[str, int]:
+        """Scoops each owner (coldkey, else hotkey) holds: verified on the scoop route."""
+    async def first_trusted_ms(self, event_id: int, exclude_id: int,
+                               trust_min: float) -> Optional[int]:
+        """The earliest receipt or page publish time of another claim on the event whose page
+        had at least `trust_min` trust."""
     async def bucket_claim_ids(self, buckets: Iterable[int]) -> Dict[int, List[int]]: ...
     async def tie_seeds(self, buckets: Iterable[int]) -> Dict[int, Tuple[int, str]]: ...
     async def put_tie_seed(self, bucket: int, block: int, block_hash: str) -> None: ...

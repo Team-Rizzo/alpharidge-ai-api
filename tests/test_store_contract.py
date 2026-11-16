@@ -9,7 +9,7 @@ import pytest
 
 from app.services.store import MemoryStore
 from app.services.store.rows import (
-    ClaimRow, JudgeItemRow, JudgePostRow, ReverifyRow, ScoopCandidateRow, SourceFetchRow,
+    ClaimRow, EventRecord, JudgeItemRow, JudgePostRow, ReverifyRow, ScoopCandidateRow, SourceFetchRow,
 )
 
 T0 = 1_790_000_000_000
@@ -148,6 +148,32 @@ async def test_scoop_record_is_per_coldkey(store):
         assert await store.update_claim(row.id, "received", status=status, reason=reason,
                                         route="scoop")
     assert await store.scoop_record(T0 - 1, [ck, hk]) == {ck: (1, 3)}
+
+
+async def test_open_scoops_and_the_first_trusted_page_on_an_event(store):
+    from datetime import date
+    ck = "contract-" + uuid.uuid4().hex[:12]
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-" + uuid.uuid4().hex))
+    rows = []
+    for i, (cold, status, route, t, reason) in enumerate((
+            (ck, "verified", "scoop", 0.1, None), (ck, "verified", "scoop", 0.1, None),
+            (ck, "provisional", "scoop", 0.1, None), (None, "rejected", "event", 0.9,
+                                                       "known_event"),
+            (None, "rejected", "event", 0.9, "judge_reject"), (None, "fetched", "event", 0.5,
+                                                               None))):
+        row = await store.create_claim(replace(claim(ck + str(i), coldkey=cold),
+                                               received_ms=T0 + i * 1000))
+        assert await store.update_claim(row.id, "received", status=status, route=route,
+                                        trust=t, reason=reason, event_id=ev.id)
+        rows.append(row)
+    assert await store.open_scoops([ck, "nobody"]) == {ck: 2}
+    await store.add_source_fetch(SourceFetchRow(claim_id=rows[3].id, verdict="supported",
+                                                published_ms=T0 - 5000))
+    await store.add_source_fetch(SourceFetchRow(claim_id=rows[4].id, verdict="rejected",
+                                                published_ms=T0 - 9000))
+    assert await store.first_trusted_ms(ev.id, rows[0].id, 0.75) == T0 - 5000
+    assert await store.first_trusted_ms(ev.id, rows[3].id, 0.75) is None
 
 
 async def test_claims_page_filters_by_type_and_reason(store):

@@ -1,8 +1,9 @@
 """Points for verified claims: the factors, the 40/60 split and settle at +72 h.
 
-    points = tier price × T × A
+    points = tier price × EVENT_PAY_X × T × A
     a confirmed scoop's points = tier price × M × T × A, M = SCOOP_PREMIUM when the confirming
-    page was published after the scoop's receipt, else 1
+    page was published after the scoop's receipt and no trusted page about it was seen before,
+    else EVENT_PAY_X
 
 The type's tier sets the price, T is the trust frozen at verification and A the age factor at
 receipt of the claimed event date or the page's publish date, the earlier. The miner's
@@ -16,8 +17,8 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from alpharidge_ai.schema import TYPE_SPEC, Claim, EventType, category_of, judged
-from alpharidge_ai.schema.types import (SCOOP_PREMIUM, TIER_PRICE, age_factor, scoop_debt,
-                                        scoop_multiple)
+from alpharidge_ai.schema import types as rules
+from alpharidge_ai.schema.types import TIER_PRICE, age_factor, scoop_debt, scoop_multiple
 from alpharidge_ai.verify.check import verdict_hash
 from alpharidge_ai.verify.dates import parse_datetime
 from app.services import recheck, intake, ledger, trust
@@ -44,17 +45,18 @@ def price(event_type) -> float:
     return TIER_PRICE.get(TYPE_SPEC[EventType(event_type)].tier, 0)
 
 
-def base_points(route: str, event_type, multiple: float = SCOOP_PREMIUM) -> float:
+def base_points(route: str, event_type, multiple: Optional[float] = None) -> float:
     if route == "scoop":
-        return price(event_type) * multiple
-    return price(event_type) if route == "event" else 0.0
+        return price(event_type) * (rules.SCOOP_PREMIUM if multiple is None else multiple)
+    return price(event_type) * rules.EVENT_PAY_X if route == "event" else 0.0
 
 
 def confirm_multiple(scoop: ClaimRow, confirm: dict) -> float:
-    """The scoop's price multiple from its confirm record's publish time and contested list,
-    as validators recompute it."""
+    """The scoop's price multiple from its confirm record's publish time, first trusted
+    sighting and contested list, as validators recompute it."""
     return scoop_multiple(parse_datetime(confirm.get("published_at")), _utc(scoop.received_ms),
-                          contested=bool(confirm.get("contested")))
+                          contested=bool(confirm.get("contested")),
+                          first_seen=parse_datetime(confirm.get("first_seen")))
 
 
 def _utc(ms: int) -> datetime:
@@ -74,7 +76,7 @@ async def claim_age(store: Store, row: ClaimRow, event_date) -> float:
 
 
 def factors(event_type, route: str, t: float, a: float,
-            multiple: float = SCOOP_PREMIUM) -> Factors:
+            multiple: Optional[float] = None) -> Factors:
     return Factors(base=base_points(route, event_type, multiple), T=t, A=round(a, 6))
 
 

@@ -24,7 +24,7 @@ from alpharidge_ai.verify.check import (
 from alpharidge_ai.verify.fetch import BLOCKED, FETCH_FAILED, FetchConfig, FetchedPage, Fetcher
 from app.config import EVENT_LANE
 from app.services import (budget, intake, judge as judges, ledger, novelty, page_flags, points,
-                          trust)
+                          scoops, trust)
 from app.services.answer_key import releases
 from app.services.entities import EntityIndex, PlaceIndex, shared_index
 from app.services.store import PRIZE_ROUTES, ClaimRow, EventRecord, Job, SourceFetchRow, Store
@@ -337,14 +337,18 @@ class Verifier:
         return None
 
     async def _untrusted_reason(self, store: Store, claim: Claim, row: ClaimRow,
-                                now_ms: int) -> Optional[str]:
+                                now_ms: int, page: Optional[FetchedPage] = None) -> Optional[str]:
         """What resolve would reject an untrusted line head for, or None when it may be held
         as a scoop."""
         if claim.event_type in releases.NO_SCOOP_TYPES:
             if releases.get_book().before(claim, row.received_ms, self.index()):
                 return "pre_release"
             return "low_trust"
-        if not EVENT_LANE["SCOOPS"] or await budget.scoop_limited(store, row, now_ms):
+        if not EVENT_LANE["SCOOPS"]:
+            return "scoop_limit"
+        if scoops.stale(claim, row.received_ms, page.published_at if page is not None else None):
+            return "scoop_stale"
+        if await budget.scoop_limited(store, row, now_ms):
             return "scoop_limit"
         return None
 
@@ -423,7 +427,7 @@ class Verifier:
             # An untrusted page that cannot be held as a scoop is not judged.
             ct = await trust.of_claim(store, self.registry, self.index(), claim, source,
                                       row.category, url)
-            why = (await self._untrusted_reason(store, claim, row, now_ms)
+            why = (await self._untrusted_reason(store, claim, row, now_ms, page)
                    if ct.t < trust.PRIZE_TRUST_MIN else None)
             if why:
                 result = replace(result, verdict=REJECTED, reason=why)

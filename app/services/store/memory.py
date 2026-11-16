@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app.services.entities import EntityRecord, refreshes
 from app.services.store.rows import (
-    INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
+    BEHIND, CHECKED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
     ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
@@ -210,6 +210,23 @@ class MemoryStore:
                 hits, judged = out.get(owner, (0, 0))
                 out[owner] = (hits + hit, judged + 1)
         return out
+
+    async def open_scoops(self, owners):
+        wanted, out = set(owners), {}
+        for c in self.claims.values():
+            owner = c.coldkey or c.hotkey
+            if c.route == "scoop" and c.status == "verified" and owner in wanted:
+                out[owner] = out.get(owner, 0) + 1
+        return out
+
+    async def first_trusted_ms(self, event_id, exclude_id, trust_min):
+        ids = {c.id for c in self.claims.values() if c.event_id == event_id
+               and c.id != exclude_id and (c.trust or 0.0) >= trust_min
+               and (c.status in CHECKED or c.reason in BEHIND)}
+        times = [self.claims[i].received_ms for i in ids]
+        times += [f.published_ms for f in self.fetches
+                  if f.claim_id in ids and f.published_ms is not None]
+        return min(times, default=None)
 
     async def tie_seeds(self, buckets):
         return {b: self.tie_rows[b] for b in buckets if b in self.tie_rows}

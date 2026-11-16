@@ -106,6 +106,15 @@ EVENT_LANE = {
     "SETTLE_EVERY_S": _el("SETTLE_EVERY_S", 60),
     "SETTLE_DELAY_H": _el("SETTLE_DELAY_H", 72),
     "CHECK_BUDGET_BASE": _el("CHECK_BUDGET_BASE", 200, int),
+    # Scoops: the event day and the page may end at most SCOOP_FRESH_H before receipt (0: no
+    # limit). A coldkey holds at most SCOOP_OPEN_BASE + SCOOP_OPEN_PER_HIT per scoop confirmed
+    # in the last 30 days open scoops at once, up to SCOOP_OPEN_MAX, and with 10 closed in that
+    # time under SCOOP_ALLOW_LOW_RATE confirmed, none.
+    "SCOOP_FRESH_H": _el("SCOOP_FRESH_H", 48),
+    "SCOOP_OPEN_BASE": _el("SCOOP_OPEN_BASE", 5, int),
+    "SCOOP_OPEN_PER_HIT": _el("SCOOP_OPEN_PER_HIT", 2, int),
+    "SCOOP_OPEN_MAX": _el("SCOOP_OPEN_MAX", 50, int),
+    "SCOOP_ALLOW_LOW_RATE": _el("SCOOP_ALLOW_LOW_RATE", 0.10),
     # Claims taken in at once; past it POST /claims answers 503 busy at once.
     "CLAIMS_IN_FLIGHT": _el("CLAIMS_IN_FLIGHT", 16, int),
     # Seconds a claim's status reply is reused before it is read again.
