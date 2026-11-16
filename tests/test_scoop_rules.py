@@ -81,3 +81,15 @@ async def test_staleness_counts_the_event_day_end_and_the_page():
     page = datetime.fromtimestamp((end - HOUR_MS) / 1000, tz=timezone.utc)
     assert scoops.stale(claim, end + 47 * HOUR_MS + 1, page)
     assert not scoops.stale(claim, end + 47 * HOUR_MS, page)
+
+
+@pytest.mark.usefixtures("scoops_on")
+async def test_a_stale_scoop_counts_as_junk_and_uses_the_check_budget():
+    from alpharidge_ai.mechanism.quality import JUNK
+
+    lane = Lane(check=True)
+    await lane.sources()
+    old = await scoop(lane, "m4", START, "OLD", event_date="2026-10-10", coldkey="ck4")
+    assert old.reason == "scoop_stale"
+    assert await lane.store.quality_outcomes(0, JUNK) == [("ck4", False, old.id)]
+    assert (await lane.store.budget_use("m4", 0))[0] == 1
