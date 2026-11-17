@@ -23,8 +23,8 @@ business-standard.com,,finance;technology;politics
 business.inquirer.net,,finance
 businessdailyafrica.com,/bd/,finance
 businessday.ng,,finance;technology
-businesstimes.com.sg,,finance
-businesstoday.in,,finance
+businesstimes.com.sg,,finance;technology
+businesstoday.in,,finance;technology
 calcalistech.com,/ctechnews/,technology
 cbc.ca,/news/business/,finance
 cbsnews.com,,finance;technology;politics
@@ -99,7 +99,7 @@ insurancejournal.com,,finance
 interest.co.nz,,finance
 investmentnews.com,,finance
 iol.co.za,/business/,finance
-irishtimes.com,/business/,finance
+irishtimes.com,/business/,finance;technology
 irishtimes.com,/politics/,politics
 irishtimes.com,/sport/,sports
 itnews.com.au,/news/,finance;technology
@@ -107,10 +107,10 @@ jakartaglobe.id,/business/,finance
 japantimes.co.jp,/business/,finance
 japantimes.co.jp,/news/,politics
 kedglobal.com,,technology
-khaleejtimes.com,/business/,finance
+khaleejtimes.com,/business/,finance;technology
 koreaherald.com,/article/,finance;technology;politics
-koreajoongangdaily.com,/business/,finance
-koreatimes.co.kr,/business/,finance
+koreajoongangdaily.com,/business/,finance;technology
+koreatimes.co.kr,/business/,finance;technology
 krebsonsecurity.com,,finance;technology
 kyivindependent.com,,politics
 legaldive.com,/news/,finance
@@ -123,7 +123,7 @@ medtechdive.com,/news/,finance
 mexiconewsdaily.com,/business/,finance
 modernretail.co,,finance
 moneycontrol.com,/news/,finance;politics
-nairametrics.com,,finance
+nairametrics.com,,finance;technology
 nationthailand.com,/business/,finance
 nbcnews.com,,finance;technology;politics
 nbcsports.com,,sports
@@ -187,7 +187,7 @@ thedailystar.net,/business/,finance
 theguardian.com,,finance;technology;politics;sports
 thehackernews.com,,finance;technology
 thehill.com,,politics
-thehindubusinessline.com,,finance
+thehindubusinessline.com,,finance;technology
 thenationalnews.com,/business/,finance
 thenationalnews.com,/news/,politics
 thenextweb.com,,technology
