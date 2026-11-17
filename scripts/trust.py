@@ -4,7 +4,8 @@
     python scripts/trust.py add example.com/ --trust 0.7 [--category finance] --reason "..."
     python scripts/trust.py add "*.example.com" --trust 0.7 --reason "..."  (host and subdomains)
     python scripts/trust.py set example.org --trust 0.8 --category finance --reason "..."
-    python scripts/trust.py suspend example.com --reason "..."  (no clawback)
+    python scripts/trust.py suspend example.com --reason "..."  (no clawback; a bare host covers
+        its path rules too, as do ban and unban)
     python scripts/trust.py ban example.com --reason "..."  (claws back open prizes)
     python scripts/trust.py unban example.com --reason "..."
     python scripts/trust.py rule "example.com/blogs/*" --kind exclude --reason "..."
@@ -87,9 +88,12 @@ async def main_async(args) -> None:
             print(f"{tr.label(s)} {s.category_trust}")
         elif args.cmd in ("suspend", "ban", "unban"):
             status = {"suspend": tr.SUSPENDED, "ban": tr.BANNED}.get(args.cmd, tr.PENDING)
-            s = await tr.set_status(store, await _source(store, args.source), status,
-                                    args.reason, actor)
-            print(f"{tr.label(s)} {s.status}")
+            rows = await tr.find_all(store, args.source)
+            if not rows:
+                sys.exit(f"unknown source: {args.source}")
+            for row in rows:
+                s = await tr.set_status(store, row, status, args.reason, actor)
+                print(f"{tr.label(s)} {s.status}")
         elif args.cmd == "rule":
             r = await tr.add_rule(store, args.pattern, args.kind, args.reason, actor)
             print(f"rule {r.id}: {r.kind} {r.pattern}")

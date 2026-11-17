@@ -20,6 +20,7 @@ from alpharidge_ai.schema.types import TYPES_PATH
 from alpharidge_ai.verify.facts import claims_match
 from alpharidge_ai.verify.check import FUTURE_SLACK_D, MAX_AGE_D, PIVOT_SLOTS
 from alpharidge_ai.verify.fetch import clean_url
+from app.config import EVENT_LANE
 from app.services import intake
 from app.services.answer_key.base import indicator_code
 from app.services.entities import (
@@ -68,6 +69,19 @@ DOC_MINHASH_K = 64
 DOC_SAME_JACCARD = 0.6
 WIRE_CREDITS = ("ap", "associated press", "reuters", "afp", "bloomberg", "dpa", "upi")
 DOC_LEAD_MIN_WORDS = 8
+# Types whose subject is a person, whom a claim may name by surname alone, and its role.
+SURNAME_ROLES = {"appointment": "appointee", "transfer": "player", "injury": "player"}
+# Types whose event is both sides on one day.
+TWO_SIDED = ("match_result",)
+_PLAIN = ("of", "and", "the", "for", "de", "du", "la", "le")
+_NAME_TAILS = ("jr", "sr", "ii", "iii", "iv")
+# Words a club's name carries or drops ("Angel City FC"), and words too common to find one.
+_CLUB_WORDS = ("fc", "cf", "sc", "afc", "ac", "rc", "cd", "ud", "sv", "fk", "bk", "club")
+_CLUB_COMMON = ("city", "united", "town", "county", "athletic", "rovers", "real", "sporting",
+                "state", "saint", "san", "new", "north", "south", "east", "west")
+# When each newer rule starts (EVENT_LANE keys).
+TYPE_CHECK, RETYPE_ON_PASS, NAME_FORMS = (
+    "TYPE_CHECK_FROM_MS", "RETYPE_ON_PASS_FROM_MS", "NAME_FORMS_FROM_MS")
 
 
 KNOWN, NEW = "known", "new"
@@ -98,6 +112,11 @@ class Identity:
     hard_key: Optional[str]
     # Subject CIKs the claim gives but nothing verified: they find events, never key them.
     claimed: frozenset = frozenset()
+    event_date: Optional[date] = None
+    # A two-sided type's sides, as the keys of each.
+    sides: Tuple[frozenset, ...] = ()
+    # The folded names the claim gives a person subject, as written.
+    people: Tuple[str, ...] = ()
 
 
 def compute_event_fingerprint(event_type: str, event_date: date, window_days: int,
@@ -160,9 +179,24 @@ def identity(claim: Claim, entities: EntityIndex, places: PlaceIndex,
               if same and f.field == same and isinstance(f.value, str)]
     fp = compute_event_fingerprint(claim.event_type.value, claim.event_date, spec.window_days,
                                    [*ids, *slots], place_key)
+    sides: List[frozenset] = []
+    if claim.event_type.value in TWO_SIDED:
+        for a in claim.actors:
+            side = frozenset(entities.actor_keys(a, claim.event_type))
+            if a.role in roles and side and not any(side & s for s in sides):
+                sides.append(side)
+    person = SURNAME_ROLES.get(claim.event_type.value)
+    people = tuple(normalize_name(a.name) for a in claim.actors if a.role == person and a.name)
     return Identity(claim.event_type, spec.category.value, spec.group, frozenset(keys),
                     tuple(ids), names, frozenset(subject or keys), place_key, fp,
-                    hard_key(claim.hard_id), frozenset(claimed))
+                    hard_key(claim.hard_id), frozenset(claimed), claim.event_date, tuple(sides),
+                    tuple(p for p in people if p))
+
+
+def on(rule: str, now_ms: int) -> bool:
+    """The newer rule applies to a claim decided now."""
+    start = EVENT_LANE[rule]
+    return bool(start) and now_ms >= start
 
 
 def _subject_roles(event_type: EventType) -> Set[str]:
@@ -334,13 +368,112 @@ def _overlap(ident: Identity, cand: EventRecord) -> bool:
     return bool(ident.actor_keys & set(cand.actor_keys))
 
 
-def _matches(ident: Identity, cand: EventRecord, subject: Optional[frozenset] = None) -> bool:
-    """Same type group, same main subject and a matching place."""
+def _initials(words: Sequence[str]) -> str:
+    return "".join(w[0] for w in words if w not in _PLAIN)
+
+
+def _bare(name: str) -> List[str]:
+    """A folded name's words without a generational tail ("jr", "iii")."""
+    words = name.split()
+    while len(words) > 1 and words[-1] in _NAME_TAILS:
+        words.pop()
+    return words
+
+
+def _forms(name: str) -> Set[str]:
+    """A folded name, without its generational tail, and written with its initials after it
+    ("federal aviation administration faa") as both. Never split around "and": "gold and
+    silver" or "chief executive and president" would meet every name sharing a part."""
+    words = _bare(name)
+    out = {name, " ".join(words)}
+    if len(words) >= 3 and words[-1] == _initials(words[:-1]):
+        out |= {" ".join(words[:-1]), words[-1]}
+    return out
+
+
+def _all_forms(names: Iterable[str]) -> Set[str]:
+    return {f for n in names for f in _forms(n)}
+
+
+def _key_names(keys: Iterable[str]) -> List[str]:
+    return [k[len("name:"):] for k in keys if k.startswith("name:")]
+
+
+def _names_meet(ours: Iterable[str], theirs: Iterable[str]) -> bool:
+    """Subject keys share a name form."""
+    return bool(_all_forms(_key_names(ours)) & _all_forms(_key_names(theirs)))
+
+
+def _surname_meets(people: Iterable[str], subject: Iterable[str]) -> bool:
+    """The claim's person subject, as written, and the event's subject (each part around
+    "and"): one gives a single word of three or more letters that is the other's last
+    word."""
+    ours = [_bare(p) for n in people for p in n.split(" and ")]
+    theirs = [_bare(p) for n in _key_names(subject) for p in n.split(" and ")]
+
+    def single(names):
+        return {w[0] for w in names if len(w) == 1 and len(w[0]) >= 3}
+
+    def last(names):
+        return {w[-1] for w in names if len(w) > 1}
+    return bool(single(ours) & last(theirs) or single(theirs) & last(ours))
+
+
+def _club(name: str) -> List[str]:
+    words = name.split()
+    while len(words) > 1 and words[0] in _CLUB_WORDS:
+        words.pop(0)
+    while len(words) > 1 and words[-1] in _CLUB_WORDS:
+        words.pop()
+    return words
+
+
+def _side_meets(side: Iterable[str], keys: Iterable[str]) -> bool:
+    """A team side is among the event's teams: a shared key, the same name without a club
+    word ("Angel City FC"), or a one-word name that is a word of the other's ("Zebre",
+    "Zebre Parma")."""
+    side, keys = set(side), set(keys)
+    if side & keys:
+        return True
+    ours = [_club(n) for n in _key_names(side)]
+    theirs = [_club(n) for n in _key_names(keys)]
+    if {" ".join(w) for w in ours} & {" ".join(w) for w in theirs}:
+        return True
+
+    def single(names):
+        return {w[0] for w in names if len(w) == 1 and len(w[0]) >= 4
+                and w[0] not in _CLUB_COMMON}
+
+    def words(names):
+        return {x for w in names if len(w) > 1 for x in w}
+    return bool(single(ours) & words(theirs) or single(theirs) & words(ours))
+
+
+def _sides_meet(ident: Identity, cand: EventRecord) -> bool:
+    """A two-sided event: both of the claim's sides are among the event's, on the same day
+    give or take one (time zones)."""
+    return (len(ident.sides) == 2 and cand.event_type == ident.event_type.value
+            and ident.event_date is not None
+            and abs((cand.event_date - ident.event_date).days) <= 1
+            and all(_side_meets(side, cand.subject_keys) for side in ident.sides))
+
+
+def _matches(ident: Identity, cand: EventRecord, subject: Optional[frozenset] = None,
+             rules: bool = False) -> bool:
+    """Same type group, same main subject and a matching place. Under the newer rules the
+    subject also meets by another form of its name (and a person by surname), and a
+    two-sided event needs both sides on the day."""
     spec = TYPE_SPEC.get(_type(cand.event_type))
     if spec is None:
         return False
+    if rules and ident.event_type.value in TWO_SIDED:
+        return _sides_meet(ident, cand)
     subject = ident.subject if subject is None else subject
-    return (_group_ok(ident, spec) and bool(subject & set(cand.subject_keys))
+    meets = bool(subject & set(cand.subject_keys))
+    if rules and not meets:
+        meets = (_names_meet(subject, cand.subject_keys)
+                 or _surname_meets(ident.people, cand.subject_keys))
+    return (_group_ok(ident, spec) and meets
             and places_match(ident.place_key, cand.place_key) and not _apart(ident, cand))
 
 
@@ -429,6 +562,7 @@ async def decide(store: Store, claim: Claim, entities: EntityIndex, places: Plac
                  now_ms: int, trust: Optional[float] = None,
                  filer: Optional[str] = None) -> Novelty:
     ident = identity(claim, entities, places, filer)
+    rules = on(NAME_FORMS, now_ms)
 
     def known(ev: EventRecord, cands=(), prize: bool = True) -> Novelty:
         ids = [c.id for c in cands]
@@ -445,6 +579,8 @@ async def decide(store: Store, claim: Claim, entities: EntityIndex, places: Plac
             return replace(n, route="scoop", reason=None)
         return n
 
+    if rules and claim.event_type.value in TWO_SIDED and len(ident.sides) < 2:
+        return Novelty(KNOWN, None, None, "invalid_schema")
     hit = await store.event_by_identity([ident.hard_key] if ident.hard_key else [],
                                         ident.fingerprint)
     if hit is not None:
@@ -456,7 +592,7 @@ async def decide(store: Store, claim: Claim, entities: EntityIndex, places: Plac
     cands = [c.id for c in found]
 
     # Identity first, then a re-worded copy by its figures; known events win over open lines.
-    matched = ([c for c in found if _matches(ident, c)]
+    matched = ([c for c in found if _matches(ident, c, rules=rules)]
                or [c for c in found if _same_numbers(ident, claim, c)])
     if matched:
         ev = max(matched, key=lambda c: (c.confidence != "line", -c.id))

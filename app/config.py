@@ -4,6 +4,7 @@ import hashlib
 import os
 
 from alpharidge_ai.ledger.attestation import BLOCK_LENGTH
+from alpharidge_ai.mechanism import quality as qm
 from alpharidge_ai.schema import OPEN_TYPES, TYPE_SPEC, EventType, category_of
 from alpharidge_ai.verify.fetch import user_agent
 from app import ROOT
@@ -105,7 +106,7 @@ EVENT_LANE = {
     "WORKER_INTERVAL_S": _el("WORKER_INTERVAL_S", 1),
     "SETTLE_EVERY_S": _el("SETTLE_EVERY_S", 60),
     "SETTLE_DELAY_H": _el("SETTLE_DELAY_H", 72),
-    "CHECK_BUDGET_BASE": _el("CHECK_BUDGET_BASE", 200, int),
+    "CHECK_BUDGET_BASE": _el("CHECK_BUDGET_BASE", 60, int),
     # Scoops: the event day and the page may end at most SCOOP_FRESH_H before receipt (0: no
     # limit). A coldkey holds at most SCOOP_OPEN_BASE + SCOOP_OPEN_PER_HIT per scoop confirmed
     # in the last 30 days open scoops at once, up to SCOOP_OPEN_MAX, and with 10 closed in that
@@ -133,16 +134,27 @@ EVENT_LANE = {
     "TICK_LOG_S": _el("TICK_LOG_S", 0),
     "PROFILE_S": _el("PROFILE_S", 0),
     "PUBLISH_HOLD_S": _el("PUBLISH_HOLD_S", 120),
+    # Claims decided from these times (ms; 0 is off; TYPE_CHECK has been on since 16 Nov 2026
+    # 10:56:37 UTC): a passed claim the judge's type answer
+    # finds none of the types for is unclear (TYPE_CHECK); a passed claim the judge gives
+    # another type is judged again as it (RETYPE_ON_PASS); names meet in other forms, and a
+    # match result needs both sides and meets by both on the day (NAME_FORMS).
+    "TYPE_CHECK_FROM_MS": _el("TYPE_CHECK_FROM_MS", 1_794_826_597_000, int),
+    "RETYPE_ON_PASS_FROM_MS": _el("RETYPE_ON_PASS_FROM_MS", 0, int),
+    "NAME_FORMS_FROM_MS": _el("NAME_FORMS_FROM_MS", 0, int),
+    # The least judge confidence in "none of the types" that makes a passed claim unclear.
+    "TYPE_NONE_MIN": _el("TYPE_NONE_MIN", 0.5),
     # Paid claims from one host and type in an hour and in a day past which the operator is
     # alerted; "host=hour/day,..." sets other limits for hosts that publish many events.
     "ALARM_SOURCE_HOUR": _el("ALARM_SOURCE_HOUR", 20, int),
     "ALARM_SOURCE_DAY": _el("ALARM_SOURCE_DAY", 50, int),
     "ALARM_SOURCE_HOSTS": os.getenv("EL_ALARM_SOURCE_HOSTS", ""),
     # Coldkey quality (alpharidge_ai.mechanism.quality), scored from claims judged since
-    # QUALITY_FROM_MS for the budget and the dashboard (validators ask from their own start).
+    # QUALITY_FROM_MS (quality.QUALITY_FROM by default) for the budget and the dashboard
+    # (validators ask from their own start).
     # QUALITY_BUDGET scales each hotkey's check budget by its coldkey's multiplier, down to
     # QUALITY_BUDGET_MIN.
-    "QUALITY_FROM_MS": _el("QUALITY_FROM_MS", 0, int),
+    "QUALITY_FROM_MS": _el("QUALITY_FROM_MS", qm.from_ms(), int),
     "QUALITY_BUDGET": _flag(os.getenv("EL_QUALITY_BUDGET", "")),
     "QUALITY_BUDGET_MIN": _el("QUALITY_BUDGET_MIN", 20, int),
     # Answer key: official feeds, private, used for accuracy only.

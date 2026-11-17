@@ -465,6 +465,75 @@ async def test_a_claim_the_judge_retypes_is_kept_as_that_type():
         "rejected", "judge_unclear", "merger_acquisition")
 
 
+class PassTyping(ScriptedJudge):
+    """A scripted judge that passes the claimed type but picks another kind for the page, and
+    does not pass `fails` when asked as it."""
+
+    def __init__(self, claimed, kind, fails=None):
+        super().__init__()
+        self.claimed, self.kind, self.fails = claimed, kind, fails
+
+    def checks(self, claim, text):
+        out = super().checks(claim, text)
+        if claim.event_type.value == self.claimed:
+            out.update(type_answer={"kind": self.kind, "p": 0.9})
+        elif claim.event_type.value == self.fails:
+            out.update(event="no")
+        return out
+
+
+async def _halt(judge):
+    lane = Lane(check=True, judge=judge)
+    await lane.sources()
+    row = await lane.submit("m1", T0 + 60_000, source_url="https://newsone.com/x",
+                            event_type="trading_halt", headline="Acme halted",
+                            actors=[{"id_scheme": "wikidata", "id": "Q1", "role": "subject",
+                                     "name": "Acme Inc."}],
+                            facts=[{"field": "exchange", "value": "Nasdaq"}],
+                            quote="Acme Inc. shares will be removed from Nasdaq.")
+    await lane.step(T0 + 61_000)
+    return lane, lane.store.claims[row.id]
+
+
+async def test_a_passed_claim_is_held_to_the_judges_type_answer_from_the_start(monkeypatch):
+    _, row = await _halt(PassTyping("trading_halt", "none"))
+    assert (row.status, row.event_type) == ("provisional", "trading_halt")
+    monkeypatch.setitem(EVENT_LANE, "TYPE_CHECK_FROM_MS", 1)
+    lane, row = await _halt(PassTyping("trading_halt", "none"))
+    assert (row.status, row.reason) == ("rejected", "judge_unclear")
+    assert (await lane.store.source_fetches(row.id))[-1].check["detail"] == {"judge": ["type"]}
+    _, row = await _halt(PassTyping("trading_halt", "delisting"))
+    assert (row.status, row.event_type) == ("provisional", "trading_halt")
+    monkeypatch.setitem(EVENT_LANE, "RETYPE_ON_PASS_FROM_MS", 1)
+    lane, row = await _halt(PassTyping("trading_halt", "delisting"))
+    assert (row.status, row.event_type) == ("provisional", "delisting")
+    rec = (await lane.store.source_fetches(row.id))[-1].check["judge"]
+    assert rec["retyped"] == {"kind": "delisting", "first": "pass"}
+    # Never retyped to a results release, which reports many events.
+    _, row = await _halt(PassTyping("trading_halt", "earnings"))
+    assert (row.status, row.event_type) == ("provisional", "trading_halt")
+    # Not passed as the type it picks either: unclear, never a junk reject.
+    _, row = await _halt(PassTyping("trading_halt", "delisting", fails="delisting"))
+    assert (row.status, row.reason) == ("rejected", "judge_unclear")
+
+
+def test_the_none_cut_is_a_setting_and_the_retype_cut_is_not(monkeypatch):
+    from app.services import judge as judges
+
+    def record(kind, p, outcome=judges.PASS):
+        return {"outcome": outcome, "type_answer": {"kind": kind, "p": p}}
+
+    assert EVENT_LANE["TYPE_NONE_MIN"] == 0.5
+    monkeypatch.setitem(EVENT_LANE, "TYPE_NONE_MIN", 0.6)
+    assert judges.retype_to(record("none", 0.55), None, True) is None
+    assert judges.retype_to(record("none", 0.6), None, True) == judges.NONE
+    monkeypatch.setitem(EVENT_LANE, "TYPE_NONE_MIN", 0.5)
+    assert judges.retype_to(record("none", 0.55), None, True) == judges.NONE
+    assert judges.retype_to(record("none", 0.45), None, True) is None
+    assert judges.retype_to(record("none", 0.55), None, False) is None
+    assert judges.retype_to(record("delisting", 0.55, "reject"), None) is None
+
+
 async def test_misconduct_penalty_is_five_times_the_value_and_nets_across_the_coldkey():
     from app.services import ops
     lane = Lane(check=True)

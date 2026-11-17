@@ -691,6 +691,13 @@ async def find(store: Store, text: str) -> Optional[SourceRow]:
                  if (r.host, r.path_rule) == (host, path)), None)
 
 
+async def find_all(store: Store, text: str) -> List[SourceRow]:
+    """The source rows a text names: a bare host names every row on it, path rules included."""
+    domain, host, path = parse_source(text)
+    rows = [r for r in await store.sources(domain) if r.host == host]
+    return [r for r in rows if r.path_rule == path] if path else rows
+
+
 async def add(store: Store, text: str, base: float, reason: str, actor: str,
               categories: Sequence[str] = (), status: str = ACTIVE,
               now_ms: Optional[int] = None) -> SourceRow:

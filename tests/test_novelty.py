@@ -270,3 +270,115 @@ async def test_a_ticker_written_as_the_company_is_the_same_event(entities, monke
                  actors=[other("Global Indemnity Group", role="company")])
     n = await _decide(store, later, entities)
     assert (n.state, n.reason) == ("known", "known_event")
+
+
+@pytest.fixture
+def rules(monkeypatch):
+    for rule in (novelty.TYPE_CHECK, novelty.NAME_FORMS):
+        monkeypatch.setitem(novelty.EVENT_LANE, rule, 1)
+
+
+def _event(event_type, names, role, facts=(), day=0, category="sports"):
+    d = Claim(**BASE).event_date + timedelta(days=day)
+    return dict(BASE, event_type=event_type, category=category, stage=None, headline=" ".join(names),
+                facts=list(facts), event_date=d.isoformat(),
+                actors=[other(n, role=role) for n in names])
+
+
+async def test_another_form_of_the_subjects_name_is_the_same_event(entities, rules):
+    store = MemoryStore()
+    await index(store, Claim(**_event("outage", ["FAA"], "provider", category="technology")),
+                entities)
+    long = _event("outage", ["Federal Aviation Administration (FAA)"], "provider",
+                  category="technology")
+    assert (await _decide(store, long, entities)).state == "known"
+    # Initials alone never join: many names share them.
+    spelled = _event("outage", ["Federal Aviation Administration"], "provider",
+                     category="technology")
+    assert (await _decide(store, spelled, entities)).state == "new"
+    store = MemoryStore()
+    await index(store, Claim(**_event("outage", ["Fedora Healthcare Solutions"], "provider",
+                                      category="technology")), entities)
+    assert (await _decide(store, _event("outage", ["Fairview Health Services"], "provider",
+                                        category="technology"), entities)).state == "new"
+
+
+async def test_a_person_named_by_surname_is_the_same_event(entities, rules):
+    store = MemoryStore()
+    office = [{"field": "office", "value": "head coach of RC Lens"}]
+    await index(store, Claim(**_event("appointment", ["RC Lens and Didier Digard"], "appointee",
+                                      office, category="politics")), entities)
+    short = _event("appointment", ["Digard and Lens"], "appointee",
+                   [{"field": "office", "value": "Lens manager"}], category="politics")
+    assert (await _decide(store, short, entities)).state == "known"
+    # Two full names that share a surname stay apart, and no surname rule for companies.
+    store = MemoryStore()
+    await index(store, Claim(**_event("appointment", ["John Smith"], "appointee", office,
+                                      category="politics")), entities)
+    jane = _event("appointment", ["Jane Smith"], "appointee",
+                  [{"field": "office", "value": "mayor of Leeds"}], category="politics")
+    assert (await _decide(store, jane, entities)).state == "new"
+
+
+async def test_a_surname_is_only_the_persons_and_drops_a_generational_tail(entities, rules):
+    store = MemoryStore()
+    await index(store, Claim(**_event("injury", ["Derwin James Jr."], "player")), entities)
+    assert (await _decide(store, _event("injury", ["Derwin James"], "player"),
+                          entities)).state == "known"
+    # Names that share a part around "and" are not one name.
+    store = MemoryStore()
+    await index(store, Claim(**_event("outage", ["Aya Gold & Silver"], "provider",
+                                      category="technology")), entities)
+    assert (await _decide(store, _event("outage", ["Americas Gold and Silver"], "provider",
+                                        category="technology"), entities)).state == "new"
+    # A one-word club never meets another club's name through the surname rule.
+    store = MemoryStore()
+    moved = _event("transfer", ["Harry Maguire"], "player",
+                   [{"field": "to_team", "value": "Red Devils"}])
+    moved["actors"].append(other("Red Devils", role="club"))
+    await index(store, Claim(**moved), entities)
+    other_move = _event("transfer", ["Anthony Mantha"], "player",
+                        [{"field": "to_team", "value": "Devils"}])
+    other_move["actors"].append(other("Devils", role="club"))
+    assert (await _decide(store, other_move, entities)).state == "new"
+
+
+async def test_without_the_start_names_meet_only_as_before(entities):
+    store = MemoryStore()
+    await index(store, Claim(**_event("outage", ["FAA"], "provider", category="technology")),
+                entities)
+    long = _event("outage", ["Federal Aviation Administration (FAA)"], "provider",
+                  category="technology")
+    assert (await _decide(store, long, entities)).state == "new"
+
+
+async def test_a_match_result_is_both_sides_on_the_day(entities, rules):
+    score = [{"field": "score", "value": "2-1"}]
+    store = MemoryStore()
+    await index(store, Claim(**_event("match_result", ["Ajax", "Twente"], "team", score)),
+                entities)
+    again = _event("match_result", ["Twente", "Ajax"], "team", score)
+    assert (await _decide(store, again, entities)).state == "known"
+    later = _event("match_result", ["Ajax", "Malmo"], "team", score, day=4)
+    assert (await _decide(store, later, entities)).state == "new"
+    rematch = _event("match_result", ["Ajax", "Twente"], "team", score, day=3)
+    assert (await _decide(store, rematch, entities)).state == "new"
+    n = await _decide(store, _event("match_result", ["Ajax"], "team", score), entities)
+    assert (n.state, n.reason) == ("known", "invalid_schema")
+    # A side written with or without a club word, or by one word of its name, is that side.
+    store = MemoryStore()
+    await index(store, Claim(**_event("match_result", ["Angel City FC", "Zebre Parma"], "team",
+                                      score)), entities)
+    short = _event("match_result", ["Angel City", "Zebre"], "team", score)
+    assert (await _decide(store, short, entities)).state == "known"
+    city = _event("match_result", ["Angel City", "Parma City"], "team", score)
+    assert (await _decide(store, city, entities)).state == "new"
+
+
+async def test_without_the_start_one_side_still_finds_a_match(entities):
+    score = [{"field": "score", "value": "2-1"}]
+    store = MemoryStore()
+    await index(store, Claim(**_event("match_result", ["Ajax", "Twente"], "team", score)),
+                entities)
+    later = _event("match_result", ["Ajax", "Malmo"], "team", score, day=4)
+    assert (await _decide(store, later, entities)).state == "known"

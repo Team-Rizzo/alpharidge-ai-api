@@ -265,7 +265,9 @@ class Verifier:
         """The validators' combined page verdict, or None while it must wait. A claim the
         judge does not pass but finds another open type or stage for is judged again as that;
         it is unclear when that type cannot hold it. On a filer's own 8-K the filing's items
-        go with it."""
+        go with it. From their start, a claim the judge passes is held to its type answer
+        too: unclear when it picks none of the types, and judged again as the type it picks,
+        unclear unless that passes too."""
         since = now_ms - 7 * DAY_MS
         stats = (await store.hotkey_stats(since, [row.hotkey])).get(row.hotkey)
         passes = bool(stats and stats.passes)
@@ -278,14 +280,22 @@ class Verifier:
                                              panel=self.panel)
 
         v = await ask(claim, task)
-        key = judges.retype_to(v, claim) if v else None
+        own = task.get("kind") == judges.CLAIM
+        key = judges.retype_to(
+            v, claim, own and novelty.on(novelty.TYPE_CHECK, now_ms),
+            own and novelty.on(novelty.RETYPE_ON_PASS, now_ms)) if v else None
         if not key:
             return v
+        if key == judges.NONE:
+            return {**v, "outcome": judges.UNCLEAR, "reason": "judge_unclear", "type_none": True}
         retyped = {"kind": key, "first": v["outcome"]}
         other = judged(claim, {"retyped": retyped})
         if other is None or intake.off_reason(other):
             return {**v, "outcome": judges.UNCLEAR, "retyped": retyped}
         again = await ask(other, {**task, "judged_as": key})
+        if again and v["outcome"] == judges.PASS and again["outcome"] != judges.PASS:
+            return {**again, "outcome": judges.UNCLEAR, "reason": "judge_unclear",
+                    "retyped": retyped}
         return {**again, "retyped": retyped} if again else None
 
     async def repeats(self, store: Store, row: ClaimRow, doc_hash: str, now_ms: int) -> int:
@@ -456,6 +466,7 @@ class Verifier:
             if verdict["outcome"] != judges.PASS:
                 why = judge_failed(verdict, judged(claim, verdict) or claim) if verdict.get(
                     "answers") else []
+                why = ["type", *why] if verdict.get("type_none") else why
                 result = replace(result, verdict=REJECTED, detail={"judge": why} if why else None,
                                  reason=verdict.get("reason") or f"judge_{verdict['outcome']}")
             elif verdict.get("retyped"):

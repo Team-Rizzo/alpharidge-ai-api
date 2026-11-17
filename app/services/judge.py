@@ -14,7 +14,7 @@ from typing import List, Optional, Tuple
 
 from alpharidge_ai.judge.combine import combined
 from alpharidge_ai.judge.prompt import JUDGE_NO, JUDGE_PROMPT_VERSION, JUDGE_YES
-from alpharidge_ai.schema import kind_key, parse_kind
+from alpharidge_ai.schema import TYPE_SPEC, kind_key, parse_kind
 from app import config
 from app.config import EVENT_LANE
 from app.services.store import ClaimRow, JudgeItemRow, JudgePostRow, Store
@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 PASS, REJECT, UNCLEAR = "pass", "reject", "unclear"
 CLAIM, CONFIRM = "claim", "confirm"
+# The page judge's type answer when the page reports none of the open types.
+NONE = "none"
 PENDING, DONE, CLOSED = "pending", "done", "closed"
 # Once every listed validator has posted, or this long after the item was queued with at
 # least one post, the verdict is combined.
@@ -279,15 +281,28 @@ def post_outcome(body: str) -> Tuple[Optional[str], Optional[str]]:
     return outcome, None if outcome == PASS else f"judge_{outcome}"
 
 
-def retype_to(record: dict, claim) -> Optional[str]:
-    """The type (and stage) to judge the claim as again: the judge did not pass it, and picked
-    another open type or stage for what the page reports."""
+def retype_to(record: dict, claim, none_on_pass: bool = False,
+              retype_on_pass: bool = False) -> Optional[str]:
+    """The type (and stage) to judge the claim as again: the judge did not pass it (or, with
+    `retype_on_pass`, passed it, other than as a results release), and picked another open
+    type or stage for what the page reports. With `none_on_pass`, NONE when it passed the claim but picked none of the
+    types."""
     ta = record.get("type_answer") or {}
-    if record.get("outcome") == PASS or record.get("reason") == "fixed_check" \
-            or not isinstance(ta.get("p"), (int, float)) or ta["p"] < JUDGE_YES:
+    passed = record.get("outcome") == PASS
+    if record.get("reason") == "fixed_check" or not isinstance(ta.get("p"), (int, float)):
+        return None
+    if passed and ta.get("kind") == NONE:
+        return NONE if none_on_pass and ta["p"] >= EVENT_LANE["TYPE_NONE_MIN"] else None
+    if ta["p"] < JUDGE_YES:
+        return None
+    if passed and not retype_on_pass:
         return None
     kind = parse_kind(ta.get("kind") or "")
     if kind is None or kind[0].value not in EVENT_LANE["TYPES"]:
+        return None
+    # A results release reports many events; a passed claim on one of them, or on the
+    # results themselves, stays its own.
+    if passed and "results" in (TYPE_SPEC[kind[0]].group, TYPE_SPEC[claim.event_type].group):
         return None
     key = kind_key(*kind)
     return None if key == kind_key(claim.event_type, claim.stage) else key

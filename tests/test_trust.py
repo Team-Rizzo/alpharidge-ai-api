@@ -73,6 +73,17 @@ async def test_ban():
     assert [e.field for e in await store.trust_log(source_id=src.id)][-1] == "status"
 
 
+async def test_a_bare_host_names_its_path_rules_too():
+    store = MemoryStore()
+    for text in ("wire.example", "wire.example/news/", "wire.example/en/news/", "other.example"):
+        await trust.add(store, text, 0.7, "seed", "operator:test")
+    assert sorted(trust.label(r) for r in await trust.find_all(store, "wire.example")) == [
+        "wire.example", "wire.example/en/news/", "wire.example/news/"]
+    assert [trust.label(r) for r in await trust.find_all(store, "wire.example/news/")] == [
+        "wire.example/news/"]
+    assert await trust.find_all(store, "none.example") == []
+
+
 async def test_primary_source_scope_and_page_rules():
     store = MemoryStore()
     acme = EntityRecord("wikidata", "Q1", "Acme", xrefs=("cik:320193",),
