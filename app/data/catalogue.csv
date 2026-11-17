@@ -15,14 +15,14 @@ bbc.com,,finance;technology;politics;sports
 bernama.com,/en/business/,finance
 betakit.com,,finance;technology
 biopharmadive.com,/news/,finance
-biospace.com,,finance
+biospace.com,,finance;technology
 bleepingcomputer.com,/news/,finance;technology
 bnnbloomberg.ca,,finance;politics
 brecorder.com,/news/,finance
 business-standard.com,,finance;technology;politics
 business.inquirer.net,,finance
 businessdailyafrica.com,/bd/,finance
-businessday.ng,,finance
+businessday.ng,,finance;technology
 businesstimes.com.sg,,finance
 businesstoday.in,,finance
 calcalistech.com,/ctechnews/,technology
@@ -34,7 +34,7 @@ channelnewsasia.com,,finance;technology;politics
 ciodive.com,/news/,finance;technology
 cityam.com,,finance;politics
 cnbc.com,,finance;technology;politics
-cnbctv18.com,,finance
+cnbctv18.com,,finance;technology
 constructiondive.com,/news/,finance
 courthousenews.com,,finance
 ctvnews.ca,,finance
@@ -68,7 +68,7 @@ euronews.com,,finance;technology;politics
 fiercebiotech.com,,finance
 fiercehealthcare.com,,finance
 fiercepharma.com,,finance
-finance.yahoo.com,,finance;politics
+finance.yahoo.com,,finance;technology;politics
 financialexpress.com,,finance;politics
 finextra.com,/newsarticle/,finance
 focustaiwan.tw,/business/,finance
@@ -84,7 +84,7 @@ geekwire.com,,finance;technology
 globalnews.ca,,finance;technology;politics
 goal.com,,sports
 grocerydive.com,/news/,finance
-gulfnews.com,/business/,finance
+gulfnews.com,/business/,finance;technology
 healthcaredive.com,/news/,finance
 heise.de,/news/,technology
 hindustantimes.com,,finance;technology;politics;sports
@@ -175,7 +175,7 @@ supplychaindive.com,/news/,finance
 swissinfo.ch,/eng/,finance
 taipeitimes.com,/News/,politics
 taipeitimes.com,/News/biz/,finance
-tbsnews.net,,finance
+tbsnews.net,,finance;technology
 tech.eu,,technology
 techcabal.com,,finance;technology
 techcrunch.com,,finance;technology
@@ -203,5 +203,5 @@ usatoday.com,,finance;technology;politics;sports
 utilitydive.com,,finance
 venturebeat.com,,finance
 wired.com,,technology
-zawya.com,/en/business/,finance
+zawya.com,/en/business/,finance;technology
 zdnet.com,,finance;technology
