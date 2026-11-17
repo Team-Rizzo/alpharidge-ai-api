@@ -17,7 +17,7 @@ from app.routers.product import get_entities, parse_time
 from app.services import budget, judge, ledger, line, ops, product, quality, scoops, trust
 from app.services.entities import EntityIndex
 from app.services.store import INTAKE_REJECTS, ClaimRow, MinerStats, SourceFetchRow, Store
-from app.utils import block
+from app.utils import block, hotkey_whitelist
 from app.utils.auth import extract_auth_from_headers
 from app.utils.clock import iso, now_ms as _now_ms
 
