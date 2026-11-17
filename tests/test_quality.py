@@ -57,13 +57,13 @@ async def test_the_dashboard_shows_each_coldkeys_standing():
     app.dependency_overrides[claims_router.get_store] = lambda: store
     client = TestClient(app)
     body = client.get("/dashboard/quality").json()
-    assert body["rule"]["half_life"] == 50 and body["rule"]["pay_full"] == 0.9
+    assert body["rule"]["half_life"] == 20 and body["rule"]["pay_full"] == 0.6
     got = {r["coldkey"]: r for r in body["coldkeys"]}
     assert got["ck-spam"]["pay_multiplier"] == 0 and got["ck-spam"]["multiplier"] == 0
     assert got["ck-spam"]["junk"] == 120
     assert got["ck-good"]["pay_multiplier"] == 1 and got["ck-good"]["paid"] == 300
     new = client.get("/dashboard/quality", params={"coldkey": "ck-new"}).json()["coldkeys"]
-    assert new == [{"coldkey": "ck-new", "q": 0.3, "pay_multiplier": 0.25, "multiplier": 1.0,
+    assert new == [{"coldkey": "ck-new", "q": 0.5, "pay_multiplier": 0.8, "multiplier": 1.0,
                     "paid": 0, "junk": 0}]
 
 
