@@ -57,7 +57,7 @@ async def _carried(store: Store, category: Optional[str]) -> Dict[str, float]:
 @router.get("/miners")
 async def dashboard_miners(window: str = "24h", category: Optional[str] = None,
                            limit: int = 256, store: Store = Depends(get_store)):
-    """Per-hotkey claims, outcomes, budget, points by route, debt carried into the signed window
+    """Per-hotkey coldkey, claims, outcomes, budget, points by route, debt carried into the signed window
     and accuracy, from the ledger."""
     if window not in _WINDOWS_MS:
         raise HTTPException(status_code=400, detail="bad_window")
@@ -82,7 +82,8 @@ async def dashboard_miners(window: str = "24h", category: Optional[str] = None,
         used = used.claims - sum(used.rejected.get(r, 0) for r in INTAKE_REJECTS) if used else 0
         points = {route: _points(kinds) for route, kinds in sorted(s.points.items())}
         miners.append({
-            "hotkey": hk, "claims": s.claims, "verified": s.verified,
+            "hotkey": hk, "coldkey": hotkey_whitelist.coldkey_of(hk),
+            "claims": s.claims, "verified": s.verified,
             "rejected": dict(sorted(s.rejected.items())),
             "budget": {"used": used, "limit": limits[hk],
                        **({"scoops": scoops[hk]} if scoops is not None else {})},

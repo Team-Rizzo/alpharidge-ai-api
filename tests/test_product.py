@@ -193,6 +193,7 @@ async def test_dashboard_shows_route_and_check(api, monkeypatch):
     assert item["points"]["provisional"] > 0 and item["points"]["clawed"] == 0
     (miner,) = client.get("/dashboard/miners").json()["miners"]
     assert miner["hotkey"] == "m1" and miner["claims"] == 1 and miner["verified"] == 1
+    assert miner["coldkey"] == "m1"
     assert miner["points"]["event"]["provisional"] == pytest.approx(item["points"]["provisional"])
     assert miner["budget"]["limit"] > 0
     assert miner["budget"]["scoops"] is True
