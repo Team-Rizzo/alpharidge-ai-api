@@ -396,7 +396,7 @@ class Verifier:
 
     async def verify(self, store: Store, row: ClaimRow, now_ms: int,
                      near: Optional[Sequence[EventRecord]] = None) -> ClaimRow:
-        """novelty -> fetched, or on to rejected when the check fails."""
+        """novelty -> fetched, or novelty -> rejected when the check fails."""
         if row.status != "novelty" or not row.route:
             return row
         if self._judge_wait.get(row.id, 0) > now_ms:
@@ -493,11 +493,11 @@ class Verifier:
             if not early:
                 await trust.record(store, trust.FIRST, source, category, row.received_ms,
                                    event_id, row.id, _ms(page.published_at))
-        row = await intake.transition(store, row, "fetched", **fields)
-        if not result.passed:
-            row = await intake.transition(store, row, "rejected", reason=result.reason,
-                                          judged_ms=now_ms)
-        return row
+        if result.passed:
+            return await intake.transition(store, row, "fetched", **fields)
+        # Decided in one move: a claim left `fetched` by a reject that failed would be placed.
+        return await intake.transition(store, row, "rejected", reason=result.reason,
+                                       judged_ms=now_ms, **fields)
 
 
 _default: Optional[Verifier] = None

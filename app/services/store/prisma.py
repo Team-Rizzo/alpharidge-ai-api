@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
+from app import db as _db
+from app.db import TX_MAX_WAIT_MS, TX_TIMEOUT_MS
 from app.services.entities import canonical_id, record_from, refreshes
 from app.utils.clock import ms as _ms
 from app.services.store.rows import (
-    BEHIND, CHECKED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
+    BEHIND, CHECKED, DECIDED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
     ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
     Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow, ReverifyRow,
     ScoopCandidateRow,
@@ -29,10 +32,13 @@ _CLAIM_FIELDS = {
     "source_id": "sourceId", "trust": "trust", "trust_band": "trustBand",
     "wrong": "wrong", "event_type": "eventType",
 }
-_CLAIM_TIMES = {"verified_ms": "verifiedAt", "judged_ms": "judgedAt", "settle_ms": "settleAt"}
+_CLAIM_TIMES = {"verified_ms": "verifiedAt", "judged_ms": "judgedAt", "settle_ms": "settleAt",
+                "decided_ms": "decidedAt"}
 
 
 _RECEIPT_LOCK = 4545001
+# Ledger rows and claim decisions hold it shared; signing an epoch holds it exclusive.
+_LEDGER_LOCK = 4545002
 _RECEIPT_SQL = ('SELECT seq, version, prev, claim_id, hotkey, body_sha256, received_ms, '
                 'hash, signature FROM "claim_receipt"')
 
@@ -54,6 +60,7 @@ def _claim_from(m) -> ClaimRow:
         source_url=m.sourceUrl, status=m.status, reason=m.reason, event_id=m.eventId,
         novelty=m.novelty, route=m.route, held=m.held,
         verified_ms=_ms(m.verifiedAt), judged_ms=_ms(m.judgedAt), settle_ms=_ms(m.settleAt),
+        decided_ms=_ms(m.decidedAt),
         pending_of_event_id=m.pendingOfEventId, doc_hash=m.docHash, source_id=m.sourceId,
         trust=m.trust, trust_band=m.trustBand, wrong=m.wrong,
         coldkey=m.coldkey)
@@ -96,9 +103,51 @@ def _ledger_from(m) -> LedgerRow:
                      received_ms=m.receivedMs, bucket=m.receiptBucket, coldkey=m.coldkey)
 
 
+def _tx_limits(timeout_ms: Optional[int] = None) -> dict:
+    """How long a transaction waits to start and may stay open (app.db)."""
+    return {"max_wait": timedelta(milliseconds=TX_MAX_WAIT_MS),
+            "timeout": timedelta(milliseconds=timeout_ms or TX_TIMEOUT_MS)}
+
+
 class PrismaStore:
-    def __init__(self, client):
+    def __init__(self, client, in_tx: bool = False):
         self.db = client
+        self._in_tx = in_tx
+        # How this transaction holds the ledger lock, if it does.
+        self._held: Optional[str] = None
+
+    @asynccontextmanager
+    async def transaction(self, timeout_ms: Optional[int] = None):
+        if self._in_tx:
+            yield self
+            return
+        async with self.db.tx(**_tx_limits(timeout_ms)) as tx:
+            yield PrismaStore(tx, in_tx=True)
+
+    async def lock_ledger(self, exclusive: bool = False) -> Optional[int]:
+        """The ledger's advisory lock, shared or exclusive, held until the transaction ends.
+        Returns the database clock in ms once it is held."""
+        if not self._in_tx:
+            raise RuntimeError("the ledger lock is taken inside a transaction")
+        want = "exclusive" if exclusive else "shared"
+        if self._held is not None and want == "exclusive" and self._held != want:
+            raise RuntimeError("a shared ledger lock is not raised to exclusive")
+        fn = "pg_advisory_xact_lock" if exclusive else "pg_advisory_xact_lock_shared"
+        if self._held is None:
+            # A wait past this fails the transaction instead of holding its connection until
+            # the transaction's own limit.
+            await self.db.execute_raw(
+                f"SET LOCAL lock_timeout = '{int(_db.LEDGER_LOCK_TIMEOUT_MS)}ms'")
+        rows = await self.db.query_raw(
+            "SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS ms "
+            f"FROM {fn}({_LEDGER_LOCK})")
+        self._held = self._held or want
+        return int(rows[0]["ms"])
+
+    async def lock_claim(self, claim_id):
+        if not self._in_tx:
+            raise RuntimeError("a claim is locked inside a transaction")
+        await self.db.query_raw('SELECT id FROM "claim" WHERE id = $1 FOR UPDATE', int(claim_id))
 
     async def is_blacklisted(self, hotkey):
         return await self.db.blacklistedhotkey.find_unique(where={"hotkey": hotkey}) is not None
@@ -128,7 +177,7 @@ class PrismaStore:
             "trust": row.trust, "trustBand": row.trust_band, "coldkey": row.coldkey,
         }
         try:
-            async with self.db.tx() as tx:
+            async with self.db.tx(**_tx_limits()) as tx:
                 prev = None
                 if receipt is not None:
                     # One receipt sequence: appends wait for each other until commit.
@@ -168,6 +217,8 @@ class PrismaStore:
         return _claim_from(m) if m else None
 
     async def update_claim(self, claim_id, expect, **fields):
+        if "status" in fields and fields["status"] not in DECIDED:
+            fields = {**fields, "decided_ms": None}
         data = {_CLAIM_FIELDS[k]: v for k, v in fields.items() if k in _CLAIM_FIELDS}
         data.update({_CLAIM_TIMES[k]: _dt(v) for k, v in fields.items() if k in _CLAIM_TIMES})
         if "payload" in fields:
@@ -176,8 +227,13 @@ class PrismaStore:
         n = await self.db.claim.update_many(where={"id": claim_id, "status": expect}, data=data)
         return n > 0
 
-    async def claims_by_status(self, status, received_before_ms=None, limit=500, skip=()):
+    async def claims_by_status(self, status, received_before_ms=None, limit=500, skip=(),
+                               after=None):
         where = {"status": status}
+        if after is not None:
+            bucket, cid = int(after[0]), int(after[1])
+            where["OR"] = [{"receiptBucket": {"gt": bucket}},
+                           {"receiptBucket": bucket, "id": {"gt": cid}}]
         if skip:
             where["id"] = {"not_in": [int(i) for i in skip]}
         if received_before_ms is not None:
@@ -265,13 +321,14 @@ class PrismaStore:
         rows = await self.db.query_raw(
             'SELECT c.id::bigint AS id, COALESCE(c.coldkey, c.hotkey) AS owner, '
             'c.status = ANY(string_to_array($2, \',\')) AS passed FROM "claim" c '
-            'WHERE c.judged_at >= to_timestamp($1::double precision / 1000) '
-            'AND c.judged_at < to_timestamp($4::double precision / 1000) '
+            'WHERE c.decided_at >= to_timestamp($1::double precision / 1000) '
+            'AND c.decided_at < to_timestamp($4::double precision / 1000) '
             'AND (c.status = ANY(string_to_array($2, \',\')) OR (c.status = \'rejected\' '
+            'AND c.judged_at IS NOT NULL '
             'AND (c.reason = ANY(string_to_array($3, \',\')) OR (c.reason = \'judge_unclear\' '
             'AND EXISTS (SELECT 1 FROM source_fetch sf WHERE sf.claim_id = c.id '
             'AND sf.check_result -> \'judge\' ->> \'type_none\' = \'true\'))))) '
-            'ORDER BY c.judged_at, c.id',
+            'ORDER BY c.decided_at, c.id',
             since_ms, ",".join(QUALITY_PAID), ",".join(junk),
             until_ms if until_ms is not None else 2 ** 52)
         return [(r["owner"], bool(r["passed"]), int(r["id"])) for r in rows]
@@ -410,9 +467,12 @@ class PrismaStore:
         })
         return _ledger_from(m)
 
-    async def ledger_rows(self, epochs):
+    async def ledger_rows(self, epochs, after_id=0, limit=None):
+        where = {"epoch": {"in": list(epochs)}}
+        if after_id:
+            where["id"] = {"gt": int(after_id)}
         rows = await self.db.ledgerentry.find_many(
-            where={"epoch": {"in": list(epochs)}}, order={"id": "asc"})
+            where=where, order={"id": "asc"}, **({"take": int(limit)} if limit else {}))
         return [_ledger_from(m) for m in rows]
 
     async def claim_ledger(self, claim_id):
@@ -514,13 +574,20 @@ class PrismaStore:
             "validatorHotkey": signer, "epoch": int(epoch)}})
         return _ms(m.issuedAt) if m is not None and m.capacity is not None else None
 
-    async def put_attestation(self, signer, epoch, body):
+    async def put_attestation(self, signer, epoch, body, issued_ms=None):
         from prisma import Json
 
         data = {"perMinerPoints": Json(body["perMinerPoints"]),
                 "totalPoints": body["totalPoints"], "merkleRoot": body["merkleRoot"],
                 "signature": body["signature"], "capacity": body["capacity"],
                 "leafCount": body["leafCount"]}
+        # A sealed epoch is signed in its seal's row, which keeps its time.
+        if await self.db.attestation.update_many(
+                where={"validatorHotkey": signer, "epoch": int(epoch), "capacity": None},
+                data=data):
+            return
+        if issued_ms is not None:
+            data["issuedAt"] = _dt(issued_ms)
         await self.db.attestation.upsert(
             where={"uq_attestation_validator_epoch": {"validatorHotkey": signer,
                                                       "epoch": int(epoch)}},
@@ -566,6 +633,42 @@ class PrismaStore:
         return out
 
     async def last_attestation_epoch(self, signer):
+        m = await self.db.attestation.find_first(
+            where={"validatorHotkey": signer, "NOT": [{"capacity": None}]},
+            order={"epoch": "desc"})
+        return m.epoch if m is not None else None
+
+    async def seal(self, signer, epoch, cut_ms):
+        # A seal is the epoch's attestation row before it is signed: no capacity, no root.
+        await self.db.execute_raw(
+            'INSERT INTO "attestation" (validator_hotkey, epoch, per_miner_points, '
+            "total_points, merkle_root, signature, issued_at) VALUES ($1, $2, '{}'::jsonb, 0, "
+            "'', '', to_timestamp($3::double precision / 1000)) ON CONFLICT DO NOTHING",
+            signer, int(epoch), int(cut_ms))
+
+    async def drop_carry(self, signer, epoch):
+        if not self._in_tx:
+            raise RuntimeError("carry rows are dropped inside the seal's transaction")
+        if await self.sealed_ms(signer, epoch) is not None:
+            raise RuntimeError(f"epoch {epoch} is sealed: its carry is kept")
+        # The ledger trigger allows this delete only for an epoch with no attestation row.
+        await self.db.execute_raw("SET LOCAL ledger.replace_carry = 'on'")
+        n = await self.db.execute_raw(
+            "DELETE FROM ledger_entry WHERE epoch = $1 AND kind = 'carry'", int(epoch))
+        await self.db.execute_raw("SET LOCAL ledger.replace_carry = 'off'")
+        return int(n)
+
+    async def sealed_ms(self, signer, epoch):
+        m = await self.db.attestation.find_unique(where={"uq_attestation_validator_epoch": {
+            "validatorHotkey": signer, "epoch": int(epoch)}})
+        return _ms(m.issuedAt) if m is not None else None
+
+    async def latest_seal_ms(self, signer):
+        m = await self.db.attestation.find_first(where={"validatorHotkey": signer},
+                                                 order={"epoch": "desc"})
+        return _ms(m.issuedAt) if m is not None else None
+
+    async def last_sealed_epoch(self, signer):
         m = await self.db.attestation.find_first(where={"validatorHotkey": signer},
                                                  order={"epoch": "desc"})
         return m.epoch if m is not None else None
@@ -815,12 +918,14 @@ class PrismaStore:
             "at": _dt(row.at_ms)})
         return replace(row, id=m.id)
 
-    async def source_events(self, source_id=None, event_id=None):
+    async def source_events(self, source_id=None, event_id=None, claim_id=None):
         where = {}
         if source_id is not None:
             where["sourceId"] = source_id
         if event_id is not None:
             where["eventId"] = event_id
+        if claim_id is not None:
+            where["claimId"] = claim_id
         rows = await self.db.sourceevent.find_many(where=where, order={"id": "asc"})
         return [SourceEventRow(
             source_id=m.sourceId, role=m.role, category=m.category, at_ms=_ms(m.at),

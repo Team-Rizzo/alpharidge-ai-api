@@ -941,6 +941,8 @@ model Claim {
   verifiedAt       DateTime? @map("verified_at") @db.Timestamptz(3)
   judgedAt         DateTime? @map("judged_at") @db.Timestamptz(3)
   settleAt         DateTime? @map("settle_at") @db.Timestamptz(3)
+  // When the claim was paid or rejected; coldkey quality goes by it.
+  decidedAt        DateTime? @map("decided_at") @db.Timestamptz(3)
   updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(3)
 
   source        Source?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
@@ -960,6 +962,7 @@ model Claim {
   @@index([bodyHash], name: "idx_claim_body_hash")
   @@index([status, receiptBucket], name: "idx_claim_status_bucket")
   @@index([judgedAt], name: "idx_claim_judged")
+  @@index([decidedAt, id], name: "idx_claim_decided")
   @@index([status, receivedAt], name: "idx_claim_status_received")
   @@index([hotkey, receivedAt], name: "idx_claim_hotkey_received")
   @@index([hotkey, updatedAt, id], name: "idx_claim_hotkey_updated")

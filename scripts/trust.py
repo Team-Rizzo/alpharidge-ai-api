@@ -1,13 +1,17 @@
 """Operator tool for the source trust registry. Every change is written to the trust log.
 
     python scripts/trust.py seed [--catalogue app/data/catalogue.csv]
+    python scripts/trust.py catalogue [--catalogue app/data/catalogue.csv] [--apply] --reason "..."
+        (seed adds new sources only; this gives existing ones the catalogue's categories at the
+        catalogue base, never lowering a base; a dry run unless --apply)
     python scripts/trust.py add example.com/ --trust 0.7 [--category finance] --reason "..."
     python scripts/trust.py add "*.example.com" --trust 0.7 --reason "..."  (host and subdomains)
     python scripts/trust.py set example.org --trust 0.8 --category finance --reason "..."
     python scripts/trust.py suspend example.com --reason "..."  (no clawback; a bare host covers
-        its path rules too, as do ban and unban)
+        its path rules too, as does ban)
     python scripts/trust.py ban example.com --reason "..."  (claws back open prizes)
-    python scripts/trust.py unban example.com --reason "..."
+    python scripts/trust.py unban example.com [--paths] --reason "..."  (a bare host's own row;
+        its suspended or banned path rules too with --paths)
     python scripts/trust.py rule "example.com/blogs/*" --kind exclude --reason "..."
     python scripts/trust.py why example.org
     python scripts/trust.py review [--days 7]
@@ -18,8 +22,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import shlex
 import sys
 import time
+from typing import NamedTuple
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -58,6 +64,69 @@ async def why(store, text) -> None:
         print(f"  {_when(e.at_ms)} {e.actor}: {e.field} {e.old} -> {e.new} ({e.reason})")
 
 
+async def set_statuses(store, text: str, cmd: str, reason: str, actor: str,
+                       paths: bool = False) -> None:
+    """Suspend, ban or unban the rows a text names. Unban on a bare host changes its own row
+    only, unless `paths`, so path rules blocked on their own stay blocked."""
+    status = {"suspend": tr.SUSPENDED, "ban": tr.BANNED}.get(cmd, tr.PENDING)
+    rows = await tr.find_all(store, text)
+    if not rows:
+        sys.exit(f"unknown source: {text}")
+    kept = []
+    if cmd == "unban" and not tr.parse_source(text)[2]:
+        blocked = [r for r in rows if r.path_rule and r.status in tr.BLOCKED]
+        rows = [r for r in rows if not r.path_rule] + (blocked if paths else [])
+        kept = [] if paths else blocked
+    for row in rows:
+        s = await tr.set_status(store, row, status, reason, actor)
+        print(f"{tr.label(s)} {s.status}")
+    for row in kept:
+        print(f"{tr.label(row)} {row.status} (unchanged; unban it by its path or with --paths)")
+    if not rows and not kept:
+        print(f"nothing to unban on {text}")
+
+
+class CategoryChange(NamedTuple):
+    source: str
+    category: str
+    base: float
+
+
+async def apply_catalogue(store, catalogue: Path, reason: str, actor: str,
+                          apply: bool = False) -> list:
+    """Give each catalogue source already in the registry the catalogue base in every category
+    the catalogue lists for it that has no trust row (a category it was seeded without). A
+    category with a row is never touched, so a base an operator set stays as set. Prints what
+    it adds, with the matching `set` command; changes nothing unless `apply`. Blocked sources
+    and sources not in the registry are reported and left alone."""
+    changes = []
+    for domain, path, cats in tr.read_catalogue(catalogue):
+        text = domain + path
+        source = await tr.find(store, text)
+        if source is None:
+            print(f"{text}: not in the registry (seed adds it)")
+            continue
+        if source.status in tr.BLOCKED:
+            print(f"{text}: {source.status}, skipped")
+            continue
+        have = {r.category for r in await store.source_trust(source.id)}
+        todo = [c for c in cats if c not in have
+                and await tr.base_of(store, source, c) < tr.TRUST_BASE_CATALOGUE]
+        for c in todo:
+            base = await tr.base_of(store, source, c)
+            changes.append(CategoryChange(text, c, base))
+            print(f"{text} {c}: no trust row (falls back to {base:.2f}); "
+                  f"{'added' if apply else 'would add'} it at {tr.TRUST_BASE_CATALOGUE:.2f}"
+                  f"{'' if apply else ' (dry run)'}")
+            print(f"  python scripts/trust.py set {shlex.quote(text)} --trust "
+                  f"{tr.TRUST_BASE_CATALOGUE:g} --category {c} --reason {shlex.quote(reason)}")
+        if apply and todo:
+            await tr.set_trust(store, source, tr.TRUST_BASE_CATALOGUE, reason, actor, todo)
+    print(f"{len(changes)} missing categories "
+          f"{'added' if apply else 'to add (run with --apply)'}")
+    return changes
+
+
 async def review(store, days: float) -> None:
     since = time.time_ns() // 1_000_000 - int(days * DAY_MS)
     flags = [e for e in await store.trust_log(actor="detector", since_ms=since)
@@ -79,6 +148,8 @@ async def main_async(args) -> None:
     try:
         if args.cmd == "seed":
             print(f"{await tr.seed(store, catalogue=args.catalogue)} sources added")
+        elif args.cmd == "catalogue":
+            await apply_catalogue(store, args.catalogue, args.reason, actor, args.apply)
         elif args.cmd == "add":
             s = await tr.add(store, args.source, args.trust, args.reason, actor, args.category)
             print(f"{tr.label(s)} {s.category_trust}")
@@ -87,13 +158,8 @@ async def main_async(args) -> None:
                                    args.reason, actor, args.category)
             print(f"{tr.label(s)} {s.category_trust}")
         elif args.cmd in ("suspend", "ban", "unban"):
-            status = {"suspend": tr.SUSPENDED, "ban": tr.BANNED}.get(args.cmd, tr.PENDING)
-            rows = await tr.find_all(store, args.source)
-            if not rows:
-                sys.exit(f"unknown source: {args.source}")
-            for row in rows:
-                s = await tr.set_status(store, row, status, args.reason, actor)
-                print(f"{tr.label(s)} {s.status}")
+            await set_statuses(store, args.source, args.cmd, args.reason, actor,
+                               getattr(args, "paths", False))
         elif args.cmd == "rule":
             r = await tr.add_rule(store, args.pattern, args.kind, args.reason, actor)
             print(f"rule {r.id}: {r.kind} {r.pattern}")
@@ -121,13 +187,17 @@ def main() -> None:
 
     s = sub.add_parser("seed")
     s.add_argument("--catalogue", type=Path)
+    c = change("catalogue")
+    c.add_argument("--catalogue", type=Path, default=tr.CATALOGUE)
+    c.add_argument("--apply", action="store_true", help="make the changes (default: dry run)")
     for name in ("add", "set"):
         c = change(name, "source")
         c.add_argument("--trust", type=float, required=True)
         c.add_argument("--category", action="append", default=[])
     change("suspend", "source")
     change("ban", "source")
-    change("unban", "source")
+    change("unban", "source").add_argument(
+        "--paths", action="store_true", help="also its suspended or banned path rules")
     r = change("rule", "pattern")
     r.add_argument("--kind", choices=("exclude", "allow", "listing", "wire"), default="exclude")
     sub.add_parser("why").add_argument("source")

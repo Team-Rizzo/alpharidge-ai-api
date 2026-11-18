@@ -84,6 +84,48 @@ async def test_a_bare_host_names_its_path_rules_too():
     assert await trust.find_all(store, "none.example") == []
 
 
+def _script():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "trust_script", Path(__file__).parent.parent / "scripts" / "trust.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def test_unban_on_a_bare_host_leaves_its_suspended_path_rules(capsys):
+    script, store = _script(), MemoryStore()
+    for text in ("wire.example", "wire.example/news/", "wire.example/en/news/"):
+        await trust.add(store, text, 0.7, "seed", "operator:test")
+
+    async def statuses():
+        return {trust.label(r): r.status for r in await trust.find_all(store, "wire.example")}
+
+    await script.set_statuses(store, "wire.example/news/", "suspend", "press releases", "op")
+    await script.set_statuses(store, "wire.example", "suspend", "hacked", "op")
+    assert set((await statuses()).values()) == {trust.SUSPENDED}
+    await trust.set_status(store, (await trust.find_all(store, "wire.example/en/news/"))[0],
+                           trust.ACTIVE, "cleared", "op")
+    capsys.readouterr()
+
+    await script.set_statuses(store, "wire.example", "unban", "fixed", "op")
+    assert await statuses() == {"wire.example": trust.PENDING,
+                                "wire.example/news/": trust.SUSPENDED,
+                                "wire.example/en/news/": trust.ACTIVE}
+    out = capsys.readouterr().out
+    assert "wire.example/news/ suspended" in out and "--paths" in out
+    assert "wire.example/en/news/" not in out
+
+    await script.set_statuses(store, "wire.example", "unban", "fixed", "op", paths=True)
+    assert await statuses() == {"wire.example": trust.PENDING,
+                                "wire.example/news/": trust.PENDING,
+                                "wire.example/en/news/": trust.ACTIVE}
+    await script.set_statuses(store, "wire.example/news/", "suspend", "again", "op")
+    await script.set_statuses(store, "wire.example/news/", "unban", "fixed", "op")
+    assert (await statuses())["wire.example/news/"] == trust.PENDING
+
+
 async def test_primary_source_scope_and_page_rules():
     store = MemoryStore()
     acme = EntityRecord("wikidata", "Q1", "Acme", xrefs=("cik:320193",),

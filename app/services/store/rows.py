@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
+from typing import (
+    AsyncContextManager, Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple,
+)
 
 from app.services.entities import EntityRecord
 
@@ -21,8 +23,13 @@ PASSED = ("provisional", "settled")
 # it keep their locked pay.
 QUALITY_PAID = PASSED + ("clawed_back",)
 # Claims whose page passed the check and judge: placed, or behind another claim on the event.
+# The verifier judges the page before a claim becomes fetched (one that fails goes on to
+# rejected), so a fetched claim passed and waits for its line.
 CHECKED = ("fetched", "verified") + QUALITY_PAID
 BEHIND = ("known_event", "lost_line")
+# Claims that were paid or rejected; a claim set back to any other status loses its decision
+# time.
+DECIDED = ("rejected",) + QUALITY_PAID
 # Scoop outcomes that count against a hotkey's scoop record.
 SCOOP_MISSES = ("scoop_unconfirmed", "scoop_mismatch")
 
@@ -59,6 +66,8 @@ class ClaimRow:
     verified_ms: Optional[int] = None
     judged_ms: Optional[int] = None
     settle_ms: Optional[int] = None
+    # When the claim was paid or rejected; quality goes by it. Set once, on that transition.
+    decided_ms: Optional[int] = None
     pending_of_event_id: Optional[int] = None
     doc_hash: Optional[str] = None
     source_id: Optional[int] = None
@@ -378,6 +387,16 @@ class MinerStats:
 
 
 class Store(Protocol):
+    def transaction(self, timeout_ms: Optional[int] = None) -> AsyncContextManager["Store"]:
+        """A store whose writes commit together, or not at all if the block raises. Inside
+        one, it is the store itself. timeout_ms bounds how long it may stay open."""
+    async def lock_ledger(self, exclusive: bool = False) -> Optional[int]:
+        """Inside a transaction, the ledger lock until it ends: shared for ledger rows and
+        claim decisions, exclusive for sealing an epoch. Returns the store's clock in ms once
+        held, when it has one. A wait longer than app.db.LEDGER_LOCK_TIMEOUT_MS fails."""
+    async def lock_claim(self, claim_id: int) -> None:
+        """Inside a transaction and after the ledger lock: the claim until the transaction
+        ends, so that what is read about it before a write is still so when it commits."""
     async def is_blacklisted(self, hotkey: str) -> bool: ...
     async def set_blacklisted(self, hotkey: str, blocked: bool, reason: Optional[str] = None) -> None: ...
     async def claim_by_body(self, hotkey: str, body_hash: str) -> Optional[ClaimRow]: ...
@@ -387,9 +406,13 @@ class Store(Protocol):
     async def receipt_of(self, claim_id: int) -> Optional[dict]: ...
     async def receipts_for(self, claim_ids: Sequence[int]) -> Dict[int, dict]: ...
     async def get_claim(self, claim_id: int) -> Optional[ClaimRow]: ...
-    async def update_claim(self, claim_id: int, expect: str, **fields) -> bool: ...
+    async def update_claim(self, claim_id: int, expect: str, **fields) -> bool:
+        """Set fields on a claim that still has status `expect`. A status outside DECIDED
+        clears decided_ms."""
     async def claims_by_status(self, status: str, received_before_ms: Optional[int] = None,
-                               limit: int = 500, skip: Sequence[int] = ()) -> List[ClaimRow]: ...
+                               limit: int = 500, skip: Sequence[int] = (),
+                               after: Optional[Tuple[int, int]] = None) -> List[ClaimRow]:
+        """Claims with the status, by (bucket, id), after the `after` (bucket, id) cursor."""
     async def judge_repeats(self, owner: str, event_type: str, doc_hash: str, since_ms: int,
                             judged_since_ms: int, exclude_id: int,
                             reasons: Sequence[str]) -> int:
@@ -408,9 +431,10 @@ class Store(Protocol):
                                 limit: int) -> List[ClaimRow]: ...
     async def quality_outcomes(self, since_ms: int, junk: Sequence[str],
                                until_ms: Optional[int] = None) -> List[Tuple[str, bool, int]]:
-        """(owner, paid, claim id) for each claim decided in [since_ms, until_ms) that was
-        paid (clawed back later included) or rejected as junk: a junk reason, or judge_unclear
-        whose judge found none of the claim's types; in decision order."""
+        """(owner, paid, claim id) for each claim decided (decided_ms) in [since_ms,
+        until_ms) that was paid (clawed back later included) or rejected as junk by the page
+        check or judge (judged_ms set): a junk reason, or judge_unclear whose judge found none
+        of the claim's types; in decision order, ties by id."""
 
     async def hotkey_stats(self, since_ms: int,
                            hotkeys: Optional[Iterable[str]] = None) -> Dict[str, HotkeyStats]: ...
@@ -421,7 +445,7 @@ class Store(Protocol):
     async def first_trusted_ms(self, event_id: int, exclude_id: int,
                                trust_min: float) -> Optional[int]:
         """The earliest receipt or page publish time of another claim on the event whose page
-        had at least `trust_min` trust."""
+        had at least `trust_min` trust and passed the check and judge."""
     async def bucket_claim_ids(self, buckets: Iterable[int]) -> Dict[int, List[int]]: ...
     async def tie_seeds(self, buckets: Iterable[int]) -> Dict[int, Tuple[int, str]]: ...
     async def put_tie_seed(self, bucket: int, block: int, block_hash: str) -> None: ...
@@ -435,7 +459,9 @@ class Store(Protocol):
     async def add_job(self, kind: str, claim_id: Optional[int], run_ms: int) -> Job: ...
     async def add_job_once(self, kind: str, claim_id: int, run_ms: int) -> Optional[Job]: ...
     async def append_ledger(self, row: LedgerRow) -> LedgerRow: ...
-    async def ledger_rows(self, epochs: Sequence[int]) -> List[LedgerRow]: ...
+    async def ledger_rows(self, epochs: Sequence[int], after_id: int = 0,
+                          limit: Optional[int] = None) -> List[LedgerRow]:
+        """Rows of the epochs by id, from after `after_id`, at most `limit` of them."""
     async def claim_ledger(self, claim_id: int) -> List[LedgerRow]: ...
     async def claim_points(self, claim_id: int) -> Dict[str, float]: ...
     async def claims_for_event(self, event_id: int, statuses: Sequence[str]) -> List[ClaimRow]: ...
@@ -453,14 +479,30 @@ class Store(Protocol):
     async def add_stage(self, event_id: int, stage: str, claim_id: Optional[int],
                         at_ms: int) -> bool: ...
     async def get_attestation(self, signer: str, epoch: int) -> Optional[dict]: ...
-    async def put_attestation(self, signer: str, epoch: int, body: dict) -> None: ...
-    async def attestation_issued_ms(self, signer: str, epoch: int) -> Optional[int]: ...
+    async def put_attestation(self, signer: str, epoch: int, body: dict,
+                              issued_ms: Optional[int] = None) -> None:
+        """Stored once per signer and epoch, issued at issued_ms (default now). A sealed
+        epoch keeps its seal's time."""
+    async def attestation_issued_ms(self, signer: str, epoch: int) -> Optional[int]:
+        """When a signed epoch was issued: its seal's cut. None until it is signed."""
+    async def seal(self, signer: str, epoch: int, cut_ms: int) -> None:
+        """Mark an epoch closed to new rows, with its quality cut, before it is signed."""
+    async def drop_carry(self, signer: str, epoch: int) -> int:
+        """Inside the seal's transaction: delete the carry rows of an epoch not yet sealed or
+        signed, and return how many there were. Raises for a sealed or signed epoch."""
+    async def sealed_ms(self, signer: str, epoch: int) -> Optional[int]:
+        """The cut of a sealed or signed epoch, else None."""
+    async def latest_seal_ms(self, signer: str) -> Optional[int]:
+        """The cut of the last epoch sealed, else None."""
+    async def last_sealed_epoch(self, signer: str) -> Optional[int]:
+        """The last epoch sealed or signed, else None."""
     async def put_reverify(self, row: ReverifyRow) -> None: ...
     async def add_reverify_pull(self, validator: str, epoch: int, at_ms: int) -> None: ...
     async def reverify_claims(self, validator: str, epoch: int) -> set: ...
     async def add_reverify_report(self, validator: str, epoch: int, at_ms: int) -> None: ...
     async def reverify_reports(self, epochs: Sequence[int]) -> Dict[Tuple[str, int], int]: ...
-    async def last_attestation_epoch(self, signer: str) -> Optional[int]: ...
+    async def last_attestation_epoch(self, signer: str) -> Optional[int]:
+        """The last epoch signed; a sealed one not yet signed does not count."""
     async def get_event(self, event_id: int) -> Optional[EventRecord]: ...
     async def event_by_identity(self, keys: Sequence[str],
                                 fingerprint: str) -> Optional[EventRecord]: ...
@@ -497,7 +539,8 @@ class Store(Protocol):
     async def put_source_trust(self, rows: Sequence[SourceTrustRow]) -> None: ...
     async def add_source_event(self, row: SourceEventRow) -> SourceEventRow: ...
     async def source_events(self, source_id: Optional[int] = None,
-                            event_id: Optional[int] = None) -> List[SourceEventRow]: ...
+                            event_id: Optional[int] = None,
+                            claim_id: Optional[int] = None) -> List[SourceEventRow]: ...
     async def page_rules(self) -> List[PageRuleRow]: ...
     async def add_page_rule(self, row: PageRuleRow) -> PageRuleRow: ...
     async def add_trust_log(self, row: TrustLogRow) -> None: ...

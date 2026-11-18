@@ -118,13 +118,14 @@ async def dashboard_mechanism(store: Store = Depends(get_store)):
 async def dashboard_quality(coldkey: Optional[str] = None, store: Store = Depends(get_store)):
     """Each scored coldkey's quality q, the pay multiplier its next paid claim gets, its check
     budget multiplier and the claims that counted, with the rule's constants. A coldkey with no
-    counted claim is at the start."""
+    counted claim is at the start. from_ms is where the scoring started: QUALITY_FROM_MS, else
+    the lookback."""
     rows = await quality.standing(store)
     if coldkey is not None:
         rows = {coldkey: rows.get(coldkey) or {
             "q": qm.START, "pay_multiplier": round(qm.pay_multiplier(qm.START), 4),
             "multiplier": round(qm.multiplier(qm.START), 4), "paid": 0, "junk": 0}}
-    return {"from_ms": EVENT_LANE["QUALITY_FROM_MS"],
+    return {"from_ms": quality.start(),
             "rule": {"half_life": qm.HALF_LIFE, "start": qm.START, "pay_zero": qm.PAY_ZERO,
                      "pay_full": qm.PAY_FULL, "zero": qm.ZERO, "full": qm.FULL,
                      "junk": list(qm.JUNK) + ["judge_unclear (type)"]},

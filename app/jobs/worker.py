@@ -19,8 +19,9 @@ JOB_LEASE_S = 600
 FETCH_PER_HOTKEY = 2
 # A job taken this many times without finishing is dropped.
 JOB_MAX_ATTEMPTS = 3
-# Kinds tried again after a failure, this long after, until dropped.
-RETRIED = (scoops.CONFIRM_JOB,)
+# Kinds tried again after a failure, this long after, until dropped. A re-check's clawback
+# can fail on a lock or pool timeout; run again, it claws once (or finds it done).
+RETRIED = (scoops.CONFIRM_JOB, recheck.JOB)
 JOB_RETRY_S = 60
 # How long one advance pass may wait, in total, for busy source hosts before it holds types.
 ADVANCE_PACE_WAIT_S = 10

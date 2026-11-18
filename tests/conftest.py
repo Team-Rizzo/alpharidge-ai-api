@@ -6,12 +6,18 @@ import pytest
 # Make the `app` package importable from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# The deployment's .env never reaches the tests.
+# The deployment's .env never reaches the tests, nor the subnet checkout's .miner_env and
+# .vali_env, which alpharidge_ai.config loads when a test imports the validator's modules.
 os.environ["API_SKIP_DOTENV"] = "1"
+os.environ["ALPHARIDGE_SKIP_ENV_FILES"] = "1"
+# The suite is hermetic: no EL_ setting from the caller's shell reaches it; every one the tests
+# rely on is set below.
+for _k in [k for k in os.environ if k.startswith("EL_")]:
+    del os.environ[_k]
 # Disabling auth keeps endpoint tests from needing a live metagraph.
-os.environ.setdefault("AUTH_ENABLED", "false")
+os.environ["AUTH_ENABLED"] = "false"
 # Fixed key so runs are reproducible.
-os.environ.setdefault("EL_RECHECK_KEY", "test-recheck-key")
+os.environ["EL_RECHECK_KEY"] = "test-recheck-key"
 # Synthetic values; production values differ.
 for _k, _v in {"RECHECK_SAMPLE_RATE": "0.37", "RECHECK_LOW_TRUST": "0.6", "RECHECK_MIN_H": "2",
                "RECHECK_MAX_H": "5", "RECHECK_ACCEPT_LANGUAGE": "xx",
@@ -27,18 +33,18 @@ for _k, _v in {"RECHECK_SAMPLE_RATE": "0.37", "RECHECK_LOW_TRUST": "0.6", "RECHE
                "HEDGE_GAP_S": "90", "TRUST_SPIKE_X": "4", "TRUST_SPIKE_MIN": "30",
                "TRUST_SPIKE_BASE_DAYS": "20"
                }.items():
-    os.environ.setdefault(f"EL_{_k}", _v)
-# Tests price at unit pay values (event 1, premium 5, debt 2); the subnet's tests check the
-# release's own values.
+    os.environ[f"EL_{_k}"] = _v
+# Tests price at today's pay, which is also the default (event 1, premium 5, debt 2); the
+# subnet's tests check the defaults themselves.
 for _k, _v in {"EVENT_PAY_X": "1", "SCOOP_PREMIUM": "5", "SCOOP_MISS_DEBT_X": "2"}.items():
-    os.environ.setdefault(f"EL_{_k}", _v)
+    os.environ[f"EL_{_k}"] = _v
 # A synthetic receipt-signing key; production sets its own.
-os.environ.setdefault("API_ATTESTATION_PRIVKEY", "7e" * 32)
+os.environ["API_ATTESTATION_PRIVKEY"] = "7e" * 32
 # Tests never reach a registry or a real chain.
-os.environ.setdefault("EL_REGISTRY", "off")
-os.environ.setdefault("SUBTENSOR_NETWORK", "mock")
+os.environ["EL_REGISTRY"] = "off"
+os.environ["SUBTENSOR_NETWORK"] = "mock"
 # Status replies are read fresh in tests unless a test turns the cache on.
-os.environ.setdefault("EL_STATUS_CACHE_S", "0")
+os.environ["EL_STATUS_CACHE_S"] = "0"
 
 
 @pytest.fixture

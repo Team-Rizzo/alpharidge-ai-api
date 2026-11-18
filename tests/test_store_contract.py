@@ -267,14 +267,14 @@ async def test_won_by_host_counts_paid_claims_per_host_and_type(store):
     assert got == [(host, "merger_acquisition", 2, 3)]
 
 
-async def test_quality_outcomes_are_passes_and_junk_in_judged_order(store):
+async def test_quality_outcomes_are_passes_and_junk_in_decided_order(store):
     ck, hk = "contract-ck-" + uuid.uuid4().hex[:8], "contract-" + uuid.uuid4().hex[:12]
     done = [("provisional", None, 3), ("rejected", "judge_reject", 1), ("rejected", "known_event", 2),
             ("settled", None, 4), ("rejected", "not_an_event", 0)]
     for status, reason, at in done:
         row = await store.create_claim(claim(hk, coldkey=ck))
         assert await store.update_claim(row.id, "received", status=status, reason=reason,
-                                        judged_ms=T0 + at)
+                                        judged_ms=T0 + at, decided_ms=T0 + at)
     await store.create_claim(claim(hk, coldkey=ck))
     got = [x[:2] for x in await store.quality_outcomes(T0 + 1, ("judge_reject", "not_an_event"))
            if x[0] == ck]
@@ -291,7 +291,7 @@ async def test_quality_keeps_a_clawed_claim_and_counts_a_typeless_unclear_as_jun
                                ("rejected", "judge_unclear", 3)]:
         row = await store.create_claim(claim(hk, coldkey=ck))
         assert await store.update_claim(row.id, "received", status=status, reason=reason,
-                                        judged_ms=T0 + at)
+                                        judged_ms=T0 + at, decided_ms=T0 + at)
         ids.append(row.id)
     await store.add_source_fetch(SourceFetchRow(claim_id=ids[1], verdict="rejected",
                                                 check={"judge": {"type_none": True}}))
@@ -310,3 +310,129 @@ async def test_an_attestation_keeps_its_issue_time(store):
     first = await store.attestation_issued_ms(signer, epoch)
     await store.put_attestation(signer, epoch, body)
     assert first is not None and await store.attestation_issued_ms(signer, epoch) == first
+
+
+async def test_quality_outcomes_go_by_when_each_claim_was_decided(store):
+    ck, hk = "contract-ck-" + uuid.uuid4().hex[:8], "contract-" + uuid.uuid4().hex[:12]
+    # (status, reason, judged, decided): judged order is not decision order.
+    done = [("provisional", None, 0, 5), ("rejected", "judge_reject", 1, 2),
+            ("settled", None, 2, 3), ("verified", None, 3, None),
+            ("rejected", "judge_reject", 4, None)]
+    ids = []
+    for status, reason, judged, decided in done:
+        row = await store.create_claim(claim(hk, coldkey=ck))
+        assert await store.update_claim(
+            row.id, "received", status=status, reason=reason, judged_ms=T0 + judged,
+            decided_ms=None if decided is None else T0 + decided)
+        ids.append(row.id)
+    got = [x for x in await store.quality_outcomes(T0, ("judge_reject",)) if x[0] == ck]
+    assert got == [(ck, False, ids[1]), (ck, True, ids[2]), (ck, True, ids[0])]
+    got = [x for x in await store.quality_outcomes(T0 + 3, ("judge_reject",), T0 + 5)
+           if x[0] == ck]
+    assert got == [(ck, True, ids[2])]
+    assert (await store.get_claim(ids[0])).decided_ms == T0 + 5
+
+
+async def test_a_claim_sent_back_undecided_loses_its_decision_time(store):
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    paid = await store.create_claim(claim(hk))
+    back = await store.create_claim(claim(hk))
+    for row, status in ((paid, "provisional"), (back, "rejected")):
+        assert await store.update_claim(row.id, "received", status=status, decided_ms=T0)
+    assert await store.update_claim(paid.id, "provisional", status="settled")
+    assert (await store.get_claim(paid.id)).decided_ms == T0
+    assert await store.update_claim(back.id, "rejected", status="fetched", reason=None)
+    assert (await store.get_claim(back.id)).decided_ms is None
+
+
+async def test_the_first_trusted_page_needs_a_claim_that_passed_the_judge(store):
+    from datetime import date
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-" + uuid.uuid4().hex))
+    rows = []
+    # Judged and waiting for its line, then still waiting for the judge.
+    for i, status in enumerate(("fetched", "novelty")):
+        row = await store.create_claim(replace(claim(hk + str(i)), received_ms=T0 + i * 1000))
+        assert await store.update_claim(row.id, "received", status=status, trust=0.9,
+                                        event_id=ev.id)
+        await store.add_source_fetch(SourceFetchRow(claim_id=row.id, verdict="supported",
+                                                    published_ms=T0 - 9000 + i * 5000))
+        rows.append(row)
+    mine = await store.create_claim(claim(hk + "x"))
+    assert await store.first_trusted_ms(ev.id, mine.id, 0.75) == T0 - 9000
+    assert await store.first_trusted_ms(ev.id, rows[0].id, 0.75) is None
+
+
+async def test_a_transaction_writes_all_or_nothing(store):
+    from app.services.store.rows import LedgerRow
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    row = await store.create_claim(claim(hk))
+    assert await store.update_claim(row.id, "received", status="verified")
+    paid = LedgerRow(hotkey=hk, claim_id=row.id, event_id=None, kind="provisional", points=1.0,
+                     epoch=3, route="event", category="finance")
+
+    with pytest.raises(RuntimeError):
+        async with store.transaction() as tx:
+            await tx.append_ledger(paid)
+            assert await tx.update_claim(row.id, "verified", status="provisional",
+                                         decided_ms=T0)
+            raise RuntimeError("crash")
+    got = await store.get_claim(row.id)
+    assert await store.claim_ledger(row.id) == []
+    assert (got.status, got.decided_ms) == ("verified", None)
+
+    async with store.transaction() as tx:
+        await tx.append_ledger(paid)
+        assert await tx.update_claim(row.id, "verified", status="provisional", decided_ms=T0)
+    got = await store.get_claim(row.id)
+    assert [r.kind for r in await store.claim_ledger(row.id)] == ["provisional"]
+    assert (got.status, got.decided_ms) == ("provisional", T0)
+
+
+async def test_a_claim_is_paid_with_its_row_or_not_at_all(store, monkeypatch):
+    from app.services import intake, points
+    from tests.pipeline import HEAD
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    row = await store.create_claim(claim(hk))
+    assert await store.update_claim(row.id, "received", status="verified")
+    row = await store.get_claim(row.id)
+    f = points.factors("merger_acquisition", "event", 1.0, 1.0)
+    real = intake.transition
+
+    async def crash(*args, **kw):
+        await real(*args, **kw)
+        raise RuntimeError("crash")
+
+    monkeypatch.setattr(intake, "transition", crash)
+    with pytest.raises(RuntimeError):
+        await points.pay(store, row, "event", f, T0, HEAD)
+    got = await store.get_claim(row.id)
+    assert await store.claim_ledger(row.id) == []
+    assert (got.status, got.decided_ms) == ("verified", None)
+
+    monkeypatch.setattr(intake, "transition", real)
+    got = await points.pay(store, row, "event", f, T0, HEAD)
+    assert got.status == "provisional"
+    assert [r.kind for r in await store.claim_ledger(row.id)] == ["provisional"]
+    if hasattr(store, "db"):
+        # The claim is stamped by the database clock inside the pay's transaction, once the
+        # ledger lock is held (created_at is the transaction's start).
+        rows = await store.db.query_raw(
+            'SELECT floor(extract(epoch FROM created_at) * 1000)::bigint AS ms '
+            'FROM ledger_entry WHERE claim_id = $1::bigint', row.id)
+        assert got.decided_ms >= int(rows[0]["ms"])
+
+
+async def test_source_events_by_claim(store):
+    from app.services.store.rows import SourceEventRow, SourceRow
+    src = await store.add_source(SourceRow(domain=f"c{uuid.uuid4().hex[:10]}.example",
+                                           status="active"))
+    a = await store.create_claim(claim("contract-" + uuid.uuid4().hex[:12]))
+    b = await store.create_claim(claim("contract-" + uuid.uuid4().hex[:12]))
+    for c in (a, b, a):
+        await store.add_source_event(SourceEventRow(source_id=src.id, role="changed",
+                                                    category="finance", at_ms=T0, claim_id=c.id))
+    got = await store.source_events(src.id, claim_id=a.id)
+    assert [(e.claim_id, e.role) for e in got] == [(a.id, "changed")] * 2
+    assert len(await store.source_events(src.id)) == 3

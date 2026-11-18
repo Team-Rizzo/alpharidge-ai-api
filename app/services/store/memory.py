@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextvars
+import copy
 import itertools
 import json
 import time
-from dataclasses import dataclass, field, replace
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, fields, replace
 from typing import Dict, List, Optional, Tuple
 
 from app.services.entities import EntityRecord, refreshes
 from app.services.store.rows import (
-    BEHIND, CHECKED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
+    BEHIND, CHECKED, DECIDED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
     ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
@@ -37,6 +41,50 @@ def _counts(claim: ClaimRow, ahead_of: ClaimRow, since_ms: int) -> bool:
     return (claim.hotkey == ahead_of.hotkey and claim.received_ms >= since_ms
             and (claim.received_ms, claim.id) < (ahead_of.received_ms, ahead_of.id)
             and claim.reason not in INTAKE_REJECTS)
+
+
+SHARED, EXCLUSIVE = "shared", "exclusive"
+# The memory transaction the running task is in.
+_tx: contextvars.ContextVar[Optional[dict]] = contextvars.ContextVar("memory_tx", default=None)
+
+
+class _SharedLock:
+    """Postgres' advisory lock as the ledger uses it: many shared holders or one exclusive,
+    and a waiting exclusive one goes before shared ones that come after it."""
+
+    def __init__(self):
+        self.readers, self.writer, self.waiting = 0, False, 0
+        self._cond: Optional[asyncio.Condition] = None
+        self._loop = None
+
+    def _condition(self) -> asyncio.Condition:
+        loop = asyncio.get_running_loop()
+        if self._cond is None or self._loop is not loop:
+            self._cond, self._loop = asyncio.Condition(), loop
+        return self._cond
+
+    async def acquire(self, exclusive: bool) -> None:
+        cond = self._condition()
+        async with cond:
+            if exclusive:
+                self.waiting += 1
+                try:
+                    await cond.wait_for(lambda: not self.writer and not self.readers)
+                finally:
+                    self.waiting -= 1
+                self.writer = True
+            else:
+                await cond.wait_for(lambda: not self.writer and not self.waiting)
+                self.readers += 1
+
+    async def release(self, exclusive: bool) -> None:
+        cond = self._condition()
+        async with cond:
+            if exclusive:
+                self.writer = False
+            else:
+                self.readers -= 1
+            cond.notify_all()
 
 
 @dataclass
@@ -76,6 +124,78 @@ class MemoryStore:
     _locked: Dict[int, int] = field(default_factory=dict)
     # Claim id -> when it last changed, in ms.
     changed: Dict[int, int] = field(default_factory=dict)
+
+    _ledger_lock: "_SharedLock" = field(default_factory=lambda: _SharedLock(), repr=False,
+                                        compare=False)
+    _claim_locks: Dict[int, asyncio.Lock] = field(default_factory=dict, repr=False,
+                                                  compare=False)
+
+    @asynccontextmanager
+    async def transaction(self, timeout_ms: Optional[int] = None):
+        """Puts every table back as it was if the block raises, and holds the ledger lock
+        taken inside it until it ends. Rows are replaced rather than changed in place, so a
+        copy of each table is enough. Writes by other tasks in the meantime are undone too
+        (from when the ledger lock was taken, when it was); tests do not rely on them. A
+        transaction inside another is the outer one."""
+        frame = _tx.get()
+        if frame is not None and frame["store"] is self:
+            yield self
+            return
+        frame = {"store": self, "held": None, "claims": [], "saved": self._tables()}
+        token = _tx.set(frame)
+        try:
+            yield self
+        except BaseException:
+            for name, table in frame["saved"].items():
+                setattr(self, name, table)
+            raise
+        finally:
+            _tx.reset(token)
+            for claim_id in frame["claims"]:
+                self._claim_locks[claim_id].release()
+            if frame["held"] is not None:
+                await self._ledger_lock.release(frame["held"] == EXCLUSIVE)
+
+    def _tables(self) -> dict:
+        return {f.name: copy.copy(getattr(self, f.name)) for f in fields(self)
+                if f.name not in ("_ids", "_ledger_lock", "_claim_locks")}
+
+    async def lock_ledger(self, exclusive: bool = False) -> Optional[int]:
+        """The ledger lock, shared or exclusive, held until the transaction ends. Taken first
+        in its transaction; a wait past app.db.LEDGER_LOCK_TIMEOUT_MS fails. No store clock:
+        None."""
+        frame = _tx.get()
+        if frame is None or frame["store"] is not self:
+            raise RuntimeError("the ledger lock is taken inside a transaction")
+        want = EXCLUSIVE if exclusive else SHARED
+        if frame["held"] in (want, EXCLUSIVE):
+            return None
+        if frame["held"] is not None:
+            raise RuntimeError("a shared ledger lock is not raised to exclusive")
+        from app import db
+        try:
+            await asyncio.wait_for(self._ledger_lock.acquire(exclusive),
+                                   db.LEDGER_LOCK_TIMEOUT_MS / 1000)
+        except asyncio.TimeoutError:
+            raise TimeoutError("ledger lock not available") from None
+        frame["held"] = want
+        # What other tasks wrote while this one waited is theirs to keep.
+        frame["saved"] = self._tables()
+        return None
+
+    async def lock_claim(self, claim_id):
+        frame = _tx.get()
+        if frame is None or frame["store"] is not self:
+            raise RuntimeError("a claim is locked inside a transaction")
+        if claim_id in frame["claims"]:
+            return
+        await self._claim_locks.setdefault(claim_id, asyncio.Lock()).acquire()
+        frame["claims"].append(claim_id)
+
+    def ledger_lock_held(self) -> Optional[str]:
+        """How this task's transaction holds the ledger lock, if it does."""
+        frame = _tx.get()
+        return frame["held"] if frame is not None and frame["store"] is self else None
 
     async def is_blacklisted(self, hotkey):
         return hotkey in self.blacklist
@@ -118,14 +238,18 @@ class MemoryStore:
         c = self.claims.get(claim_id)
         if c is None or c.status != expect:
             return False
+        if "status" in fields and fields["status"] not in DECIDED:
+            fields = {**fields, "decided_ms": None}
         self.claims[claim_id] = replace(c, **fields)
         self._touch(claim_id)
         return True
 
-    async def claims_by_status(self, status, received_before_ms=None, limit=500, skip=()):
+    async def claims_by_status(self, status, received_before_ms=None, limit=500, skip=(),
+                               after=None):
         skip = set(skip)
         rows = [c for c in self.claims.values() if c.status == status and c.id not in skip
-                and (received_before_ms is None or c.received_ms < received_before_ms)]
+                and (received_before_ms is None or c.received_ms < received_before_ms)
+                and (after is None or (c.bucket, c.id) > tuple(after))]
         return [replace(c) for c in sorted(rows, key=lambda c: (c.bucket, c.id))[:limit]]
 
     async def judge_repeats(self, owner, event_type, doc_hash, since_ms, judged_since_ms,
@@ -179,12 +303,13 @@ class MemoryStore:
     async def quality_outcomes(self, since_ms, junk, until_ms=None):
         none = {f.claim_id for f in self.fetches
                 if ((f.check or {}).get("judge") or {}).get("type_none")}
-        rows = [c for c in self.claims.values() if c.judged_ms is not None
-                and c.judged_ms >= since_ms and (until_ms is None or c.judged_ms < until_ms)
-                and (c.status in QUALITY_PAID or (c.status == "rejected" and (
+        rows = [c for c in self.claims.values() if c.decided_ms is not None
+                and c.decided_ms >= since_ms and (until_ms is None or c.decided_ms < until_ms)
+                and (c.status in QUALITY_PAID or (c.status == "rejected"
+                                                   and c.judged_ms is not None and (
                     c.reason in junk or (c.reason == "judge_unclear" and c.id in none))))]
         return [(c.coldkey or c.hotkey, c.status in QUALITY_PAID, c.id)
-                for c in sorted(rows, key=lambda c: (c.judged_ms, c.id))]
+                for c in sorted(rows, key=lambda c: (c.decided_ms, c.id))]
 
     async def hotkey_stats(self, since_ms, hotkeys=None):
         wanted = set(hotkeys) if hotkeys is not None else None
@@ -292,9 +417,11 @@ class MemoryStore:
         self.ledger.append(row)
         return replace(row)
 
-    async def ledger_rows(self, epochs):
+    async def ledger_rows(self, epochs, after_id=0, limit=None):
         wanted = set(epochs)
-        return [replace(r) for r in self.ledger if r.epoch in wanted]
+        rows = [r for r in self.ledger if r.epoch in wanted
+                and (not after_id or (r.id or 0) > after_id)]
+        return [replace(r) for r in rows[:limit]]
 
     async def claim_ledger(self, claim_id):
         return [replace(r) for r in self.ledger if r.claim_id == claim_id]
@@ -358,12 +485,38 @@ class MemoryStore:
         body = self.attestations.get((signer, epoch))
         return json.loads(json.dumps(body)) if body is not None else None
 
-    async def put_attestation(self, signer, epoch, body):
+    async def put_attestation(self, signer, epoch, body, issued_ms=None):
         self.attestations.setdefault((signer, epoch), json.loads(json.dumps(body)))
-        self.attestation_ms.setdefault((signer, epoch), int(time.time() * 1000))
+        self.attestation_ms.setdefault((signer, epoch), int(time.time() * 1000)
+                                       if issued_ms is None else int(issued_ms))
 
     async def attestation_issued_ms(self, signer, epoch):
+        if (signer, epoch) not in self.attestations:
+            return None
         return self.attestation_ms.get((signer, epoch))
+
+    async def seal(self, signer, epoch, cut_ms):
+        self.attestation_ms.setdefault((signer, epoch), int(cut_ms))
+
+    async def drop_carry(self, signer, epoch):
+        frame = _tx.get()
+        if frame is None or frame["store"] is not self:
+            raise RuntimeError("carry rows are dropped inside the seal's transaction")
+        if (signer, epoch) in self.attestation_ms:
+            raise RuntimeError(f"epoch {epoch} is sealed: its carry is kept")
+        keep = [r for r in self.ledger if not (r.epoch == epoch and r.kind == "carry")]
+        n, self.ledger = len(self.ledger) - len(keep), keep
+        return n
+
+    async def sealed_ms(self, signer, epoch):
+        return self.attestation_ms.get((signer, epoch))
+
+    async def latest_seal_ms(self, signer):
+        epoch = await self.last_sealed_epoch(signer)
+        return self.attestation_ms[(signer, epoch)] if epoch is not None else None
+
+    async def last_sealed_epoch(self, signer):
+        return max((e for s, e in self.attestation_ms if s == signer), default=None)
 
     async def put_reverify(self, row):
         key = (row.claim_id, row.validator)
@@ -535,10 +688,11 @@ class MemoryStore:
         self.source_event_rows.append(row)
         return replace(row)
 
-    async def source_events(self, source_id=None, event_id=None):
+    async def source_events(self, source_id=None, event_id=None, claim_id=None):
         return [replace(r) for r in self.source_event_rows
                 if (source_id is None or r.source_id == source_id)
-                and (event_id is None or r.event_id == event_id)]
+                and (event_id is None or r.event_id == event_id)
+                and (claim_id is None or r.claim_id == claim_id)]
 
     async def page_rules(self):
         return [replace(r) for r in self.rule_rows.values()]

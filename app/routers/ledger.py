@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from alpharidge_ai.ledger.attestation import CLOSE_GRACE_BLOCKS
+from alpharidge_ai.mechanism import quality as qm
 from app import config
 from app.routers.auth import get_validator_hotkey
 from app.routers.claims import get_store
@@ -70,13 +71,27 @@ async def get_points(epoch: int, _: str = Depends(get_validator_hotkey),
         raise HTTPException(status_code=503, detail=str(e))
 
 
+def served_starts() -> set:
+    """The starts /ledger/quality answers from."""
+    out = {config.EVENT_LANE["QUALITY_FROM_MS"]}
+    if qm.QUALITY_FROM is not None:
+        out.add(qm.from_ms())
+    return out
+
+
 @router.get("/ledger/quality")
 async def get_quality(from_ms: Optional[int] = None, epoch: Optional[int] = None,
                       _: str = Depends(get_validator_hotkey), store: Store = Depends(get_store)):
-    """Each claim judged from from_ms that was paid or junk, as (owner index, passed, claim
-    id), in judged order; with an epoch, only those judged before its points were signed, so every
-    validator scores that epoch alike."""
-    since = config.EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else max(0, from_ms)
+    """Each claim paid or rejected as junk from from_ms, as (owner index, passed, claim id),
+    in the order they were decided; with an epoch, only those decided before its points were
+    sealed. A claim is decided under the shared ledger lock and an epoch is sealed under the
+    exclusive one, one millisecond past both the clock and the last seal; a decision after
+    a seal is stamped no earlier than it. So the answer is the same whenever it is asked.
+    from_ms is the subnet's QUALITY_FROM (what validators ask) or the API's QUALITY_FROM_MS
+    (the default); other starts are refused, since each costs a full read and a cache entry."""
+    since = config.EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else from_ms
+    if since not in served_starts():
+        raise HTTPException(status_code=400, detail="from_ms_not_served")
     until = None
     if epoch is not None:
         until = await store.attestation_issued_ms(ledger.LEDGER_SIGNER, epoch)
@@ -93,8 +108,10 @@ async def get_leaves(epoch: int, cursor: Optional[str] = None, limit: int = 5000
                      _: str = Depends(get_validator_hotkey), store: Store = Depends(get_store)):
     await _closed(epoch)
     after = int(cursor) if cursor and cursor.isdigit() else 0
-    rows = [r for r in await store.ledger_rows([epoch]) if r.id > after]
-    page = rows[:_limit(limit)]
+    n = _limit(limit)
+    # One past the page tells whether there is more.
+    rows = await store.ledger_rows([epoch], after_id=after, limit=n + 1)
+    page = rows[:n]
     more = len(rows) > len(page)
     return {"epoch": epoch, "leaves": [ledger.leaf(r) for r in page],
             "next_cursor": str(page[-1].id) if more and page else None}

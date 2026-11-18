@@ -89,10 +89,11 @@ Everything is read from the environment, with `.env` in the repo root loaded at 
 | Keys | Purpose |
 |---|---|
 | `EL_TYPES` | Event types accepted at intake (default: every open type in the subnet's `types.json`, in four categories: finance, technology, politics, sports); others are rejected as `type_off`. The category comes from the type; there is no per-category pool |
+| `EL_EVENT_PAY_X`, `EL_SCOOP_PREMIUM`, `EL_SCOOP_MISS_DEBT_X` | Pay: a claim's points are the tier price × `EL_EVENT_PAY_X`, a confirmed scoop's the tier price × `EL_SCOOP_PREMIUM` (the event rate when a trusted page was out first), and a missed scoop costs `EL_SCOOP_MISS_DEBT_X` × its 1x pay. Defaults 1, 5 and 2 (today's pay). Every validator must use the same values (in its `.vali_env`, or the defaults of the subnet release it runs). The epoch's points come from the signed leaves, not from these; a validator that prices differently cannot check paid claims' prices on re-verify (it posts those as `unreachable`, `pay_settings_differ`, rather than a disagreement that would hold an honest claim), and an epoch with scoop debt in its window fails its debt check (`unbound_debt`) and keeps its last weights. The values are served on `/config/subnet` as `pay`; a validator that differs logs `[CONFIG] ALARM pay settings differ`. Change them only together with a subnet release that changes the defaults |
 | `EL_SCOOPS` | An untrusted page can be held for up to 72 h as a scoop until a trusted page confirms it (default `true`; `false` turns scoops off) |
 | `EL_SCAN_FEEDS` | The feed list sent to listed validators with the open scoops (default `app/data/scan_feeds.json`) |
 | `EL_CHECK_BUDGET_BASE` | Daily checks per hotkey before verified claims add to it |
-| `EL_QUALITY_FROM_MS`, `EL_QUALITY_BUDGET`, `EL_QUALITY_BUDGET_MIN` | Coldkey quality is scored from claims judged since `EL_QUALITY_FROM_MS` (shown on `/dashboard/quality`); with `EL_QUALITY_BUDGET` on, each hotkey's check budget above `EL_QUALITY_BUDGET_MIN` (default 20) is scaled by its coldkey's multiplier |
+| `EL_QUALITY_FROM_MS`, `EL_QUALITY_BUDGET`, `EL_QUALITY_BUDGET_MIN` | Coldkey quality is scored from claims decided (paid or rejected) since `EL_QUALITY_FROM_MS`, or in the last 30 days when it is 0 (the start used is shown on `/dashboard/quality`); with `EL_QUALITY_BUDGET` on, each hotkey's check budget above `EL_QUALITY_BUDGET_MIN` (default 20) is scaled by its coldkey's multiplier |
 | `EL_RATE_LIMIT_ENABLED` | Per-IP rate limits (behind a reverse proxy, pass the client address through) |
 | `EL_FETCH_TIMEOUT_S`, `EL_FETCH_RETRY`, `EL_FETCH_PUBLIC_ONLY`, `EL_DOMAIN_RPS`, `EL_FETCH_CONCURRENCY`, `EL_USER_AGENT_CONTACT` | Fetching (15 s a request, 5 s to connect, as validators); the user agent is `AlphaRidgeBot/<version> (+<contact>)`. The contact is a URL or email the operator chooses |
 | `EL_SETTLE_DELAY_H`, `EL_SETTLE_EVERY_S`, `EL_WORKER_INTERVAL_S` | Settlement and worker timing (a signed profile's `ledger.settle_delay_h` overrides `EL_SETTLE_DELAY_H`) |
@@ -136,6 +137,8 @@ The baseline's tables outside the event lane are kept as they are; no migration 
 
 Two pieces are hand-written SQL that Prisma can't express: the HNSW index on `events.embedding` and the append-only trigger on `ledger_entry`. When you generate a new migration with `prisma migrate dev`, delete the `DROP INDEX` Prisma adds for the HNSW index before committing it.
 
+Prisma runs each migration file as one transaction, on one session for the whole deploy. On a large live table, keep a lock-taking change short with a transaction-local `lock_timeout` (`SET LOCAL` or `set_config(..., true)`; a plain `SET` carries into the next migration), put a `CREATE INDEX CONCURRENTLY` alone in its own file, and backfill with a script rather than in the migration. [DEPLOY.md](DEPLOY.md) is the runbook for the `claim.decided_at` release, which does all three.
+
 **Seed data** (once, after migrating):
 
 ```bash
@@ -174,18 +177,23 @@ Every change is written to the trust log with a reason and the operator's name.
 
 ```bash
 .venv/bin/python scripts/trust.py seed [--catalogue export.csv]        # load the seed, optionally a catalogue
+.venv/bin/python scripts/trust.py catalogue --reason "..." [--apply]    # add catalogue categories missing from registered sources
 .venv/bin/python scripts/trust.py add example.com/ --trust 0.7 [--category finance] --reason "..."
 .venv/bin/python scripts/trust.py set example.com --trust 0.8 --category finance --reason "..."
 .venv/bin/python scripts/trust.py suspend example.com --reason "..."       # stop new pay, no clawback
 .venv/bin/python scripts/trust.py ban example.com --reason "..."           # also claws back open prizes
-.venv/bin/python scripts/trust.py unban example.com --reason "..."
+.venv/bin/python scripts/trust.py unban example.com --reason "..." [--paths]   # --paths: also its blocked path rules
 .venv/bin/python scripts/trust.py rule "example.com/blogs/*" --kind exclude|allow|listing|wire --reason "..."
 .venv/bin/python scripts/trust.py why example.com                      # how a source's trust was reached
 .venv/bin/python scripts/trust.py review [--days 7]                    # page-type review flags
 .venv/bin/python scripts/trust.py nightly
 ```
 
-The catalogue import takes a `domain,path,categories` CSV, such as a Media Cloud collection export (needs a Media Cloud account); `app/data/catalogue.csv` is the outlet list. Sources are per host: `domain` is a host, and `*.host` also covers its subdomains. Rows on shared hosting platforms (`trust.TRUST_SHARED_DOMAINS`) are skipped. Re-run it monthly. `app/data/trust_seed.json` holds the official sources and page rules. An official row with a `subject` (`{"ids": ["wikidata:Q312"], "names": ["Apple"]}`), such as a company newsroom or a club site, is official only for claims that name that subject among their parties; other claims on it count at the outlet base trust. Rows without one (a government, a league) speak for any claim. Seed rows and catalogue rows carry the categories they are trusted for; a subject comes only from the seed, so a row added with `trust.py add` has none. `seed` skips sources already registered, so a row changed in the seed or catalogue reaches an existing database only through `trust.py set` (or a fresh database). Release wires are never official enough to settle a claim on their own.
+The catalogue import takes a `domain,path,categories` CSV, such as a Media Cloud collection export (needs a Media Cloud account); `app/data/catalogue.csv` is the outlet list. Sources are per host: `domain` is a host, and `*.host` also covers its subdomains. Rows on shared hosting platforms (`trust.TRUST_SHARED_DOMAINS`) are skipped. Re-run it monthly. `app/data/trust_seed.json` holds the official sources and page rules. An official row with a `subject` (`{"ids": ["wikidata:Q312"], "names": ["Apple"]}`), such as a company newsroom or a club site, is official only for claims that name that subject among their parties; other claims on it count at the outlet base trust. Rows without one (a government, a league) speak for any claim. Seed rows and catalogue rows carry the categories they are trusted for; a subject comes only from the seed, so a row added with `trust.py add` has none. `seed` skips sources already registered, so a row changed in the seed or catalogue reaches an existing database only through `trust.py set`, `trust.py catalogue` (or a fresh database). Release wires are never official enough to settle a claim on their own.
+
+`trust.py catalogue` reads `app/data/catalogue.csv` (or `--catalogue`) and, for each registered source in it, adds the catalogue base (`TRUST_BASE_CATALOGUE`, 0.7) in each listed category that has no trust row yet, such as a category added to the catalogue after the source was seeded. A category with a row is never touched, so a base an operator raised or lowered with `set` stays as set; banned and suspended sources and sources not yet registered are listed and skipped. Without `--apply` it is a dry run: it prints each category it would add, with the matching `set` command, and changes nothing. Run the dry run first, then `--apply`; each change goes to the trust log with the reason. A scoop's confirming page counts at its source's trust in the type's category or a category the type shares (`SHARED_CATEGORY` in `app/services/scoops.py`), not the source's best category, so a missing row costs those confirmations.
+
+`unban` on a bare host clears the host's own row only: path rules that were suspended or banned on their own stay blocked (it lists them). Unban each by its path, or pass `--paths` to clear them with the host.
 
 ### Product API keys (`scripts/api_keys.py`)
 
@@ -242,10 +250,10 @@ EDGAR records are identity only and count toward accuracy; they never prove a cl
 | Dashboard | `GET /dashboard/miners`, `/dashboard/items`, `/dashboard/validators`, `/dashboard/mechanism`, `/dashboard/sources`, `/dashboard/quality` | Public, rate-limited |
 | Operator | `/ops/*` | `OPERATOR_HOTKEYS` |
 | Mechanism | `GET /mechanism/profile` | Validator |
-| Config | `GET /config/subnet`: served validator settings and the minimum validator version | Validator (signed) |
+| Config | `GET /config/subnet`: served validator settings, the pay settings (`pay`) validators check theirs against, and the minimum validator version | Validator (signed) |
 | Misc | `/health`, `/validators/versions` (internal), and `/v2` (410 Gone) | — |
 
-`GET /dashboard/quality[?coldkey=]` gives each scored coldkey's quality `q`, its weight multiplier and the paid and junk claims that counted, with the rule's constants (see the subnet's docs/miner.md). `GET /ledger/quality?from_ms=&epoch=` serves validators the same outcomes, `(owner index, passed)` in judged order, from the start they ask for and, with an epoch, judged before that epoch's points were signed (`409 epoch_unsigned` before then); an epoch's answer is kept for 3 h, so both validators score it alike.
+`GET /dashboard/quality[?coldkey=]` gives each scored coldkey's quality `q`, its weight multiplier and the paid and junk claims that counted, with the rule's constants (see the subnet's docs/miner.md). `GET /ledger/quality?from_ms=&epoch=` serves validators the same outcomes, `(owner index, passed)` in the order claims were decided (paid or rejected), from the start they ask for, which must be the subnet's `QUALITY_FROM` (what validators ask) or `EL_QUALITY_FROM_MS` (the default when `from_ms` is left out; any other start is `400 from_ms_not_served`), and, with an epoch, decided before that epoch's points were signed (`409 epoch_unsigned` before then); an epoch's answer is kept for 3 h, so both validators score it alike.
 
 `GET /dashboard/mechanism` gives the capacity `C` in force, the open categories, the window, the epoch length and the last signed total. `GET /dashboard/sources` is the trusted list: each source whose pages can win, with its trust per category, its kind (`official`, `outlet`, `wire`), `official_for` on a company's or club's own site, and the page rules (excluded and listing pages) that apply on any source.
 

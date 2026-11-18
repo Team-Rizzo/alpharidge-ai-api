@@ -12,6 +12,7 @@ category label is never an input.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Dict, Optional
@@ -25,6 +26,8 @@ from app.services import recheck, intake, ledger, trust
 from app.services.store import PASSED, ClaimRow, LedgerRow, Store
 from app.utils import block, hotkey_whitelist
 from app.utils.clock import HOUR_MS
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -115,18 +118,40 @@ async def debt(store: Store, row: ClaimRow, head: Optional[int] = None) -> float
 async def pay(store: Store, row: ClaimRow, route: str, f: Factors, now_ms: int,
               head: Optional[int] = None) -> ClaimRow:
     """verified -> provisional, writing the 40% row when it is above zero. The row carries
-    the hash of the claim's page-judge record, which its signed leaf covers."""
+    the hash of the claim's page-judge record, which its signed leaf covers. The row, the
+    re-check job and the claim's move commit together under the ledger lock, so the epoch
+    that holds the row is signed after the claim's outcome is written."""
     pts = provisional(f)
-    if pts > 0:
-        record = ledger.judge_record(await store.source_fetches(row.id))
-        signed = {"verdict": verdict_hash(record)} if record else {}
-        await ledger.write(store, LedgerRow(
+    settle_ms = now_ms + int(ledger.params().settle_delay_h * HOUR_MS)
+    if pts <= 0:
+        return await intake.transition(store, row, "provisional", settle_ms=settle_ms)
+    record = ledger.judge_record(await store.source_fetches(row.id))
+    signed = {"verdict": verdict_hash(record)} if record else {}
+    # No chain call while the transaction is open.
+    head = await block.current_block() if head is None else head
+    if head is None:
+        raise RuntimeError("chain head unavailable")
+    async with store.transaction() as tx:
+        await tx.lock_ledger()
+        await ledger.write(tx, LedgerRow(
             hotkey=row.hotkey, claim_id=row.id, event_id=row.event_id,
             kind=ledger.PROVISIONAL, points=pts, epoch=0, route=route, category=row.category,
             factors={**f.as_dict(), **signed}), head)
-        await recheck.schedule(store, row, route, f.T, now_ms)
-    return await intake.transition(store, row, "provisional",
-                                   settle_ms=now_ms + int(ledger.params().settle_delay_h * HOUR_MS))
+        await recheck.schedule(tx, row, route, f.T, now_ms)
+        return await intake.transition(tx, row, "provisional", settle_ms=settle_ms)
+
+
+async def finish_pay(store: Store, row: ClaimRow, paid: LedgerRow, now_ms: int) -> ClaimRow:
+    """verified -> provisional for a claim whose paid row an earlier pay wrote without moving
+    it (pay was three steps before it was one transaction). No second row is written: it
+    settles from the row it has."""
+    settle_ms = now_ms + int(ledger.params().settle_delay_h * HOUR_MS)
+    t = float((paid.factors or {}).get("T", 1.0))
+    async with store.transaction() as tx:
+        await tx.lock_ledger()
+        if recheck.selected(row.id, paid.route, t):
+            await tx.add_job_once(recheck.JOB, row.id, now_ms + recheck.delay_ms(row.id))
+        return await intake.transition(tx, row, "provisional", settle_ms=settle_ms)
 
 
 async def coverage_owners(store: Store, row: ClaimRow) -> int:
@@ -166,15 +191,20 @@ async def settle_one(store: Store, row: ClaimRow, head: Optional[int] = None) ->
             head = await block.current_block()
             if head is None:
                 raise RuntimeError("chain head unavailable")
-        row = await intake.transition(store, row, "settled")
-        for p in prov:
-            f = Factors(base=p.factors["base"], T=p.factors["T"], A=p.factors.get("A", 1.0))
-            pts = settled(f)
-            if pts > 0:
-                await ledger.write(store, LedgerRow(
-                    hotkey=row.hotkey, claim_id=row.id, event_id=row.event_id,
-                    kind=ledger.SETTLE, points=pts, epoch=0, route=p.route,
-                    category=p.category, factors=f.as_dict()), head)
+        # The move and its rows commit together: a settle that fails leaves the claim
+        # provisional, and settle_due settles it again.
+        async with store.transaction() as tx:
+            await tx.lock_ledger()
+            row = await intake.transition(tx, row, "settled")
+            for p in prov:
+                f = Factors(base=p.factors["base"], T=p.factors["T"],
+                            A=p.factors.get("A", 1.0))
+                pts = settled(f)
+                if pts > 0:
+                    await ledger.write(tx, LedgerRow(
+                        hotkey=row.hotkey, claim_id=row.id, event_id=row.event_id,
+                        kind=ledger.SETTLE, points=pts, epoch=0, route=p.route,
+                        category=p.category, factors=f.as_dict()), head)
     return row
 
 
@@ -188,6 +218,9 @@ async def settle_due(store: Store, now_ms: int, head: Optional[int] = None,
             done += 1
         except intake.InvalidTransition:
             pass
+        except Exception as e:
+            # Left provisional; settled on a later pass.
+            logger.warning(f"Settle of claim {row.id} failed: {e!r}")
     return done
 
 

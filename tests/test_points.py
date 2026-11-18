@@ -18,10 +18,11 @@ from alpharidge_ai.verify.dates import parse_datetime
 from app import config
 from app.config import EVENT_LANE
 from app.routers import ledger as ledger_router
-from app.services import ledger, points, product, trust
+from app.services import intake, ledger, points, product, trust
 from alpharidge_ai.judge.client import ScriptedJudge
 from app.services.answer_key import match
 from app.services.store import LedgerRow, MemoryStore
+from alpharidge_ai.mechanism.quality import JUNK
 
 from .pipeline import HEAD, HOUR_MS, T0, Lane
 from .test_guards import actors
@@ -109,8 +110,8 @@ async def test_settle_waits_while_the_chain_head_is_unavailable(monkeypatch):
     async def no_head():
         return None
     monkeypatch.setattr(points.block, "current_block", no_head)
-    with pytest.raises(RuntimeError):
-        await points.settle_due(lane.store, T0 + 73 * HOUR_MS)
+    # Left provisional, and the pass goes on to the claims after it.
+    assert await points.settle_due(lane.store, T0 + 73 * HOUR_MS) == 0
     assert (await lane.store.get_claim(row.id)).status == "provisional"
     assert await points.settle_due(lane.store, T0 + 73 * HOUR_MS, head=HEAD) == 1
     assert [r.kind for r in lane.store.ledger].count(ledger.SETTLE) == 1
@@ -290,7 +291,7 @@ async def test_a_forged_carry_fails_on_the_validator_side():
     store = await _debt_store()
     for e in range(3):
         await ledger.signed_points(store, e, p, keypair=KP)
-    await ledger.carry(store, 3, p.window)
+    await ledger.seal(store, 3, p.window)
     (row,) = [r for r in store.ledger if r.kind == ledger.CARRY]
     row.points = -1.0
     pull = LedgerPull(_Signer(store, p), pinned_pubkey=KP.ss58_address, window=3)
@@ -562,3 +563,59 @@ async def test_misconduct_penalty_is_five_times_the_value_and_nets_across_the_co
     assert net_by_coldkey(got.points, got.coldkeys) == {}
     settles = await ledger_router.settles(lane.store, await lane.store.ledger_rows([epoch]))
     assert await pull.unbound_settles(epoch, settles) is None
+
+
+async def test_a_paid_row_is_dropped_when_the_claim_cannot_be_paid():
+    from tests.test_store_contract import claim
+    store = MemoryStore()
+    row = await store.create_claim(claim("hk"))
+    await store.update_claim(row.id, "received", status="verified")
+    stale = await store.get_claim(row.id)
+    # Another task rejects the claim first; the pay that read it as verified writes nothing.
+    await intake.transition(store, stale, "rejected", reason="low_trust")
+    f = points.factors("merger_acquisition", "event", 1.0, 1.0)
+    with pytest.raises(intake.InvalidTransition):
+        await points.pay(store, stale, "event", f, T0, HEAD)
+    assert await store.claim_ledger(row.id) == []
+
+
+async def test_once_scaled_debt_that_quality_left_unpaid_still_carries(monkeypatch):
+    """A coldkey paid at lock 0 after a run of junk: its pay does not cover its debt in the
+    scaled window, so the debt carries when its epoch leaves. The validator agrees."""
+    from types import SimpleNamespace
+    from alpharidge_ai.mechanism import quality as qm
+    from alpharidge_ai.validator import loop as loop_module
+    from app.services import quality
+    from tests.test_store_contract import T0, claim
+
+    start = datetime.fromtimestamp(T0 / 1000, timezone.utc)
+    monkeypatch.setattr(qm, "QUALITY_FROM", start)
+    quality.reset()
+    p = replace(ledger.defaults(), window=3)
+    store = MemoryStore()
+    for i in range(120):
+        row = await store.create_claim(claim("m1", coldkey="ck"))
+        await store.update_claim(row.id, "received", status="rejected", reason="judge_reject",
+                                 judged_ms=T0 + i, decided_ms=T0 + i)
+    paid = await store.create_claim(claim("m1", coldkey="ck"))
+    await store.update_claim(paid.id, "received", status="provisional", decided_ms=T0 + 200)
+    missed = await store.create_claim(claim("m1", coldkey="ck"))
+    await store.append_ledger(LedgerRow("m1", missed.id, None, ledger.DEBT, -10.0, 0, "scoop",
+                                        "finance", received_ms=T0, bucket=0, coldkey="ck"))
+    await store.append_ledger(LedgerRow("m1", paid.id, None, ledger.PROVISIONAL, 20.0, 1,
+                                        "event", "finance", received_ms=T0, bucket=0,
+                                        coldkey="ck"))
+
+    class Client(_Signer):
+        async def ledger_quality(self, from_ms, epoch):
+            return await ledger_router.get_quality(from_ms, epoch, "vali", self.store)
+
+    client = Client(store, p)
+    lp = loop_module.LedgerLoop(client, SimpleNamespace(hotkeys=[]), lambda: 0)
+    pull = LedgerPull(client, pinned_pubkey=KP.ss58_address, window=3)
+    for e in range(4):
+        got, reason = await pull.pull(e, {"m1": 1}, carry_locks=lp.carry_locks)
+        assert reason == "accepted"
+    assert [(r.epoch, r.points) for r in store.ledger if r.kind == ledger.CARRY] == [(3, -10.0)]
+    assert lp._served[0] == 2 and lp._served[1][1][str(paid.id)] == 0.0
+    quality.reset()

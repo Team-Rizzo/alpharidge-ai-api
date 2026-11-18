@@ -6,20 +6,25 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 from alpharidge_ai.schema import TYPE_SPEC, Claim
-from alpharidge_ai.verify.check import UNREAD
+from alpharidge_ai.verify.check import SUPPORTED, UNREAD
 from app.services import budget, intake, ledger, line, novelty, points, product, scoops, trust
 from app.services.answer_key import releases
 from app.services.entities import EntityIndex, PlaceIndex, shared_index
 from app.services.store import (
-    PRIZE_ROUTES, ClaimRow, EventFactRow, EventRecord, SourceRow, Store,
+    PRIZE_ROUTES, ClaimRow, EventFactRow, EventRecord, SourceFetchRow, SourceRow, Store,
 )
 from app.utils import block
 from app.utils.clock import HOUR_MS
 
 LINE_WAIT_S = 600
+# A verified prize claim whose pay did not commit (its transaction could not start, or timed
+# out) is paid again this long after it was verified; a pay still on its way is not raced.
+PAY_RETRY_MS = 10 * 60 * 1000
+# Verified claims read per query when held scoops are closed.
+CLOSE_PAGE = 500
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +65,16 @@ class Resolver:
 
     async def _reject(self, store: Store, row: ClaimRow, reason: str, now_ms: int) -> ClaimRow:
         return await intake.transition(store, row, "rejected", reason=reason, judged_ms=now_ms)
+
+    async def _reject_with_debt(self, store: Store, row: ClaimRow, reason: str, now_ms: int,
+                                head: int) -> ClaimRow:
+        """Reject a held scoop and write its debt in one transaction under the ledger lock:
+        if either fails the scoop stays verified, and is closed again on a later pass."""
+        async with store.transaction() as tx:
+            await tx.lock_ledger()
+            row = await self._reject(tx, row, reason, now_ms)
+            await points.debt(tx, row, head)
+        return row
 
     async def _waiting(self, store: Store, row: ClaimRow, now_ms: int) -> bool:
         """True while a claim ahead in the same line has not been checked yet."""
@@ -113,6 +128,10 @@ class Resolver:
 
     async def resolve(self, store: Store, row: ClaimRow, now_ms: int,
                       head: Optional[int] = None) -> ClaimRow:
+        checked = checked_fetch(await store.source_fetches(row.id))
+        if checked is not None and checked.verdict != SUPPORTED:
+            # Its check failed and the move to rejected did not commit: it is not placed.
+            return await self._reject(store, row, checked.reason or "unsupported", now_ms)
         claim = Claim.model_validate(row.payload)
         ev = await store.get_event(row.event_id) if row.event_id is not None else None
         if ev is None or row.route not in PRIZE_ROUTES:
@@ -246,12 +265,10 @@ class Resolver:
                            now_ms: int, head: Optional[int] = None, firm: bool = False) -> None:
         """A trusted page shows a held scoop got the event wrong. Trusted claims held behind
         it go on as usual. A mismatch costs the scoop's debt."""
-        if reason == "scoop_mismatch":
-            head = await _head(head)
-        row = await self._reject(store, scoop, reason, now_ms)
         if reason != "scoop_mismatch":
+            await self._reject(store, scoop, reason, now_ms)
             return
-        await points.debt(store, row, head)
+        row = await self._reject_with_debt(store, scoop, reason, now_ms, await _head(head))
         ev = await store.get_event(scoop.event_id) if scoop.event_id is not None else None
         theirs = await store.get_source(scoop.source_id) if scoop.source_id is not None else None
         if ev is not None and theirs is not None:
@@ -330,31 +347,97 @@ class Resolver:
     # Scoop windows
 
     async def close_windows(self, store: Store, now_ms: int, head: Optional[int] = None) -> None:
-        waiting = sorted(await store.claims_by_status("verified"),
-                         key=lambda c: (c.received_ms, c.id))
-        for row in waiting:
+        """Close held scoops whose window has ended, and pay verified prize claims whose pay
+        failed. Every verified claim is looked at, a page at a time, oldest first; one that
+        fails is left for the next pass."""
+        after = None
+        while True:
+            page = await store.claims_by_status("verified", limit=CLOSE_PAGE, after=after)
+            for row in page:
+                try:
+                    head = await self._close(store, row, now_ms, head)
+                except intake.InvalidTransition:
+                    pass
+                except Exception as e:
+                    logger.warning(f"Closing or paying claim {row.id} failed: {e!r}")
+            if len(page) < CLOSE_PAGE:
+                return
+            after = (page[-1].bucket, page[-1].id)
+
+    async def _close(self, store: Store, row: ClaimRow, now_ms: int,
+                     head: Optional[int]) -> Optional[int]:
+        """Pay or close one verified claim when it is due; returns the chain head, once read."""
+        if row.route == "event":
+            await self.repay(store, row, now_ms, head)
+            return head
+        end = row.received_ms + int(novelty.SCOOP_WINDOW_H * HOUR_MS)
+        if row.route != "scoop" or now_ms < end:
+            return head
+        # A page found before the end is checked first.
+        if await store.scoop_candidates(row.id, ("queued",)):
+            return head
+        head = await _head(head)
+        if await self._confirmed(store, row) is not None:
+            await self.repay(store, row, now_ms, head)
+            return head
+        async with ledger.claim_lock(row.id):
             row = await store.get_claim(row.id)
             if row is None or row.status != "verified":
-                continue
-            end = row.received_ms + int(novelty.SCOOP_WINDOW_H * HOUR_MS)
-            if row.route != "scoop" or now_ms < end:
-                continue
-            # A page found before the end is checked first.
-            if await store.scoop_candidates(row.id, ("queued",)):
-                continue
-            head = await _head(head)
-            try:
-                async with ledger.claim_lock(row.id):
-                    row = await store.get_claim(row.id)
-                    if row is None or row.status != "verified":
-                        continue
-                    if await self._lost_on_timing(store, row):
-                        await self._reject(store, row, "lost_line", now_ms)
-                        continue
-                    row = await self._reject(store, row, "scoop_unconfirmed", now_ms)
-                    await points.debt(store, row, head)
-            except intake.InvalidTransition:
-                pass
+                return head
+            if await self._confirmed(store, row) is not None:
+                return head
+            if await self._lost_on_timing(store, row):
+                await self._reject(store, row, "lost_line", now_ms)
+            else:
+                await self._reject_with_debt(store, row, "scoop_unconfirmed", now_ms, head)
+        return head
+
+    async def repay(self, store: Store, row: ClaimRow, now_ms: int,
+                    head: Optional[int] = None) -> Optional[ClaimRow]:
+        """Pay a verified claim whose pay did not commit, as it would have been paid: an
+        event-route claim that took its event, at its frozen trust and age, once PAY_RETRY_MS
+        has passed since it was verified; a scoop whose confirmation was recorded, at that
+        confirmation's trust and multiple. None when it is neither. A claim whose paid row
+        is already written (by the pay before it was atomic) is moved on without a second
+        row. The claim's move to provisional commits with its row and only from verified, so
+        two pays of one claim write one row."""
+        if row.route == "event" and now_ms - (row.verified_ms or now_ms) < PAY_RETRY_MS:
+            return None
+        async with ledger.claim_lock(row.id):
+            row = await store.get_claim(row.id)
+            if row is None or row.status != "verified" or row.route not in PRIZE_ROUTES:
+                return None
+            paid = [r for r in await store.claim_ledger(row.id) if r.kind == ledger.PROVISIONAL]
+            if paid:
+                logger.warning(f"Claim {row.id} has its paid row but is still verified; "
+                               f"moving it on without a second row")
+                return await points.finish_pay(store, row, paid[0], now_ms)
+            claim = Claim.model_validate(row.payload)
+            if row.route == "scoop":
+                confirm = await self._confirmed(store, row)
+                if confirm is None:
+                    return None
+                ev = await store.get_event(row.event_id) if row.event_id is not None else None
+                if ev is not None and ev.first_claim_id is None:
+                    await store.update_event(ev.id, confidence=REPORTED, first_claim_id=row.id)
+                a = await points.claim_age(store, row, claim.event_date)
+                f = points.factors(claim.event_type, "scoop", float(confirm["trust"]), a,
+                                   points.confirm_multiple(row, confirm))
+                logger.warning(f"Paying confirmed scoop {row.id} whose pay did not commit")
+                return await points.pay(store, row, "scoop", f, now_ms, head)
+            ev = await store.get_event(row.event_id) if row.event_id is not None else None
+            if ev is None or ev.first_claim_id != row.id:
+                return None
+            t, _ = await self._trust(store, row)
+            a = await points.claim_age(store, row, claim.event_date)
+            logger.warning(f"Paying claim {row.id} whose pay did not commit")
+            return await points.pay(store, row, "event",
+                                    points.factors(claim.event_type, "event", t, a), now_ms, head)
+
+    @staticmethod
+    async def _confirmed(store: Store, scoop: ClaimRow) -> Optional[dict]:
+        """The confirmation recorded on a held scoop, which is paid with it."""
+        return (ledger.judge_record(await store.source_fetches(scoop.id)) or {}).get("confirm")
 
     async def _lost_on_timing(self, store: Store, scoop: ClaimRow) -> bool:
         """Another claim took the scoop's event with an outcome that does not conflict."""
@@ -368,6 +451,11 @@ class Resolver:
         index = self.index()
         return not (novelty.conflicting(ours, theirs, index)
                     or novelty.decided_otherwise(ours, theirs, index))
+
+
+def checked_fetch(fetches: Sequence[SourceFetchRow]) -> Optional[SourceFetchRow]:
+    """The fetch the page check last decided on (it records its date gate), else None."""
+    return next((f for f in reversed(fetches) if "date_gate" in (f.check or {})), None)
 
 
 async def _head(head: Optional[int]) -> int:

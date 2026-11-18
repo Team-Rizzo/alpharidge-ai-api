@@ -23,6 +23,23 @@ def pooled_url(url: str, limit: str = "", timeout_s: str = "") -> Optional[str]:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
+# Prisma waits this long for a pooled connection (pool_timeout, 10 s unless
+# EL_DB_POOL_TIMEOUT_S sets it) before a query fails.
+POOL_TIMEOUT_MS = int(float(config.DB_POOL_TIMEOUT_S or 10) * 1000)
+# A transaction waits for its connection as long as a plain query does, plus a margin for its
+# BEGIN: Prisma's 2 s default failed a pay's transaction under pool pressure while plain
+# queries still went through.
+TX_MAX_WAIT_MS = POOL_TIMEOUT_MS + 5000
+# Longest a transaction may stay open (Prisma's default is 5 s).
+TX_TIMEOUT_MS = 60_000
+# Longest a transaction waits for the ledger lock. The exclusive hold only seals an epoch (a
+# few rows), and every shared hold is one short write, so a wait this long means something is
+# stuck: the transaction fails and rolls back instead of holding its pooled connection until
+# TX_TIMEOUT_MS, and the claim stays where it was. Pays and settles are done again by the
+# resolver and settle passes; of the jobs, only confirm and re-check jobs are retried
+# (app/jobs/worker.py RETRIED).
+LEDGER_LOCK_TIMEOUT_MS = 20_000
+
 _url = pooled_url(os.getenv("DATABASE_URL", ""), config.DB_CONNECTION_LIMIT,
                   config.DB_POOL_TIMEOUT_S)
 # Must exceed the slowest raw dashboard query.

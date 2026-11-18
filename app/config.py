@@ -6,6 +6,7 @@ import os
 from alpharidge_ai.ledger.attestation import BLOCK_LENGTH
 from alpharidge_ai.mechanism import quality as qm
 from alpharidge_ai.schema import OPEN_TYPES, TYPE_SPEC, EventType, category_of
+from alpharidge_ai.schema.types import pay_settings
 from alpharidge_ai.verify.fetch import user_agent
 from app import ROOT
 
@@ -59,6 +60,12 @@ def validator_config(hotkey: str) -> dict:
         out.update({k: os.environ[f"VALIDATOR_{k}"] for k in _JUDGE_KEYS
                     if os.getenv(f"VALIDATOR_{k}", "").strip()})
     return out
+
+# Pay settings (EL_EVENT_PAY_X, EL_SCOOP_PREMIUM, EL_SCOOP_MISS_DEBT_X; today's pay by default),
+# read from the environment when used. Every validator must use the same values: they are served
+# on /config/subnet, and a validator whose own differ logs an alarm. A malformed value stops
+# start-up here rather than at the first claim.
+pay_settings()
 
 VALIDATOR_VERSIONS_PATH = os.getenv(
     "VALIDATOR_VERSIONS_PATH", str(ROOT / ".validator_versions.json"))
@@ -149,9 +156,10 @@ EVENT_LANE = {
     "ALARM_SOURCE_HOUR": _el("ALARM_SOURCE_HOUR", 20, int),
     "ALARM_SOURCE_DAY": _el("ALARM_SOURCE_DAY", 50, int),
     "ALARM_SOURCE_HOSTS": os.getenv("EL_ALARM_SOURCE_HOSTS", ""),
-    # Coldkey quality (alpharidge_ai.mechanism.quality), scored from claims judged since
-    # QUALITY_FROM_MS (quality.QUALITY_FROM by default) for the budget and the dashboard
-    # (validators ask from their own start).
+    # Coldkey quality (alpharidge_ai.mechanism.quality), scored from claims decided (paid or
+    # rejected) since QUALITY_FROM_MS (quality.QUALITY_FROM by default), in the order they
+    # were decided, for the budget and the dashboard; at 0, from the last 30 days
+    # (app.services.quality.start). Validators ask from their own start.
     # QUALITY_BUDGET scales each hotkey's check budget by its coldkey's multiplier, down to
     # QUALITY_BUDGET_MIN.
     "QUALITY_FROM_MS": _el("QUALITY_FROM_MS", qm.from_ms(), int),

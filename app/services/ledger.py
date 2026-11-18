@@ -4,18 +4,20 @@ import asyncio
 import logging
 import weakref
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from alpharidge_ai.ledger.attestation import LEDGER_SIGNER
+from alpharidge_ai.mechanism import quality as qm
 from alpharidge_ai.mechanism.pools import (CAPACITY, PROVISIONAL_SHARE, WINDOW_EPOCHS, carried,
                                            window_points)
 from alpharidge_ai.schema.types import MISCONDUCT_PENALTY_X, reverify_rate
 from alpharidge_ai.verify.check import UNREAD
 from app.config import EVENT_LANE
-from app.services import intake
+from app.services import intake, quality
 from app.services.store import ClaimRow, LedgerRow, SourceFetchRow, Store
 from app.utils import attestation_crypto as ac
 from app.utils import block, mechanism_profile
+from app.utils.clock import now_ms as _now_ms
 
 logger = logging.getLogger(__name__)
 
@@ -84,19 +86,24 @@ def epoch_of(head: int) -> int:
 
 
 async def write(store: Store, row: LedgerRow, head: Optional[int] = None) -> LedgerRow:
+    """Append a row in the head's epoch, or the first after it not yet sealed. The row is
+    written under the ledger lock (shared), so an epoch is never sealed between choosing it
+    and the row's commit. Inside a transaction, it commits with it."""
     head = await block.current_block() if head is None else head
     if head is None:
         raise RuntimeError("chain head unavailable")
-    row.epoch = epoch_of(head)
-    # A signed epoch never gains rows.
-    while await store.get_attestation(LEDGER_SIGNER, row.epoch) is not None:
-        row.epoch += 1
     if row.claim_id is not None and row.received_ms is None:
         claim = await store.get_claim(row.claim_id)
         if claim is not None:
             row.received_ms, row.bucket = claim.received_ms, claim.bucket
             row.coldkey = row.coldkey or claim.coldkey
-    return await store.append_ledger(row)
+    async with store.transaction() as tx:
+        await tx.lock_ledger()
+        row.epoch = epoch_of(head)
+        # A sealed epoch never gains rows.
+        while await tx.sealed_ms(LEDGER_SIGNER, row.epoch) is not None:
+            row.epoch += 1
+        return await tx.append_ledger(row)
 
 
 def leaf(row: LedgerRow) -> dict:
@@ -151,8 +158,28 @@ async def leaves(store: Store, epoch: int) -> List[dict]:
     return [leaf(r) for r in await store.ledger_rows([epoch])]
 
 
+# Rows read per query when a window is read whole.
+WINDOW_PAGE = 5_000
+
+
+async def window_rows(store: Store, epochs: Sequence[int]) -> List[LedgerRow]:
+    """The epochs' rows by id, read a page at a time so that no single query is long."""
+    out: List[LedgerRow] = []
+    while True:
+        page = await store.ledger_rows(epochs, after_id=out[-1].id if out else 0,
+                                       limit=WINDOW_PAGE)
+        out.extend(page)
+        if len(page) < WINDOW_PAGE:
+            return out
+
+
+def _leaves(rows: Sequence[LedgerRow]) -> List[dict]:
+    return [leaf(r) for r in rows]
+
+
 async def window_leaves(store: Store, epoch: int, size: Optional[int] = None) -> List[dict]:
-    return [leaf(r) for r in await store.ledger_rows(window(epoch, size))]
+    # A large window takes a while to turn into leaves; the event loop keeps serving.
+    return await asyncio.to_thread(_leaves, await window_rows(store, window(epoch, size)))
 
 
 def window(epoch: int, size: Optional[int] = None) -> range:
@@ -169,28 +196,105 @@ _signing = asyncio.Lock()
 SIGN_CATCHUP_MAX = 48
 
 
-async def carry(store: Store, epoch: int, size: int) -> None:
-    """Write the epoch's carry rows: debt the window would otherwise drop."""
-    if any(r.kind == CARRY for r in await store.ledger_rows([epoch])):
-        return
-    prev = await window_leaves(store, epoch - 1, size)
-    for c in carried(prev, await leaves(store, epoch - size)):
-        await store.append_ledger(LedgerRow(
-            hotkey=c["miner_hotkey"], claim_id=None, event_id=None, kind=CARRY,
-            points=c["points_awarded"], epoch=epoch, route=CARRY, category=c["category"],
-            received_ms=0, bucket=0, coldkey=c["coldkey"]))
+async def carry_locks(store: Store, epoch: int) -> Optional[Dict[str, float]]:
+    """The locks the carry into the epoch is valued with: those of the epoch before it when
+    that one was signed from quality.QUALITY_FROM, else None (raw points). The epoch's own
+    locks are known only once it is signed, after its carry; validators read the same ones
+    from /ledger/quality for the epoch before."""
+    if qm.QUALITY_FROM is None or epoch < 1:
+        return None
+    until = await store.attestation_issued_ms(LEDGER_SIGNER, epoch - 1)
+    if not qm.active(until):
+        return None
+    # `until` is the epoch's seal: every decision before it committed before the seal.
+    return qm.locked(await quality.outcomes(store, qm.from_ms(), until))
 
 
-async def _sign(store: Store, epoch: int, p: Params, keypair) -> dict:
-    signer = LEDGER_SIGNER
-    leaves = await window_leaves(store, epoch, p.window)
+async def carry_rows(store: Store, epoch: int, size: int) -> List[LedgerRow]:
+    """The epoch's carry rows: debt the window would otherwise drop, valued as the weights
+    value it. Read from earlier epochs only, all sealed before this one is, so the rows are
+    the same whenever they are worked out."""
+    gone = await leaves(store, epoch - size)
+    locks = await carry_locks(store, epoch) if gone else None
+    worth = None if locks is None else (lambda leaf: qm.worth(leaf, locks))
+    rows = await window_rows(store, window(epoch - 1, size))
+    return await asyncio.to_thread(_carry_rows, rows, gone, worth, epoch)
+
+
+def _carry_rows(rows: List[LedgerRow], gone: List[dict], worth, epoch: int) -> List[LedgerRow]:
+    # Epoch by epoch, as validators list the window.
+    rows = sorted(rows, key=lambda r: (r.epoch, r.id))
+    return [LedgerRow(
+        hotkey=c["miner_hotkey"], claim_id=None, event_id=None, kind=CARRY,
+        points=c["points_awarded"], epoch=epoch, route=CARRY, category=c["category"],
+        received_ms=0, bucket=0, coldkey=c["coldkey"])
+        for c in carried([leaf(r) for r in rows], gone, worth)]
+
+
+async def seal(store: Store, epoch: int, size: int) -> int:
+    """Close the epoch to new rows and fix its quality cut; returns the cut. The carry rows
+    are worked out first, with no lock held, then written with the seal in one short
+    transaction under the exclusive lock: every row and decision committed before it is in
+    the epoch and its cut, and every later one is after both. The cut is above the store's
+    clock when the lock is held and above the last seal, so it is above every stamp already
+    committed (intake.decided_at), and every later stamp is at least the cut.
+
+    Carry rows already in the epoch were left by code from before the seal, stopped between
+    writing them and signing; the epoch is unsigned, so they are replaced."""
+    if epoch >= 1 and await store.sealed_ms(LEDGER_SIGNER, epoch - 1) is not None and (
+            await store.get_attestation(LEDGER_SIGNER, epoch - 1) is None):
+        # Its carry is valued with the cut of a signed epoch before it.
+        raise RuntimeError(f"epoch {epoch - 1} is sealed but not signed")
+    rows = await carry_rows(store, epoch, size)
+    async with store.transaction() as tx:
+        at = await tx.lock_ledger(exclusive=True)
+        cut = await tx.sealed_ms(LEDGER_SIGNER, epoch)
+        if cut is not None:
+            return cut
+        # The carry is read from the epochs epoch - size to epoch - 1. Epochs are sealed in
+        # order, so when both ends are sealed every one between is, and none gains rows. In
+        # the first epochs signed they are not all sealed yet: read again under the lock.
+        for e in {epoch - size, epoch - 1}:
+            if e >= 0 and await tx.sealed_ms(LEDGER_SIGNER, e) is None:
+                rows = await carry_rows(tx, epoch, size)
+                break
+        dropped = await tx.drop_carry(LEDGER_SIGNER, epoch)
+        if dropped:
+            logger.warning(f"Epoch {epoch}: replaced {dropped} carry rows left unsigned")
+        for row in rows:
+            await tx.append_ledger(row)
+        last = await tx.latest_seal_ms(LEDGER_SIGNER)
+        at = intake.decision_ms() if at is None else at
+        cut = max(at, last if last is not None else at) + 1
+        await tx.seal(LEDGER_SIGNER, epoch, cut)
+    return cut
+
+
+def _attest(leaves: List[dict], signer: str, epoch: int, keypair) -> dict:
     per_miner = window_points(leaves)
     total = round(sum(per_miner.values()), 6)
     root = ac.merkle_root(leaves)
     msg = ac.attestation_message(signer, epoch, per_miner, total, root)
-    cached = {"perMinerPoints": per_miner, "totalPoints": total, "merkleRoot": root,
-              "signature": ac.sign_attestation(keypair or ac.load_signing_key(), msg),
-              "capacity": float(p.capacity), "leafCount": len(leaves)}
+    return {"perMinerPoints": per_miner, "totalPoints": total, "merkleRoot": root,
+            "signature": ac.sign_attestation(keypair or ac.load_signing_key(), msg),
+            "leafCount": len(leaves)}
+
+
+async def _sign(store: Store, epoch: int, p: Params, keypair) -> dict:
+    """Seal the epoch, then read its window and sign it with no lock or transaction held:
+    once sealed its rows and quality cut no longer change, so writers and deciders go on
+    while a large window is read. A signing that fails after the seal is done again from
+    the same rows; the seal's cut is the attestation's issue time."""
+    signer = LEDGER_SIGNER
+    done = await store.get_attestation(signer, epoch)
+    if done is not None:
+        return done
+    if await store.sealed_ms(signer, epoch) is None:
+        await seal(store, epoch, p.window)
+    leaves = await window_leaves(store, epoch, p.window)
+    # Hashing a large window takes seconds; the event loop keeps serving meanwhile.
+    cached = await asyncio.to_thread(_attest, leaves, signer, epoch, keypair)
+    cached["capacity"] = float(p.capacity)
     await store.put_attestation(signer, epoch, cached)
     return await store.get_attestation(signer, epoch) or cached
 
@@ -204,7 +308,7 @@ async def signed_points(store: Store, epoch: int, p: Optional[Params] = None,
     """Points per hotkey over the epoch's window, with the Merkle root, signed once and
     then served unchanged. Epochs past the last signed one are signed in order, each
     after its carry rows, at most SIGN_CATCHUP_MAX per call. An unsigned epoch before
-    `oldest` or before the last signed one is not signed."""
+    `oldest` or before the last sealed one is not signed."""
     p = p or params()
     cached = await store.get_attestation(LEDGER_SIGNER, epoch)
     if cached is None:
@@ -214,17 +318,21 @@ async def signed_points(store: Store, epoch: int, p: Optional[Params] = None,
             cached = await store.get_attestation(LEDGER_SIGNER, epoch)
             if cached is None:
                 last = await store.last_attestation_epoch(LEDGER_SIGNER)
-                if last is not None and epoch < last:
+                sealed = await store.last_sealed_epoch(LEDGER_SIGNER)
+                top = max((e for e in (last, sealed) if e is not None), default=None)
+                # Epochs are sealed in order, so one before the last seal is never signed.
+                if top is not None and epoch < top:
                     raise EpochTooOld(epoch)
                 if last is None or last < epoch:
-                    behind = range(epoch if last is None else last + 1, epoch)
+                    # From the epoch after the last signed one, or one sealed and not signed.
+                    first = last + 1 if last is not None else (
+                        sealed if sealed is not None else epoch)
+                    behind = range(first, epoch)
                     for e in behind[:SIGN_CATCHUP_MAX]:
                         if await store.get_attestation(LEDGER_SIGNER, e) is None:
-                            await carry(store, e, p.window)
                             await _sign(store, e, p, keypair)
                     if len(behind) > SIGN_CATCHUP_MAX:
                         raise RuntimeError("signing_behind")
-                    await carry(store, epoch, p.window)
                 cached = await _sign(store, epoch, p, keypair)
     lo = window(epoch, p.window)
     return {
@@ -276,14 +384,18 @@ async def _clawback_one(store: Store, claim_id: int, reason: str, head: Optional
             head = await block.current_block() if head is None else head
             if head is None:
                 raise RuntimeError("chain head unavailable")
-            paid = await in_window(store, row.id, head)
-            if paid > 0:
-                await write(store, LedgerRow(
-                    hotkey=row.hotkey, claim_id=row.id, event_id=row.event_id,
-                    kind=CLAWBACK, points=-paid, epoch=0, route=row.route,
-                    category=row.category, reason=reason,
-                    factors={"trust": row.trust, "trust_band": row.trust_band}), head)
-            await intake.transition(store, row, "clawed_back", reason=reason)
+            # The row and the move commit together: a claim left provisional or settled is
+            # clawed again whole by whatever claws it next.
+            async with store.transaction() as tx:
+                await tx.lock_ledger()
+                paid = await in_window(tx, row.id, head)
+                if paid > 0:
+                    await write(tx, LedgerRow(
+                        hotkey=row.hotkey, claim_id=row.id, event_id=row.event_id,
+                        kind=CLAWBACK, points=-paid, epoch=0, route=row.route,
+                        category=row.category, reason=reason,
+                        factors={"trust": row.trust, "trust_band": row.trust_band}), head)
+                await intake.transition(tx, row, "clawed_back", reason=reason)
         else:
             return 0
         return 1
@@ -294,7 +406,23 @@ async def _clawback_one(store: Store, claim_id: int, reason: str, head: Optional
 async def penalty(store: Store, row: ClaimRow, reason: str,
                   head: Optional[int] = None) -> float:
     """A negative row of MISCONDUCT_PENALTY_X times the claim's full value, or for an unpaid
-    scoop times its debt; 0 when it has neither or was already penalised."""
+    scoop times its debt; 0 when it has neither or was already penalised. Read and written
+    under the ledger lock in one transaction."""
+    rows = await store.claim_ledger(row.id)
+    if any(r.kind == PENALTY for r in rows) or not any(r.kind in (PROVISIONAL, DEBT)
+                                                       for r in rows):
+        return 0.0
+    head = await block.current_block() if head is None else head
+    if head is None:
+        raise RuntimeError("chain head unavailable")
+    async with store.transaction() as tx:
+        await tx.lock_ledger()
+        # Another process may be penalising it too; the second sees the first's row.
+        await tx.lock_claim(row.id)
+        return await _penalty(tx, row, reason, head)
+
+
+async def _penalty(store: Store, row: ClaimRow, reason: str, head: int) -> float:
     rows = await store.claim_ledger(row.id)
     paid = [r for r in rows if r.kind == PROVISIONAL]
     if any(r.kind == PENALTY for r in rows):

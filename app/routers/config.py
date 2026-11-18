@@ -68,8 +68,8 @@ async def get_subnet_config(
     request: Request,
     validator_hotkey: str = Depends(get_validator_hotkey),
 ):
-    """Served validator settings and the minimum validator version; records the version the
-    caller reports."""
+    """Served validator settings, the pay settings validators check theirs against and the
+    minimum validator version; records the version the caller reports."""
     client_version = request.headers.get("X-Validator-Version", "unknown")
     logger.info(f"Config request from {validator_hotkey[:12]}.. version={client_version}")
 
@@ -87,6 +87,7 @@ async def get_subnet_config(
 
     return {
         "config": config.validator_config(validator_hotkey),
+        "pay": config.pay_settings(),
         "min_validator_version": config.MIN_VALIDATOR_VERSION,
         "timestamp": datetime.utcnow().isoformat(),
     }

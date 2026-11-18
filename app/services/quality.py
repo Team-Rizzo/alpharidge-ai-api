@@ -1,37 +1,76 @@
-"""Coldkey quality from judged claims (alpharidge_ai.mechanism.quality), read again at most
+"""Coldkey quality from decided claims (alpharidge_ai.mechanism.quality), read again at most
 once a minute."""
 
+import asyncio
 import time
 from typing import Dict, List, Optional, Tuple
 
 from alpharidge_ai.mechanism.quality import JUNK, multiplier, pay_multiplier, scores
 from app.config import EVENT_LANE
 from app.services.store import Store
+from app.utils.clock import DAY_MS, HOUR_MS, now_ms as _now_ms
 
 CACHE_S = 60
-# An epoch's outcomes are kept for this long, so a later status change (a clawback, a scoop
-# confirmed) cannot give the second validator another answer than the first.
+# An epoch's outcomes are kept this long. They do not change once the epoch is signed (claims
+# are read by when they were decided), so this only spares the database.
 EPOCH_CACHE_S = 3 * 3600
+# With no start set (QUALITY_FROM_MS 0), the budget and the dashboard score the claims decided
+# in this span instead of every claim ever. q halves a claim's weight every 20 claims after it:
+# a coldkey that decides 100 claims in the span is scored to within 2^-5 of its full history,
+# and a quieter one starts the span at START, as a new coldkey does.
+LOOKBACK_MS = 30 * DAY_MS
 
-_cache: Dict[Tuple[int, Optional[int]], Tuple[float, List[Tuple[str, bool, int]]]] = {}
+# Most reads kept at once; the oldest goes first.
+CACHE_MAX = 32
+
+Key = Tuple[int, Optional[int]]
+_cache: Dict[Key, Tuple[float, List[Tuple[str, bool, int]]]] = {}
+_loading: Dict[Key, asyncio.Future] = {}
+
+
+def start() -> int:
+    """Where the budget and the dashboard start: QUALITY_FROM_MS, else the lookback, to the
+    hour so that reads share the cache."""
+    if EVENT_LANE["QUALITY_FROM_MS"]:
+        return EVENT_LANE["QUALITY_FROM_MS"]
+    cut = _now_ms() - LOOKBACK_MS
+    return cut - cut % HOUR_MS
 
 
 async def outcomes(store: Store, from_ms: Optional[int] = None,
                    until_ms: Optional[int] = None) -> List[Tuple[str, bool, int]]:
-    """(owner, passed, claim id) for each paid or junk claim judged from from_ms (default
-    QUALITY_FROM_MS) and before until_ms, in judged order."""
-    key = (EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else int(from_ms), until_ms)
+    """(owner, passed, claim id) for each paid or junk claim decided from from_ms (default
+    start()) and before until_ms, in decision order. One read runs per key at a time; other
+    callers wait for it."""
+    key = (start() if from_ms is None else int(from_ms), until_ms)
     at, rows = _cache.get(key, (0.0, None))
-    if rows is None or time.monotonic() - at >= _ttl(key):
-        rows = await store.quality_outcomes(key[0], JUNK, until_ms)
-        for k in [k for k in _cache if k != key]:
-            if time.monotonic() - _cache[k][0] >= _ttl(k):
-                del _cache[k]
-        _cache[key] = (time.monotonic(), rows)
+    if rows is not None and time.monotonic() - at < _ttl(key):
+        return rows
+    task = _loading.get(key)
+    if task is None:
+        task = _loading[key] = asyncio.ensure_future(_load(store, key))
+
+        def done(t: asyncio.Future) -> None:
+            if _loading.get(key) is t:
+                del _loading[key]
+
+        task.add_done_callback(done)
+    return await asyncio.shield(task)
+
+
+async def _load(store: Store, key: Key) -> List[Tuple[str, bool, int]]:
+    rows = await store.quality_outcomes(key[0], JUNK, key[1])
+    now = time.monotonic()
+    for k in [k for k in _cache if now - _cache[k][0] >= _ttl(k)]:
+        del _cache[k]
+    _cache.pop(key, None)
+    while len(_cache) >= CACHE_MAX:
+        del _cache[min(_cache, key=lambda k: _cache[k][0])]
+    _cache[key] = (now, rows)
     return rows
 
 
-def _ttl(key: Tuple[int, Optional[int]]) -> float:
+def _ttl(key: Key) -> float:
     return CACHE_S if key[1] is None else EPOCH_CACHE_S
 
 
@@ -54,3 +93,4 @@ async def standing(store: Store) -> Dict[str, dict]:
 
 def reset() -> None:
     _cache.clear()
+    _loading.clear()

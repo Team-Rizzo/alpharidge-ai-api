@@ -375,7 +375,7 @@ async def test_api_keys_can_be_revoked():
     a = await tool.run(store, tool.parse(["add", "acme"]))
     b = await tool.run(store, tool.parse(["add", "acme"]))
     c = await tool.run(store, tool.parse(["add", "beta"]))
-    assert await tool.run(store, tool.parse(["revoke", "--key", a])) == "revoked 1"
+    assert await tool.run(store, tool.parse(["revoke", f"--key={a}"])) == "revoked 1"
     assert await store.api_key_owner(tool._hash(a)) is None
     assert await store.api_key_owner(tool._hash(b)) == "acme"
     assert await tool.run(store, tool.parse(["revoke", "acme"])) == "revoked 1"

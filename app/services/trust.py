@@ -614,12 +614,17 @@ async def contradict(store: Store, event_id: int, source: SourceRow, claim: Clai
 
 async def penalize(store: Store, kind: str, source: SourceRow, claim: ClaimRow,
                    now_ms: Optional[int] = None, head: Optional[int] = None) -> SourceEventRow:
-    """A changed page against a used claim."""
+    """A changed page against a used claim. Run again after a failed clawback, it records
+    the source's penalty once."""
     now_ms = now_ms or _now_ms()
-    row = await record(store, kind, source, claim.category, now_ms, claim.event_id, claim.id)
-    if kind == CHANGED:
-        await log(store, "flag:changed", None, str(claim.id), "page changed after fetch",
-                  "detector", source.id, now_ms=now_ms)
+    done = [e for e in await store.source_events(source.id, claim_id=claim.id) if e.role == kind]
+    if done:
+        row = done[0]
+    else:
+        row = await record(store, kind, source, claim.category, now_ms, claim.event_id, claim.id)
+        if kind == CHANGED:
+            await log(store, "flag:changed", None, str(claim.id), "page changed after fetch",
+                      "detector", source.id, now_ms=now_ms)
     if kind in CLAWED:
         fresh = await store.get_claim(claim.id)
         if fresh is not None:

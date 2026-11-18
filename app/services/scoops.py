@@ -9,11 +9,11 @@ from datetime import datetime, time, timedelta, timezone
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
-from alpharidge_ai.schema import (Actor, Claim, IdScheme, category_of, confirm_claim, judged,
-                                  renamed)
+from alpharidge_ai.schema import (Actor, Claim, EventType, IdScheme, category_of, confirm_claim,
+                                  judged, renamed)
 from alpharidge_ai.verify.check import PIVOT_SLOTS, pick_quote
 from app import ROOT
-from app.config import CATEGORIES, EVENT_LANE
+from app.config import EVENT_LANE
 from app.services import intake, judge as judges, ledger, novelty, trust
 from app.services.entities import LINKED, SEC_NAMES
 from app.services.store import ClaimRow, Job, ScoopCandidateRow, Store
@@ -52,7 +52,12 @@ def feeds() -> Tuple[dict, ...]:
 
 
 def stale(claim: Claim, received_ms: int, published: Optional[datetime]) -> bool:
-    """The scoop's event day, or its page, ended more than SCOOP_FRESH_H before receipt."""
+    """The scoop's event day, or its page, ended more than SCOOP_FRESH_H before receipt.
+    It runs after the fixed check passed, and that check turns away a read page without a
+    publish date (no_publish_date), so `published` is missing only for an unread page. Such a
+    scoop is held on its event date alone; a confirming page out before that day fails
+    (future_date) and the judge fails one that dates the event earlier (scoop_mismatch), so a
+    fresh date on an old story ends unconfirmed, with its debt."""
     hours = EVENT_LANE["SCOOP_FRESH_H"]
     if not hours:
         return False
@@ -61,18 +66,46 @@ def stale(claim: Claim, received_ms: int, published: Optional[datetime]) -> bool
     return _ms(day_end) < cutoff or (published is not None and _ms(published) < cutoff)
 
 
+# Categories a type's confirming page may also count in, at its source's trust there, when that
+# is higher than in the type's own. Company news is written up by business and technology
+# outlets alike: the trusted list marks many business desks finance only (axios.com,
+# fiercebiotech.com, the *dive.com sites) and technology outlets technology only (wired.com,
+# heise.de, tech.eu), and each covers the other's company deals, funding, launches, results,
+# leadership changes and breaches (a breach is a company disclosure: SEC 8-K Item 1.05).
+# Tariffs and sanctions are core news for business and trade desks (supplychaindive.com,
+# freightwaves.com, oilprice.com), and the regulation of technology for business and politics
+# desks (politico.eu). Every other type counts in its own category only: market mechanics
+# (delistings, halts), macro releases, technical news (vulnerabilities, outages,
+# breakthroughs), sports, and the rest of politics. An outlet whose catalogue categories miss its
+# beat is corrected in app/data/catalogue.csv (tests/test_catalogue.py walks them), not here.
+SHARED_CATEGORY: Dict[str, Tuple[str, ...]] = {
+    **dict.fromkeys(("earnings", "guidance", "merger_acquisition", "bankruptcy", "personnel",
+                     "layoffs", "ipo_listing"), ("technology",)),
+    **dict.fromkeys(("funding", "product_launch", "partnership", "infrastructure_investment",
+                     "security_incident"), ("finance",)),
+    "sanction_or_tariff": ("finance",),
+    "tech_regulation": ("finance", "politics"),
+}
+
+
+def confirm_categories(event_type) -> Tuple[str, ...]:
+    """The categories a confirming page of the type counts in: its own, then those it shares."""
+    t = EventType(event_type)
+    return (category_of(t).value,) + SHARED_CATEGORY.get(t.value, ())
+
+
 async def category_trust(store: Store, v, entities, claim: Claim, source, url: str):
     """A confirming page's trust and the category it is in: the claim's type's category, else
-    the source's best category when that is higher."""
-    category = category_of(claim.event_type).value
-    ct = await trust.of_claim(store, v.registry, entities, claim, source, category, url)
-    if ct.t >= trust.PRIZE_TRUST_MIN or source is None:
-        return ct, category
-    best = max(CATEGORIES, key=lambda c: trust.trust(source, c))
-    if best == category:
-        return ct, category
-    other = await trust.of_claim(store, v.registry, entities, claim, source, best, url)
-    return (other, best) if other.t > ct.t else (ct, category)
+    a category the type shares (SHARED_CATEGORY) where the source is trusted more."""
+    own, *shared = confirm_categories(claim.event_type)
+    best = (await trust.of_claim(store, v.registry, entities, claim, source, own, url), own)
+    if best[0].t >= trust.PRIZE_TRUST_MIN or source is None:
+        return best
+    for category in shared:
+        ct = await trust.of_claim(store, v.registry, entities, claim, source, category, url)
+        if ct.t > best[0].t:
+            best = (ct, category)
+    return best
 
 
 def since(claim: Claim) -> datetime:

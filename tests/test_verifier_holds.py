@@ -108,3 +108,59 @@ def test_private_fetches_are_refused_outside_a_mock_network(monkeypatch):
     verifier.check_public_only(mock=True)
     monkeypatch.setitem(EVENT_LANE, "FETCH_PUBLIC_ONLY", True)
     verifier.check_public_only(mock=False)
+
+
+async def test_a_recheck_whose_clawback_fails_is_retried_once_through(monkeypatch):
+    """A clawback that fails (a lock or pool timeout) is not lost: the job runs again, and
+    the source is penalised once however many times it runs."""
+    import time
+    from app.jobs import worker
+    from app.services import ledger, trust
+    from app.utils import block
+
+    monkeypatch.setitem(config.PRIVATE, "RECHECK_SAMPLE_RATE", 1.0)
+    lane = Lane(check=True)
+    await lane.sources()
+    row = await lane.submit("m1", T0 + 60_000, source_url="https://newsone.com/r",
+                            headline="Deal R", actors=actors("Q41", "Q42"))
+    await lane.step(SEEN)
+    await lane.store.update_claim(row.id, "provisional", trust_band="low")
+    second = Fetcher()
+    second.pages[row.source_url] = Page("A different page.", T0)
+    monkeypatch.setattr(recheck, "_default", recheck.Recheck(
+        fetcher=second, checker=Fixed(False, fetcher=second)))
+    real, calls = ledger.in_window, []
+
+    async def timed_out(*a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("canceling statement due to lock timeout")
+        return await real(*a, **k)
+
+    monkeypatch.setattr(ledger, "in_window", timed_out)
+
+    async def head():
+        return lane.head
+
+    monkeypatch.setattr(block, "current_block", head)
+    (job,) = [j for j in lane.store.jobs.values() if j.kind == recheck.JOB]
+    pool, now = worker.JobPool(size=4, per_hotkey=2), time.time_ns() // 1_000_000
+    job.run_ms = now
+    for i in range(worker.JOB_MAX_ATTEMPTS + 1):
+        await pool.poll(lane.store, now + i * 2 * worker.JOB_RETRY_S * 1000)
+        await pool.drain()
+    got = lane.store.claims[row.id]
+    assert (got.status, got.reason, lane.store.jobs[job.id].status) == (
+        "clawed_back", "clawed:changed", "done")
+    assert len(calls) == 2
+    paid, clawed = await lane.store.claim_ledger(row.id)
+    assert (paid.kind, clawed.kind, clawed.points) == (
+        ledger.PROVISIONAL, ledger.CLAWBACK, -paid.points)
+    assert len([e for e in await lane.store.source_events()
+                if e.claim_id == row.id and e.role == trust.CHANGED]) == 1
+    # Run again after it succeeded: nothing more.
+    rows = await lane.store.claim_ledger(row.id)
+    assert await recheck.get_recheck().run(lane.store, row.id, now) is False
+    assert await lane.store.claim_ledger(row.id) == rows
+    assert len([e for e in await lane.store.source_events(claim_id=row.id)
+                if e.role == trust.CHANGED]) == 1

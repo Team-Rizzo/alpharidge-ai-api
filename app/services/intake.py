@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from pydantic import ValidationError
 
+from alpharidge_ai.ledger.attestation import LEDGER_SIGNER
 from alpharidge_ai.schema import (
     Claim, ClaimKind, canonical_body, category_of, has_required, text_problem,
 )
@@ -14,6 +15,7 @@ from app.services import budget, receipts
 from app.services.store import ClaimRow, DuplicateClaim, Store
 from app.utils import hotkey_whitelist
 from app.utils.auth import AuthRequest, body_sha256
+from app.utils.clock import now_ms as _now_ms
 from app.utils.receipt import bucket, to_ms
 
 MAX_BODY_BYTES = 16384
@@ -46,10 +48,39 @@ class InvalidTransition(Exception):
     pass
 
 
+# Transitions that decide a claim: it is paid or rejected. Quality reads claims in the order
+# of this stamp; a settle or clawback keeps it.
+DECIDES = ("provisional", "rejected")
+
+
+def decision_ms() -> int:
+    """The time a claim decided now is stamped with, when the store has no clock."""
+    return _now_ms()
+
+
+async def decided_at(tx: Store) -> int:
+    """The stamp for a claim decided in `tx`, which holds the ledger lock shared: the store's
+    clock (else decision_ms()), and never before the last epoch's seal. A seal's cut is above
+    every stamp committed before it, so a decision is in an epoch's quality cut exactly when
+    it committed before that epoch was sealed."""
+    at = await tx.lock_ledger()
+    cut = await tx.latest_seal_ms(LEDGER_SIGNER)
+    at = decision_ms() if at is None else at
+    return at if cut is None else max(at, cut)
+
+
 async def transition(store: Store, claim: ClaimRow, to: str, **fields) -> ClaimRow:
+    """Move a claim along an edge. A deciding move holds the ledger lock shared and is
+    stamped by decided_at(), so an epoch's quality cut is final once it is sealed."""
     if to not in EDGES.get(claim.status, ()):
         raise InvalidTransition(f"{claim.status} -> {to}")
-    if not await store.update_claim(claim.id, claim.status, status=to, **fields):
+    if to not in DECIDES:
+        moved = await store.update_claim(claim.id, claim.status, status=to, **fields)
+    else:
+        async with store.transaction() as tx:
+            fields["decided_ms"] = await decided_at(tx)
+            moved = await tx.update_claim(claim.id, claim.status, status=to, **fields)
+    if not moved:
         raise InvalidTransition(f"claim {claim.id} is no longer {claim.status}")
     return await store.get_claim(claim.id)
 

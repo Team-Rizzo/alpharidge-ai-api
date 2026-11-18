@@ -93,7 +93,8 @@ async def scoop_allowances(store: Store, hotkeys: Iterable[str],
 
 async def scoop_limited(store: Store, row: ClaimRow, now_ms: int) -> bool:
     """The claim's coldkey has missed too many of its recent scoops, or holds as many open as
-    it may."""
+    it may. The verifier asks first, to spare the judge; the resolver asks again just before
+    it holds the scoop, one claim at a time in the one writer, so the cap is never overshot."""
     owner = row.coldkey or row.hotkey
     since = now_ms - int(SCOOP_ALLOW_WINDOW_D * DAY_MS)
     held = (await store.open_scoops([owner])).get(owner, 0)
