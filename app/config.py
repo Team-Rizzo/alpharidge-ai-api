@@ -1,12 +1,14 @@
 """Environment-driven settings shared by the routers."""
 
 import hashlib
+import logging
 import os
+import time
 
 from alpharidge_ai.ledger.attestation import BLOCK_LENGTH
 from alpharidge_ai.mechanism import quality as qm
 from alpharidge_ai.schema import OPEN_TYPES, TYPE_SPEC, EventType, category_of
-from alpharidge_ai.schema.types import pay_settings
+from alpharidge_ai.schema.types import pay_settings, pay_switch
 from alpharidge_ai.verify.fetch import user_agent
 from app import ROOT
 
@@ -61,11 +63,26 @@ def validator_config(hotkey: str) -> dict:
                     if os.getenv(f"VALIDATOR_{k}", "").strip()})
     return out
 
-# Pay settings (EL_EVENT_PAY_X, EL_SCOOP_PREMIUM, EL_SCOOP_MISS_DEBT_X; today's pay by default),
-# read from the environment when used. Every validator must use the same values: they are served
-# on /config/subnet, and a validator whose own differ logs an alarm. A malformed value stops
-# start-up here rather than at the first claim.
+# Pay settings (EL_EVENT_PAY_X, EL_SCOOP_PREMIUM, EL_SCOOP_MISS_DEBT_X; the code's table by
+# default), read from the environment when used. Every validator must use the same values: they
+# are served on /config/subnet, and a validator whose own differ logs an alarm. A malformed value
+# stops start-up here rather than at the first claim.
 pay_settings()
+# The pay table switch: EL_PAY_TABLE (a table in the code, "new") applies to claims received from
+# EL_PAY_TABLE_FROM_MS on. Served on /config/subnet as {"pay_table", "from_ms"}; validators read
+# it hourly, so set the start at least PAY_SWITCH_LEAD_MS ahead.
+PAY_SWITCH_LEAD_MS = 2 * 3_600_000
+
+
+def served_pay_switch():
+    switch = pay_switch()
+    return None if switch is None else {"pay_table": switch[0], "from_ms": switch[1]}
+
+
+if pay_switch() is not None and pay_switch()[1] - time.time() * 1000 < PAY_SWITCH_LEAD_MS:
+    logging.getLogger(__name__).warning(
+        f"EL_PAY_TABLE_FROM_MS {pay_switch()[1]} is less than 2 h away: a validator that has "
+        f"not read the switch by then prices claims after it at the old table")
 
 VALIDATOR_VERSIONS_PATH = os.getenv(
     "VALIDATOR_VERSIONS_PATH", str(ROOT / ".validator_versions.json"))

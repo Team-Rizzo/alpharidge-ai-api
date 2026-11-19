@@ -176,8 +176,8 @@ class Resolver:
         if route == "scoop":
             return row
         a = await points.claim_age(store, row, claim.event_date)
-        return await points.pay(store, row, route, points.factors(claim.event_type, route, t, a),
-                                now_ms, head)
+        return await points.pay(store, row, route, points.factors(
+            claim.event_type, route, t, a, received_ms=row.received_ms), now_ms, head)
 
     async def _rival(self, store: Store, row: ClaimRow, claim: Claim, ev: EventRecord,
                      now_ms: int) -> ClaimRow:
@@ -230,8 +230,8 @@ class Resolver:
         await self._store_facts(store, ev, row, claim)
         row = await self._verified(store, row, now_ms)
         a = await points.claim_age(store, row, claim.event_date)
-        return await points.pay(store, row, "event",
-                                points.factors(claim.event_type, "event", t, a), now_ms, head)
+        return await points.pay(store, row, "event", points.factors(
+            claim.event_type, "event", t, a, received_ms=row.received_ms), now_ms, head)
 
     async def _scooped(self, store: Store, ev: EventRecord) -> bool:
         first = await store.get_claim(ev.first_claim_id) if ev.first_claim_id else None
@@ -259,7 +259,8 @@ class Resolver:
         a = await points.claim_age(store, scoop, claim.event_date)
         m = points.confirm_multiple(scoop, confirm)
         return await points.pay(store, scoop, "scoop",
-                                points.factors(claim.event_type, "scoop", t, a, m), now_ms, head)
+                                points.factors(claim.event_type, "scoop", t, a, m,
+                                               received_ms=scoop.received_ms), now_ms, head)
 
     async def scoop_failed(self, store: Store, scoop: ClaimRow, reason: str, by: SourceRow,
                            now_ms: int, head: Optional[int] = None, firm: bool = False) -> None:
@@ -333,7 +334,8 @@ class Resolver:
                 row = await store.get_claim(row.id)
                 a = await points.claim_age(store, row, claim.event_date)
                 await points.pay(store, row, "event",
-                                 points.factors(claim.event_type, "event", ct.t, a), now_ms, head)
+                                 points.factors(claim.event_type, "event", ct.t, a,
+                                                received_ms=row.received_ms), now_ms, head)
                 return "paid"
             if row.status == "rejected" and row.reason == "low_trust":
                 if ev.confidence != LINE or ev.first_claim_id is not None:
@@ -422,7 +424,8 @@ class Resolver:
                     await store.update_event(ev.id, confidence=REPORTED, first_claim_id=row.id)
                 a = await points.claim_age(store, row, claim.event_date)
                 f = points.factors(claim.event_type, "scoop", float(confirm["trust"]), a,
-                                   points.confirm_multiple(row, confirm))
+                                   points.confirm_multiple(row, confirm),
+                                   received_ms=row.received_ms)
                 logger.warning(f"Paying confirmed scoop {row.id} whose pay did not commit")
                 return await points.pay(store, row, "scoop", f, now_ms, head)
             ev = await store.get_event(row.event_id) if row.event_id is not None else None
@@ -431,8 +434,8 @@ class Resolver:
             t, _ = await self._trust(store, row)
             a = await points.claim_age(store, row, claim.event_date)
             logger.warning(f"Paying claim {row.id} whose pay did not commit")
-            return await points.pay(store, row, "event",
-                                    points.factors(claim.event_type, "event", t, a), now_ms, head)
+            return await points.pay(store, row, "event", points.factors(
+                claim.event_type, "event", t, a, received_ms=row.received_ms), now_ms, head)
 
     @staticmethod
     async def _confirmed(store: Store, scoop: ClaimRow) -> Optional[dict]:

@@ -1,6 +1,6 @@
 """Points for verified claims: the factors, the 40/60 split and settle at +72 h.
 
-    points = tier price × EVENT_PAY_X × T × A
+    points = tier price × EVENT_PAY_X × T × A, at the pay table in force at the claim's receipt
     a confirmed scoop's points = tier price × M × T × A, M = SCOOP_PREMIUM when the confirming
     page was published after the scoop's receipt and no trusted page about it was seen before,
     else EVENT_PAY_X
@@ -48,10 +48,15 @@ def price(event_type) -> float:
     return TIER_PRICE.get(TYPE_SPEC[EventType(event_type)].tier, 0)
 
 
-def base_points(route: str, event_type, multiple: Optional[float] = None) -> float:
+def base_points(route: str, event_type, multiple: Optional[float] = None,
+                received_ms: Optional[int] = None) -> float:
+    """Priced by the pay table in force at the claim's receipt, as validators price it."""
     if route == "scoop":
-        return price(event_type) * (rules.SCOOP_PREMIUM if multiple is None else multiple)
-    return price(event_type) * rules.EVENT_PAY_X if route == "event" else 0.0
+        return price(event_type) * (rules.pay_settings(received_ms)["SCOOP_PREMIUM"]
+                                    if multiple is None else multiple)
+    if route == "event":
+        return price(event_type) * rules.pay_settings(received_ms)["EVENT_PAY_X"]
+    return 0.0
 
 
 def confirm_multiple(scoop: ClaimRow, confirm: dict) -> float:
@@ -78,9 +83,10 @@ async def claim_age(store: Store, row: ClaimRow, event_date) -> float:
     return age(event_date, row.received_ms, ledger.published_ms(fetches))
 
 
-def factors(event_type, route: str, t: float, a: float,
-            multiple: Optional[float] = None) -> Factors:
-    return Factors(base=base_points(route, event_type, multiple), T=t, A=round(a, 6))
+def factors(event_type, route: str, t: float, a: float, multiple: Optional[float] = None,
+            received_ms: Optional[int] = None) -> Factors:
+    return Factors(base=base_points(route, event_type, multiple, received_ms), T=t,
+                   A=round(a, 6))
 
 
 def provisional(f: Factors) -> float:

@@ -213,6 +213,18 @@ Quality turns on when the subnet release sets `quality.QUALITY_FROM` (validators
 - **Never roll the API back past this release once `QUALITY_FROM` is set.** The old code stamps nothing, so claims it decides drop out of quality, and it signs without a seal, so an epoch's cut is no longer fixed. Validators would score differently from the API.
 - **Validators on 4.1.2 fail every carry epoch once quality is on.** They value carry from raw points, the API from quality locks, so their `_carry_ok` check fails for every epoch with carry. Every validator must run the release with the same `QUALITY_FROM` before that time. The API host's subnet checkout must carry that same release: an API whose `QUALITY_FROM` differs from the validators' writes carry they reject.
 
+## Switching to the new pay table
+
+The code holds two pay tables (`schema.types.PAY_TABLES`): `today` (event 1, premium 5, miss debt 2) and `new` (event 0.25, premium 10, miss debt 1). `today` applies until a switch is set. The API serves the switch on `/config/subnet` as `"pay_switch": {"pay_table": "new", "from_ms": T}`; validators read it hourly and apply it. No pay values are served for validators to apply: the switch only names a table in the code.
+
+1. Confirm every validator runs this release (`/validators/versions`).
+2. Remove `EL_EVENT_PAY_X`, `EL_SCOOP_PREMIUM` and `EL_SCOOP_MISS_DEBT_X` from the API's `.env` and from each validator's `.vali_env`: a local value wins over either table.
+3. In the API's `.env` set `EL_PAY_TABLE=new` and `EL_PAY_TABLE_FROM_MS=<T>`, with T at least 2 h ahead (the API warns at start-up otherwise), and restart the API.
+4. Each claim is priced by the table in force at its receipt (`received_ms`), on the API and on every validator, so an epoch that holds claims from both sides of T is checked alike.
+5. Check: each validator logs `[CONFIG] pay table switch: ('new', T)`, and no `ALARM pay settings` line.
+
+To undo before T, unset `EL_PAY_TABLE` and restart the API; validators clear the switch on their next read. After T, claims received since T are already priced at `new`: don't undo it.
+
 ## Rollback
 
 Do not roll back once `QUALITY_FROM` is set (above). The writer goes first and is stopped, not restarted: its unsigned seals must be gone before the old writer starts.
