@@ -73,8 +73,8 @@ async def get_points(epoch: int, _: str = Depends(get_validator_hotkey),
 
 def served_starts() -> set:
     """The starts /ledger/quality answers from."""
-    out = {config.EVENT_LANE["QUALITY_FROM_MS"]}
-    if qm.QUALITY_FROM is not None:
+    out = {config.EVENT_LANE["BUDGET_FROM_MS"]}
+    if qm.start_ms() is not None:
         out.add(qm.from_ms())
     return out
 
@@ -87,9 +87,9 @@ async def get_quality(from_ms: Optional[int] = None, epoch: Optional[int] = None
     sealed. A claim is decided under the shared ledger lock and an epoch is sealed under the
     exclusive one, one millisecond past both the clock and the last seal; a decision after
     a seal is stamped no earlier than it. So the answer is the same whenever it is asked.
-    from_ms is the subnet's QUALITY_FROM (what validators ask) or the API's QUALITY_FROM_MS
+    from_ms is the quality start (what validators ask) or the API's BUDGET_FROM_MS
     (the default); other starts are refused, since each costs a full read and a cache entry."""
-    since = config.EVENT_LANE["QUALITY_FROM_MS"] if from_ms is None else from_ms
+    since = config.EVENT_LANE["BUDGET_FROM_MS"] if from_ms is None else from_ms
     if since not in served_starts():
         raise HTTPException(status_code=400, detail="from_ms_not_served")
     until = None

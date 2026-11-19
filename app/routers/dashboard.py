@@ -118,7 +118,7 @@ async def dashboard_mechanism(store: Store = Depends(get_store)):
 async def dashboard_quality(coldkey: Optional[str] = None, store: Store = Depends(get_store)):
     """Each scored coldkey's quality q, the pay multiplier its next paid claim gets, its check
     budget multiplier and the claims that counted, with the rule's constants. A coldkey with no
-    counted claim is at the start. from_ms is where the scoring started: QUALITY_FROM_MS, else
+    counted claim is at the start. from_ms is where the scoring started: BUDGET_FROM_MS, else
     the lookback."""
     rows = await quality.standing(store)
     if coldkey is not None:

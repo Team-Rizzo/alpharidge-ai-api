@@ -14,7 +14,7 @@ CACHE_S = 60
 # An epoch's outcomes are kept this long. They do not change once the epoch is signed (claims
 # are read by when they were decided), so this only spares the database.
 EPOCH_CACHE_S = 3 * 3600
-# With no start set (QUALITY_FROM_MS 0), the budget and the dashboard score the claims decided
+# With no start set (BUDGET_FROM_MS 0), the budget and the dashboard score the claims decided
 # in this span instead of every claim ever. q halves a claim's weight every 20 claims after it:
 # a coldkey that decides 100 claims in the span is scored to within 2^-5 of its full history,
 # and a quieter one starts the span at START, as a new coldkey does.
@@ -29,10 +29,10 @@ _loading: Dict[Key, asyncio.Future] = {}
 
 
 def start() -> int:
-    """Where the budget and the dashboard start: QUALITY_FROM_MS, else the lookback, to the
+    """Where the budget and the dashboard start: BUDGET_FROM_MS, else the lookback, to the
     hour so that reads share the cache."""
-    if EVENT_LANE["QUALITY_FROM_MS"]:
-        return EVENT_LANE["QUALITY_FROM_MS"]
+    if EVENT_LANE["BUDGET_FROM_MS"]:
+        return EVENT_LANE["BUDGET_FROM_MS"]
     cut = _now_ms() - LOOKBACK_MS
     return cut - cut % HOUR_MS
 

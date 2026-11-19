@@ -89,6 +89,7 @@ async def get_subnet_config(
         "config": config.validator_config(validator_hotkey),
         "pay": config.pay_settings(),
         "pay_switch": config.served_pay_switch(),
+        "quality_switch": config.served_quality_switch(),
         "min_validator_version": config.MIN_VALIDATOR_VERSION,
         "timestamp": datetime.utcnow().isoformat(),
     }

@@ -184,13 +184,13 @@ async def test_without_a_start_the_budget_and_dashboard_read_recent_claims(monke
     store = MemoryStore()
     now = T0 + 100 * DAY_MS
     monkeypatch.setattr(quality, "_now_ms", lambda: now)
-    monkeypatch.setitem(quality.EVENT_LANE, "QUALITY_FROM_MS", 0)
+    monkeypatch.setitem(quality.EVENT_LANE, "BUDGET_FROM_MS", 0)
     await _judged(store, "hk", "ck", [("rejected", "unsupported")] * 50, at=now - 40 * DAY_MS)
     await _judged(store, "hk", "ck", [("provisional", None)] * 3, at=now - DAY_MS)
     assert (await quality.standing(store))["ck"]["junk"] == 0
     assert (await quality.multipliers(store))["ck"] == 1.0
     # A set start is read from, and a read from a given start is not cut.
-    monkeypatch.setitem(quality.EVENT_LANE, "QUALITY_FROM_MS", now - 50 * DAY_MS)
+    monkeypatch.setitem(quality.EVENT_LANE, "BUDGET_FROM_MS", now - 50 * DAY_MS)
     quality.reset()
     assert (await quality.standing(store))["ck"]["junk"] == 50
     assert len(await quality.outcomes(store, 0)) == 53
@@ -233,8 +233,8 @@ def test_the_dashboard_reports_the_start_it_scored_from(monkeypatch):
     client = TestClient(app)
     now = T0 + 100 * DAY_MS + 123
     monkeypatch.setattr(quality, "_now_ms", lambda: now)
-    monkeypatch.setitem(quality.EVENT_LANE, "QUALITY_FROM_MS", 0)
+    monkeypatch.setitem(quality.EVENT_LANE, "BUDGET_FROM_MS", 0)
     cut = now - quality.LOOKBACK_MS
     assert client.get("/dashboard/quality").json()["from_ms"] == cut - cut % HOUR_MS
-    monkeypatch.setitem(quality.EVENT_LANE, "QUALITY_FROM_MS", T0)
+    monkeypatch.setitem(quality.EVENT_LANE, "BUDGET_FROM_MS", T0)
     assert client.get("/dashboard/quality").json()["from_ms"] == T0

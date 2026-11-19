@@ -198,10 +198,10 @@ SIGN_CATCHUP_MAX = 48
 
 async def carry_locks(store: Store, epoch: int) -> Optional[Dict[str, float]]:
     """The locks the carry into the epoch is valued with: those of the epoch before it when
-    that one was signed from quality.QUALITY_FROM, else None (raw points). The epoch's own
+    that one was signed from the quality start, else None (raw points). The epoch's own
     locks are known only once it is signed, after its carry; validators read the same ones
     from /ledger/quality for the epoch before."""
-    if qm.QUALITY_FROM is None or epoch < 1:
+    if qm.start_ms() is None or epoch < 1:
         return None
     until = await store.attestation_issued_ms(LEDGER_SIGNER, epoch - 1)
     if not qm.active(until):

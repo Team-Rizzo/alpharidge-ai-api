@@ -84,6 +84,20 @@ if pay_switch() is not None and pay_switch()[1] - time.time() * 1000 < PAY_SWITC
         f"EL_PAY_TABLE_FROM_MS {pay_switch()[1]} is less than 2 h away: a validator that has "
         f"not read the switch by then prices claims after it at the old table")
 
+# The quality start: EL_QUALITY_FROM_MS (ms; unset or 0 is off) turns the subnet's quality rule
+# on for epochs signed from it. Served on /config/subnet as {"from_ms"}; validators read it
+# hourly and apply it, so set it at least PAY_SWITCH_LEAD_MS ahead. The rule itself is the
+# subnet code's; only its start is served.
+def served_quality_switch():
+    start = qm.start_ms()
+    return None if start is None else {"from_ms": start}
+
+
+if qm.start_ms() is not None and qm.start_ms() - time.time() * 1000 < PAY_SWITCH_LEAD_MS:
+    logging.getLogger(__name__).warning(
+        f"EL_QUALITY_FROM_MS {qm.start_ms()} is less than 2 h away: a validator that has not "
+        f"read it by then scores epochs after it without quality")
+
 VALIDATOR_VERSIONS_PATH = os.getenv(
     "VALIDATOR_VERSIONS_PATH", str(ROOT / ".validator_versions.json"))
 
@@ -173,13 +187,14 @@ EVENT_LANE = {
     "ALARM_SOURCE_HOUR": _el("ALARM_SOURCE_HOUR", 20, int),
     "ALARM_SOURCE_DAY": _el("ALARM_SOURCE_DAY", 50, int),
     "ALARM_SOURCE_HOSTS": os.getenv("EL_ALARM_SOURCE_HOSTS", ""),
-    # Coldkey quality (alpharidge_ai.mechanism.quality), scored from claims decided (paid or
-    # rejected) since QUALITY_FROM_MS (quality.QUALITY_FROM by default), in the order they
-    # were decided, for the budget and the dashboard; at 0, from the last 30 days
-    # (app.services.quality.start). Validators ask from their own start.
+    # Coldkey quality (alpharidge_ai.mechanism.quality) for the budget and the dashboard,
+    # scored from claims decided (paid or rejected) since BUDGET_FROM_MS, in the order they
+    # were decided; at 0 (the default), from the last 30 days (app.services.quality.start).
+    # Separate from the quality start (EL_QUALITY_FROM_MS), so turning the pay rule on does not
+    # restart anyone's budget score. Validators ask from the quality start.
     # QUALITY_BUDGET scales each hotkey's check budget by its coldkey's multiplier, down to
     # QUALITY_BUDGET_MIN.
-    "QUALITY_FROM_MS": _el("QUALITY_FROM_MS", qm.from_ms(), int),
+    "BUDGET_FROM_MS": _el("BUDGET_FROM_MS", 0, int),
     "QUALITY_BUDGET": _flag(os.getenv("EL_QUALITY_BUDGET", "")),
     "QUALITY_BUDGET_MIN": _el("QUALITY_BUDGET_MIN", 20, int),
     # Answer key: official feeds, private, used for accuracy only.
