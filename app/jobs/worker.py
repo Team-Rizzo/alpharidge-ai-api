@@ -153,7 +153,8 @@ async def advance_queued(store: Store, now_ms: int, limit: int = 200) -> int:
                 ct = await trust.of_claim(store, v.registry, v.entities, claim, source,
                                           row.category, row.source_url)
                 await novelty.apply(store, row, v.entities, v.places, now_ms, trust=ct.t,
-                                    filer=ct.filer)
+                                    filer=ct.filer,
+                                    listing=v.registry.is_listing(row.source_url))
                 done += 1
             except intake.InvalidTransition:
                 pass
@@ -191,6 +192,7 @@ async def tick(store: Store, now_ms: int) -> None:
         await timed("params", ledger.refresh_params())
         await timed("settle", points.settle_due(store, now_ms))
         await timed("close", judge.close_moved(store))
+        await timed("lines", line.drop_dead(store, now_ms))
     slow = EVENT_LANE["TICK_LOG_S"]
     if slow > 0 and sum(spent.values()) >= slow:
         logger.info("[TICK] " + " ".join(f"{k}={v:.2f}s" for k, v in spent.items()))

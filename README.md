@@ -257,6 +257,17 @@ EDGAR records are identity only and count toward accuracy; they never prove a cl
 
 `GET /dashboard/mechanism` gives the capacity `C` in force, the open categories, the window, the epoch length and the last signed total. `GET /dashboard/sources` is the trusted list: each source whose pages can win, with its trust per category, its kind (`official`, `outlet`, `wire`), `official_for` on a company's or club's own site, and the page rules (excluded and listing pages) that apply on any source.
 
+Each event carries its stored `confidence` and a `status` that says what backs it (`verification` and `verification_status` on claims and dashboard items):
+
+| `confidence` | `status` | Meaning |
+|---|---|---|
+| `confirmed` | `corroborated` | Two or more different trusted publishers, or an official source |
+| `reported` | `single_source` | One trusted page |
+| `unverified` | `awaiting_source` | A scoop waiting for a trusted page to confirm it |
+| `line` | `pending` | A claim not checked yet; never listed. A line whose claims were all rejected is deleted a day after it opened |
+
+A second report of a page (not a listing page) joins the event of that type and date already on it, however it spells its actors.
+
 Events about people who aren't linked public figures, and legal or regulatory claims about any person, stay `unverified` until trusted, independent sources confirm them. Until then they are not on `/events` or `/feed` by default; the public dashboard lists them with `verification: "unverified"`, and API-key callers can request them with `include_unverified=true` while `EL_API_UNVERIFIED` is on (the default). An event whose claim is later contradicted, retracted or corrected carries `marked`. A paid claim proved wrong (an official figure contradicts it, the operator retracts or corrects it, or an official page settles it otherwise) is clawed back, in every trust band. A paid claim whose source page later changes or disappears can be clawed back. A trusted outlet that disagrees only raises an operator alarm.
 
 Each `/dashboard/items` row carries `validators`: one entry per validator hotkey that judged the claim's page, re-checked it or found a page for it, `{"hotkey", "verdict": "pass"|"reject"|"unclear"|null, "reason", "recheck": "agree"|"disagree"|"unreachable"|null, "confirm": {"status", "reason"}|null}`. `verdict` is that validator's own reading of its latest posted answers and `reason` the code miners get (`fixed_check`, `judge_reject`, `judge_unclear`); no scores or answers. `recheck` is its `/ledger/reverify` verdict (an agree on a page that has since changed counts as agree). `confirm` is its best found page for a scoop (confirmed, then queued, then rejected) with the coarse reason, never the page. Like `source_domain`, the list is shown only to the claim's own hotkey and operators until the claim settles, and is `null` to everyone else before then.

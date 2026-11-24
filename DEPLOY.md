@@ -244,3 +244,14 @@ Do not roll back once `QUALITY_FROM` is set (above). The writer goes first and i
    WHERE decided_at IS NOT NULL AND status NOT IN ('rejected', 'provisional', 'settled', 'clawed_back');
    ```
    Then roll forward again from step 1: pre-checks, backfill, restart the writer and the readers, backfill again.
+
+## One page, one event (APP-711)
+
+- **Migration:** `20261124000000_claim_source_url_index` builds a hash index on `claim.source_url` CONCURRENTLY (reads and writes go on). If it fails, `DROP INDEX CONCURRENTLY IF EXISTS "idx_claim_source_url"`, mark it rolled back and deploy again. Check `SELECT indisvalid FROM pg_index WHERE indexrelid = 'idx_claim_source_url'::regclass;` is `t`.
+- **Restart the writer.** From then on, a second report of a page joins the event already on it, and the worker deletes lines left with only rejected claims once they are a day old.
+- **Cleanup**, after the restart:
+  - `python scripts/merge_page_events.py` prints what would change;
+  - `--apply` merges split events into the earliest and deletes dead lines.
+  
+  Moved claims show again in their miners' change feeds.
+- **Rollback:** the old code runs on this schema, so revert the code and leave the index.

@@ -436,3 +436,53 @@ async def test_source_events_by_claim(store):
     got = await store.source_events(src.id, claim_id=a.id)
     assert [(e.claim_id, e.role) for e in got] == [(a.id, "changed")] * 2
     assert len(await store.source_events(src.id)) == 3
+
+
+async def _event(store, confidence: str, event_type: str = "merger_acquisition"):
+    from datetime import date
+    return await store.add_event(EventRecord(event_type, "finance", date(2026, 10, 13),
+                                             "fp-" + uuid.uuid4().hex, confidence=confidence))
+
+
+async def _on(store, ev, status: str, url: str, reason=None):
+    hk = "contract-" + uuid.uuid4().hex[:12]
+    row = await store.create_claim(replace(claim(hk), source_url=url))
+    assert await store.update_claim(row.id, "received", status=status, reason=reason,
+                                    event_id=ev.id)
+    return row
+
+
+async def test_claims_on_a_page_find_its_events_of_one_type_and_date(store):
+    from datetime import date
+    url = f"https://a.example/{uuid.uuid4().hex}"
+    reported, line, gone = [await _event(store, c) for c in ("reported", "line", "reported")]
+    other_type = await _event(store, "reported", "funding")
+    await _on(store, reported, "provisional", url)
+    await _on(store, line, "novelty", url)
+    await _on(store, gone, "rejected", url, "judge_reject")
+    await _on(store, other_type, "provisional", url)
+    await _on(store, gone, "provisional", url + "/other")
+    got = await store.events_by_source(url, "merger_acquisition", date(2026, 10, 13))
+    assert [e.id for e in got] == [reported.id, line.id]
+    assert await store.events_by_source(url, "merger_acquisition", date(2026, 10, 14)) == []
+
+
+async def test_a_line_left_with_rejected_claims_only_is_deleted(store):
+    from app.services.store.rows import LedgerRow
+    url = f"https://a.example/{uuid.uuid4().hex}"
+    dead, live, paid, event = [await _event(store, c)
+                               for c in ("line", "line", "line", "reported")]
+    lost = await _on(store, dead, "rejected", url, "doc_prize_used")
+    await _on(store, live, "rejected", url, "judge_reject")
+    await _on(store, live, "fetched", url)
+    await _on(store, event, "rejected", url, "known_event")
+    await store.append_ledger(LedgerRow(hotkey="contract-x", claim_id=None, event_id=paid.id,
+                                        kind="debt", points=-1.0, epoch=3))
+    mine = {dead.id, live.id, paid.id, event.id}
+    late = T0 * 2
+    assert [i for i in await store.dead_lines(late, 10_000_000) if i in mine] == [dead.id]
+    assert [i for i in await store.dead_lines(0) if i in mine] == []
+    assert await store.drop_lines([dead.id, live.id, paid.id, event.id]) == 1
+    assert await store.get_event(dead.id) is None
+    assert (await store.get_claim(lost.id)).event_id is None
+    assert await store.get_event(live.id) is not None

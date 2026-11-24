@@ -715,6 +715,29 @@ class PrismaStore:
             raise DuplicateEvent(rec.fingerprint)
         return _event_from(rows[0])
 
+    async def events_by_source(self, source_url, event_type, event_date):
+        rows = await self.db.query_raw(
+            f"SELECT {_EVENT_COLS} FROM events WHERE event_type = $2 AND event_date = $3::date "
+            'AND id IN (SELECT event_id FROM "claim" WHERE source_url = $1 '
+            "AND event_id IS NOT NULL AND status <> 'rejected') ORDER BY id",
+            source_url, event_type, event_date.isoformat())
+        return [_event_from(r) for r in rows]
+
+    async def dead_lines(self, before_ms, limit=500):
+        rows = await self.db.query_raw(
+            f"SELECT e.id FROM events e WHERE {_DEAD_LINE} "
+            "AND e.first_seen_at < to_timestamp($1::double precision / 1000) "
+            "ORDER BY e.id LIMIT $2", before_ms, limit)
+        return [int(r["id"]) for r in rows]
+
+    async def drop_lines(self, event_ids):
+        if not event_ids:
+            return 0
+        rows = await self.db.query_raw(
+            f"DELETE FROM events e WHERE e.id = ANY($1::int[]) AND {_DEAD_LINE} RETURNING e.id",
+            [int(i) for i in event_ids])
+        return len(rows)
+
     async def prize_docs(self, since_ms, probe=None):
         sql = ('SELECT doc_hash FROM "claim" WHERE doc_hash IS NOT NULL '
                "AND route = ANY(string_to_array($1, ',')) "
@@ -1294,6 +1317,11 @@ def _day(d: date) -> datetime:
     return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
 
 
+# A line with no claim left but rejected ones and nothing in the ledger.
+_DEAD_LINE = (
+    "e.confidence = 'line' AND NOT EXISTS (SELECT 1 FROM \"claim\" c "
+    "WHERE c.event_id = e.id AND c.status <> 'rejected') "
+    "AND NOT EXISTS (SELECT 1 FROM ledger_entry l WHERE l.event_id = e.id)")
 _EVENT_COLS = (
     "id, event_type, category, event_date::text AS event_date, fingerprint, canonical_title, "
     "entities, place_iso2, place_admin1, identity_key, stage, first_claim_id, confidence, "

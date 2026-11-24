@@ -94,6 +94,7 @@ class MemoryStore:
     ledger: List[LedgerRow] = field(default_factory=list)
     blacklist: set = field(default_factory=set)
     events: Dict[int, EventRecord] = field(default_factory=dict)
+    event_added_ms: Dict[int, int] = field(default_factory=dict)
     fetches: List[SourceFetchRow] = field(default_factory=list)
     judge_item_rows: Dict[int, JudgeItemRow] = field(default_factory=dict)
     judge_post_rows: List[JudgePostRow] = field(default_factory=list)
@@ -563,7 +564,34 @@ class MemoryStore:
             raise DuplicateEvent(rec.fingerprint)
         rec = replace(rec, id=next(self._ids))
         self.events[rec.id] = rec
+        self.event_added_ms[rec.id] = time.time_ns() // 1_000_000
         return replace(rec)
+
+    async def events_by_source(self, source_url, event_type, event_date):
+        ids = {c.event_id for c in self.claims.values()
+               if c.source_url == source_url and c.event_id is not None and c.status != "rejected"}
+        return [replace(e) for i, e in sorted(self.events.items()) if i in ids
+                and e.event_type == event_type and e.event_date == event_date]
+
+    def _dead(self, event_id, before_ms):
+        e = self.events.get(event_id)
+        return (e is not None and e.confidence == "line"
+                and self.event_added_ms.get(event_id, 0) < before_ms
+                and not any(c.event_id == event_id and c.status != "rejected"
+                            for c in self.claims.values())
+                and not any(r.event_id == event_id for r in self.ledger))
+
+    async def dead_lines(self, before_ms, limit=500):
+        return [i for i in sorted(self.events) if self._dead(i, before_ms)][:limit]
+
+    async def drop_lines(self, event_ids):
+        gone = [i for i in event_ids if self._dead(i, float("inf"))]
+        for i in gone:
+            del self.events[i]
+            for cid, c in list(self.claims.items()):
+                if c.event_id == i:
+                    self.claims[cid] = replace(c, event_id=None)
+        return len(gone)
 
     async def prize_docs(self, since_ms, probe=None):
         return [c.doc_hash for c in self.claims.values()

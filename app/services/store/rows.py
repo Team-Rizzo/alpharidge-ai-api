@@ -509,6 +509,14 @@ class Store(Protocol):
     async def event_candidates(self, date_lo: date, date_hi: date, actor_keys: Sequence[str],
                                event_type: str, event_date: date) -> List[EventRecord]: ...
     async def add_event(self, rec: EventRecord) -> EventRecord: ...
+    async def events_by_source(self, source_url: str, event_type: str,
+                               event_date: date) -> List[EventRecord]:
+        """Events of this type and date that a claim on this URL, not rejected, is on."""
+    async def dead_lines(self, before_ms: int, limit: int = 500) -> List[int]:
+        """Lines opened before `before_ms` with no claim left but rejected ones and no ledger
+        row, oldest first."""
+    async def drop_lines(self, event_ids: Sequence[int]) -> int:
+        """Delete the given lines that are still dead; returns how many."""
     async def prize_docs(self, since_ms: int,
                          probe: Optional[Tuple[str, str, int, List[str]]] = None) -> List[str]: ...
     async def add_source_fetch(self, row: SourceFetchRow) -> SourceFetchRow: ...

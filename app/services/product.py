@@ -33,6 +33,15 @@ logger = logging.getLogger(__name__)
 
 CONFIRMED, REPORTED, UNVERIFIED, LINE = "confirmed", "reported", "unverified", "line"
 PUBLIC = (CONFIRMED, REPORTED)
+# What each stored confidence is called in responses, beside the stored value: two trusted
+# publishers or an official source, one trusted page, a scoop waiting for a trusted page, and a
+# claim not checked yet (never shown).
+STATUS = {CONFIRMED: "corroborated", REPORTED: "single_source", UNVERIFIED: "awaiting_source",
+          LINE: "pending"}
+
+
+def status_of(confidence: Optional[str]) -> Optional[str]:
+    return STATUS.get(confidence, confidence) if confidence is not None else None
 EVENT, STAGE, FACT, CONFIDENCE, MARKED = "event", "stage", "fact", "confidence", "marked"
 # Next to each source_url: when it may be shown. Never served.
 OPEN_AT = "_source_open_ms"
@@ -234,7 +243,8 @@ def _summary(ev: EventRecord, lead: Optional[ClaimRow], actors: List[Actor],
     return {"id": str(ev.id), "headline": _headline(ev, actors, entities),
             "category": ev.category, "type": ev.event_type, "stage": ev.stage,
             "event_date": ev.event_date.isoformat(), "first_seen_at": iso(ev.first_seen_ms),
-            "confidence": ev.confidence, "marked": ev.marked,
+            "confidence": ev.confidence, "status": status_of(ev.confidence),
+            "marked": ev.marked,
             "source_url": lead.source_url if lead else None, OPEN_AT: open_ms(lead)}
 
 
@@ -305,9 +315,10 @@ async def labelled_summary(store: Store, ev: Optional[EventRecord], now_ms: int,
                            entities: EntityIndex) -> dict:
     """Headline and verification label of a published event, unverified included."""
     if not visible(ev, now_ms, include_unverified=True):
-        return {"headline": None, "verification": None}
+        return {"headline": None, "verification": None, "verification_status": None}
     s = await summary(store, ev, entities)
-    return {"headline": s["headline"], "verification": s["confidence"]}
+    return {"headline": s["headline"], "verification": s["confidence"],
+            "verification_status": s["status"]}
 
 
 def record_json(r: FeedRow) -> dict:
@@ -350,7 +361,9 @@ async def _append(store: Store, ev: EventRecord, v: View, now_ms: int,
         out = [row(STAGE, s) for s in stages if s["stage"] not in seen_stages]
         out += [row(FACT, f) for f in facts if f["id"] not in seen_facts]
         if ev.confidence != last:
-            out.append(row(CONFIDENCE, {"confidence": ev.confidence, "previous": last}))
+            out.append(row(CONFIDENCE, {"confidence": ev.confidence, "previous": last,
+                                        "status": status_of(ev.confidence),
+                                        "previous_status": status_of(last)}))
         if ev.marked != marked:
             out.append(row(MARKED, {"marked": ev.marked}))
     return [await store.add_feed(r) for r in out]

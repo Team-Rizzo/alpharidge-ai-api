@@ -220,16 +220,22 @@ async def test_reworded_copy_of_the_winning_page_pays_once():
     ev = await lane.submit("m1", T0, source_url="https://newsone.com/e1")
     await lane.step(T0 + 1000)
     assert lane.store.events[lane.event_of(ev)].stage == "announced"
-    copy = await lane.submit("m3", T0 + 10_000, headline="Acme Inc. to buy Beta Labs",
-                             actors=[{"id_scheme": "other", "id": "acme", "role": "acquirer",
-                                      "name": "Acme Inc."},
-                                     {"id_scheme": "other", "id": "beta-labs", "role": "target",
-                                      "name": "Beta Labs"}],
-                             source_url="https://newsone.com/e1")
+    reworded = dict(headline="Acme Inc. to buy Beta Labs",
+                    actors=[{"id_scheme": "other", "id": "acme", "role": "acquirer",
+                             "name": "Acme Inc."},
+                            {"id_scheme": "other", "id": "beta-labs", "role": "target",
+                             "name": "Beta Labs"}])
+    # The same page joins the event its first claim opened; a copy of it elsewhere has no
+    # event prize left.
+    same = await lane.submit("m3", T0 + 10_000, source_url="https://newsone.com/e1", **reworded)
+    lane.page("https://wiretwo.org/e1", lane.fetcher.pages["https://newsone.com/e1"].text)
+    copy = await lane.submit("m4", T0 + 10_000, source_url="https://wiretwo.org/e1", **reworded)
     await lane.step(T0 + 20_000)
     await lane.settle(T0 + 80 * HOUR_MS)
+    assert lane.store.claims[same.id].reason == "known_event"
+    assert lane.event_of(same) == lane.event_of(ev)
     assert lane.store.claims[copy.id].reason == "doc_prize_used"
-    assert "m3" not in lane.paid()
+    assert "m3" not in lane.paid() and "m4" not in lane.paid()
 
 
 async def test_unestablished_registry_id_counts_as_known():

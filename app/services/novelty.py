@@ -560,7 +560,9 @@ def _type(value: str) -> Optional[EventType]:
 
 async def decide(store: Store, claim: Claim, entities: EntityIndex, places: PlaceIndex,
                  now_ms: int, trust: Optional[float] = None,
-                 filer: Optional[str] = None) -> Novelty:
+                 filer: Optional[str] = None, listing: bool = False) -> Novelty:
+    """`listing` is true for a page that lists several events (a calendar, a results table):
+    it is matched by identity only."""
     ident = identity(claim, entities, places, filer)
     rules = on(NAME_FORMS, now_ms)
 
@@ -581,6 +583,14 @@ async def decide(store: Store, claim: Claim, entities: EntityIndex, places: Plac
 
     if rules and claim.event_type.value in TWO_SIDED and len(ident.sides) < 2:
         return Novelty(KNOWN, None, None, "invalid_schema")
+    # The page first: an event of this type and date another claim on the same page is on is
+    # this one, however the claim spells its actors. A page wins one event prize anyway.
+    if not listing:
+        on_page = await store.events_by_source(claim.source_url, claim.event_type.value,
+                                               claim.event_date)
+        if on_page:
+            ev = max(on_page, key=lambda c: (c.confidence != "line", -c.id))
+            return await rival(ev, known(ev, on_page))
     hit = await store.event_by_identity([ident.hard_key] if ident.hard_key else [],
                                         ident.fingerprint)
     if hit is not None:
@@ -668,24 +678,24 @@ async def open_line(store: Store, claim: Claim, entities: EntityIndex,
 
 async def place(store: Store, claim: Claim, entities: EntityIndex, places: PlaceIndex,
                 now_ms: int, trust: Optional[float] = None,
-                filer: Optional[str] = None) -> Novelty:
+                filer: Optional[str] = None, listing: bool = False) -> Novelty:
     """The claim's novelty, opening a line when it is the first for a new event."""
-    n = await decide(store, claim, entities, places, now_ms, trust, filer)
+    n = await decide(store, claim, entities, places, now_ms, trust, filer, listing)
     if n.state == NEW and n.event_id is None:
         try:
             n.event_id = (await open_line(store, claim, entities, places, filer)).id
         except DuplicateEvent:
             # Another worker opened the same line first.
-            n = await decide(store, claim, entities, places, now_ms, trust, filer)
+            n = await decide(store, claim, entities, places, now_ms, trust, filer, listing)
     return n
 
 
 async def apply(store: Store, row: ClaimRow, entities: EntityIndex, places: PlaceIndex,
                 now_ms: int, trust: Optional[float] = None,
-                filer: Optional[str] = None) -> ClaimRow:
+                filer: Optional[str] = None, listing: bool = False) -> ClaimRow:
     """queued -> novelty for one claim."""
     n = await place(store, Claim.model_validate(row.payload), entities, places, now_ms, trust,
-                    filer)
+                    filer, listing)
     if n.state == KNOWN and n.route is None:
         out = await intake.transition(store, row, "rejected", reason=n.reason or "known_event",
                                       novelty=n.state, event_id=n.event_id)

@@ -176,6 +176,7 @@ async def _status_reply(store: Store, claim: ClaimRow) -> dict:
         "route": claim.route,
         "event_id": str(claim.event_id) if shown and claim.event_id is not None else None,
         "verification": verification,
+        "verification_status": product.status_of(verification),
         "category": claim.category,
         "points": {"provisional": points.get("provisional", 0.0),
                    "settled": points.get("settle", 0.0),

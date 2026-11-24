@@ -374,7 +374,7 @@ class Verifier:
                                   url)
         async with _placing:
             n = await novelty.place(store, claim, self.index(), self.places, now_ms, ct.t,
-                                    ct.filer)
+                                    ct.filer, self.registry.is_listing(url))
         fields.update(payload=claim.model_dump(mode="json", exclude_none=True),
                       event_type=claim.event_type.value, category=category, novelty=n.state,
                       route=n.route, event_id=n.event_id)

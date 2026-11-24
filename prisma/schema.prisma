@@ -967,6 +967,7 @@ model Claim {
   @@index([hotkey, receivedAt], name: "idx_claim_hotkey_received")
   @@index([hotkey, updatedAt, id], name: "idx_claim_hotkey_updated")
   @@index([eventId], name: "idx_claim_event")
+  @@index([sourceUrl], map: "idx_claim_source_url", type: Hash)
   @@map("claim")
 }
 

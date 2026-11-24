@@ -63,3 +63,14 @@ async def ready_claims(store: Store, now_ms: int, limit: int = 500) -> List[Clai
     seeds = await tie_seeds(store, shared) if shared else {}
     return await in_line_order(store, [c for c in rows
                                        if c.bucket not in shared or c.bucket in seeds])
+
+
+# A line whose claims were all rejected is deleted this long after it opened: a claim turned
+# away because its page could not be fetched may be sent back to it until then.
+DEAD_LINE_H = 24
+
+
+async def drop_dead(store: Store, now_ms: int, limit: int = 500) -> int:
+    """Delete lines left with no claim but rejected ones, so a rejected claim leaves no event."""
+    return await store.drop_lines(await store.dead_lines(now_ms - DEAD_LINE_H * 3_600_000,
+                                                         limit))
