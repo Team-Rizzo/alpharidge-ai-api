@@ -9,14 +9,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from alpharidge_ai.schema import Actor, Claim, IdScheme, headline
+from alpharidge_ai.schema.types import official_release
 from app.config import EVENT_LANE
 from app.services import ledger, trust
 from app.services.entities import LINKED, EntityIndex, EntityRecord, id_key, normalize_name
 from app.services.store import (
-    PRIZE_ROUTES, WON, ClaimRow, EventFactRow, EventRecord, FeedRow, SourceRow, Store,
+    PRIZE_ROUTES, WON, ClaimRow, EventFactRow, EventRecord, FeedRow, SourceFetchRow, SourceRow,
+    Store,
 )
 from app.utils.clock import iso
 
@@ -45,6 +47,10 @@ def status_of(confidence: Optional[str]) -> Optional[str]:
 EVENT, STAGE, FACT, CONFIDENCE, MARKED = "event", "stage", "fact", "confidence", "marked"
 # Next to each source_url: when it may be shown. Never served.
 OPEN_AT = "_source_open_ms"
+SOURCE_KEYS = ("source_url", "url")
+PRESS_RELEASE, AGGREGATOR, NEWS = "press_release", "aggregator", "news"
+# Hosts that syndicate other publishers' stories, with their subdomains.
+AGGREGATOR_HOSTS = ("finance.yahoo.com", "marketscreener.com")
 
 
 def parse_ms(text: str) -> int:
@@ -65,7 +71,7 @@ def open_ms(c: Optional[ClaimRow]) -> Optional[int]:
 
 
 def hide_sources(obj, now_ms: Optional[int]):
-    """`obj` with each source_url whose claim has not settled left out; every source_url when
+    """`obj` with each source link whose claim has not settled left out; every link when
     `now_ms` is None."""
     if isinstance(obj, list):
         return [hide_sources(x, now_ms) for x in obj]
@@ -73,8 +79,10 @@ def hide_sources(obj, now_ms: Optional[int]):
         return obj
     out = {k: hide_sources(v, now_ms) for k, v in obj.items() if k != OPEN_AT}
     at = obj.get(OPEN_AT)
-    if out.get("source_url") and (now_ms is None or at is None or at > now_ms):
-        out["source_url"] = None
+    if now_ms is None or at is None or at > now_ms:
+        for k in SOURCE_KEYS:
+            if out.get(k):
+                out[k] = None
     return out
 
 
@@ -228,6 +236,108 @@ def confidence_of(ev: EventRecord, v: View) -> str:
     return REPORTED
 
 
+# Where the story ran
+
+def publisher_of(url: str) -> str:
+    return trust.host_of(url)
+
+
+def source_kind(url: str) -> str:
+    if official_release(url):
+        return PRESS_RELEASE
+    host = trust.host_of(url)
+    if any(host == h or host.endswith("." + h) for h in AGGREGATOR_HOSTS):
+        return AGGREGATOR
+    return NEWS
+
+
+def _earliest(*times: Optional[int]) -> Optional[int]:
+    return min((t for t in times if t is not None), default=None)
+
+
+def _published(fetches: Sequence[SourceFetchRow]) -> Optional[int]:
+    return next((f.published_ms for f in reversed(fetches) if f.published_ms is not None), None)
+
+
+def _order(s: dict) -> tuple:
+    at = s["_published_ms"]
+    return at is None, at or 0, s["kind"] == AGGREGATOR
+
+
+async def sources_of(store: Store, events: Sequence[EventRecord]) -> Dict[int, List[dict]]:
+    """The trusted pages about each event, one per URL, the original (earliest published)
+    first. A page opens when the claim it came with settles; a confirming page when the claim
+    it confirms does."""
+    ids = [ev.id for ev in events]
+    if not ids:
+        return {}
+    won = await store.claims_for_events(ids, WON)
+    claims = {c.id: c for c in won}
+    rows = [se for se in await store.source_events_for(ids)
+            if se.role in (trust.FIRST, trust.CONFIRM) and se.claim_id is not None]
+    wanted = {se.claim_id for se in rows} | {ev.first_claim_id for ev in events}
+    missing = wanted - set(claims) - {None}
+    if missing:
+        claims.update({c.id: c for c in await store.claims_by_ids(sorted(missing))})
+    fetches: Dict[int, List[SourceFetchRow]] = {}
+    for f in await store.fetches_for_claims(sorted(claims)) if claims else ():
+        fetches.setdefault(f.claim_id, []).append(f)
+    source_ids = {c.source_id for c in won if c.source_id is not None}
+    source_ids |= {se.source_id for se in rows}
+    sources = {s.id: s for s in await store.sources_by_ids(sorted(source_ids))} \
+        if source_ids else {}
+
+    def shown(source_id: Optional[int]) -> bool:
+        s = sources.get(source_id)
+        return s is not None and s.status not in trust.BLOCKED
+
+    def trusted(c: Optional[ClaimRow]) -> bool:
+        return c is not None and (c.trust or 0.0) >= trust.PRIZE_TRUST_MIN
+
+    pages: Dict[int, Dict[str, dict]] = {ev.id: {} for ev in events}
+
+    def add(event_id: int, url: Optional[str], published_ms: Optional[int],
+            at: Optional[int]) -> None:
+        if not url:
+            return
+        seen = pages[event_id].get(url)
+        if seen is None:
+            pages[event_id][url] = {"publisher": publisher_of(url), "kind": source_kind(url),
+                                    "_published_ms": published_ms, "url": url, OPEN_AT: at}
+            return
+        seen["_published_ms"] = _earliest(seen["_published_ms"], published_ms)
+        seen[OPEN_AT] = _earliest(seen[OPEN_AT], at)
+
+    for c in won:
+        if trusted(c) and shown(c.source_id):
+            add(c.event_id, c.source_url, _published(fetches.get(c.id, ())), open_ms(c))
+    leads = {ev.id: claims.get(ev.first_claim_id) for ev in events}
+    for se in rows:
+        c = claims.get(se.claim_id)
+        if c is None or not shown(se.source_id):
+            continue
+        if se.role == trust.FIRST:
+            if trusted(c):
+                add(se.event_id, c.source_url,
+                    _earliest(se.published_ms, _published(fetches.get(c.id, ()))), open_ms(c))
+            continue
+        confirm = (ledger.judge_record(fetches.get(c.id, ())) or {}).get("confirm")
+        if confirm:
+            add(se.event_id, confirm.get("url"), se.published_ms, open_ms(c))
+        else:
+            # A report on an event another claim took confirms that claim.
+            add(se.event_id, c.source_url, se.published_ms, open_ms(leads.get(se.event_id)))
+
+    out = {}
+    for event_id, by_url in pages.items():
+        items = sorted(by_url.values(), key=_order)
+        out[event_id] = [{"publisher": s["publisher"], "kind": s["kind"],
+                          "published_at": iso(s["_published_ms"]), "url": s["url"],
+                          "original": i == 0, OPEN_AT: s[OPEN_AT]}
+                         for i, s in enumerate(items)]
+    return out
+
+
 # Response shapes
 
 def _headline(ev: EventRecord, actors: List[Actor], entities: EntityIndex) -> str:
@@ -239,21 +349,37 @@ def _headline(ev: EventRecord, actors: List[Actor], entities: EntityIndex) -> st
 
 
 def _summary(ev: EventRecord, lead: Optional[ClaimRow], actors: List[Actor],
-             entities: EntityIndex) -> dict:
+             entities: EntityIndex, sources: Sequence[dict] = ()) -> dict:
+    url = sources[0]["url"] if sources else lead.source_url if lead else None
     return {"id": str(ev.id), "headline": _headline(ev, actors, entities),
             "category": ev.category, "type": ev.event_type, "stage": ev.stage,
             "event_date": ev.event_date.isoformat(), "first_seen_at": iso(ev.first_seen_ms),
             "confidence": ev.confidence, "status": status_of(ev.confidence),
             "marked": ev.marked,
+            "publisher": publisher_of(url) if url else None,
+            "source_kind": source_kind(url) if url else None,
             "source_url": lead.source_url if lead else None, OPEN_AT: open_ms(lead)}
 
 
-async def summary(store: Store, ev: EventRecord, entities: EntityIndex) -> dict:
+async def _lead_actors(store: Store, ev: EventRecord) -> Tuple[Optional[ClaimRow], List[Actor]]:
     scoops = [] if ev.first_claim_id is not None else await store.claims_for_event(
         ev.id, WON)
     lead = await _lead(store, ev, scoops)
-    actors = list(Claim.model_validate(lead.payload).actors) if lead else []
-    return _summary(ev, lead, actors, entities)
+    return lead, list(Claim.model_validate(lead.payload).actors) if lead else []
+
+
+async def summaries(store: Store, events: Sequence[EventRecord],
+                    entities: EntityIndex) -> List[dict]:
+    sources = await sources_of(store, events)
+    out = []
+    for ev in events:
+        lead, actors = await _lead_actors(store, ev)
+        out.append(_summary(ev, lead, actors, entities, sources.get(ev.id, ())))
+    return out
+
+
+async def summary(store: Store, ev: EventRecord, entities: EntityIndex) -> dict:
+    return (await summaries(store, [ev], entities))[0]
 
 
 async def _claim(store: Store, v: View, claim_id: Optional[int]) -> Optional[ClaimRow]:
@@ -294,9 +420,11 @@ def _actor(a: Actor, entities: EntityIndex) -> dict:
 
 async def detail(store: Store, ev: EventRecord, entities: EntityIndex) -> dict:
     v = await view(store, ev)
+    sources = (await sources_of(store, [ev]))[ev.id]
     iso2, _, admin1 = (ev.place_key or "").partition("-")
     return {
-        **_summary(ev, v.lead, v.actors, entities),
+        **_summary(ev, v.lead, v.actors, entities, sources),
+        "sources": sources,
         "stages": await _stages(store, ev, v),
         "facts": [_fact(f, v) for f in v.facts],
         "entities": [_actor(a, entities) for a in v.actors],
@@ -316,9 +444,9 @@ async def labelled_summary(store: Store, ev: Optional[EventRecord], now_ms: int,
     """Headline and verification label of a published event, unverified included."""
     if not visible(ev, now_ms, include_unverified=True):
         return {"headline": None, "verification": None, "verification_status": None}
-    s = await summary(store, ev, entities)
-    return {"headline": s["headline"], "verification": s["confidence"],
-            "verification_status": s["status"]}
+    _, actors = await _lead_actors(store, ev)
+    return {"headline": _headline(ev, actors, entities), "verification": ev.confidence,
+            "verification_status": status_of(ev.confidence)}
 
 
 def record_json(r: FeedRow) -> dict:
@@ -354,7 +482,9 @@ async def _append(store: Store, ev: EventRecord, v: View, now_ms: int,
                        event_type=ev.event_type, at_ms=now_ms, payload=payload)
 
     if not started:
-        body = {**_summary(ev, v.lead, v.actors, entities), "stages": stages, "facts": facts}
+        sources = (await sources_of(store, [ev]))[ev.id]
+        body = {**_summary(ev, v.lead, v.actors, entities, sources), "stages": stages,
+                "facts": facts}
         body.pop("id")
         out = [row(EVENT, body)]
     else:

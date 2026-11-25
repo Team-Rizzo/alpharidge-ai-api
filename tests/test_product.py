@@ -382,3 +382,159 @@ async def test_api_keys_can_be_revoked():
     assert await store.api_key_owner(tool._hash(c)) == "beta"
     with pytest.raises(SystemExit):
         tool.parse(["revoke"])
+
+
+async def _story(store, lead_url="https://finance.yahoo.com/news/acme-beta"):
+    import uuid
+    from datetime import date
+
+    from app.services.store import ClaimRow, EventRecord, SourceFetchRow, SourceRow
+    from tests.pipeline import payload
+
+    hosts = {"finance.yahoo.com": "active", "uk.finance.yahoo.com": "active",
+             "newsone.com": "active", "prnewswire.com": "active", "wiretwo.org": "active",
+             "dailythree.net": "active", "banned.com": "banned", "lowblog.net": "active"}
+    src = {h: await store.add_source(SourceRow(domain=h, owner_id=f"domain:{h}", status=s))
+           for h, s in hosts.items()}
+    ev = await store.add_event(EventRecord("merger_acquisition", "finance", date(2026, 10, 13),
+                                           "fp-" + uuid.uuid4().hex, publish_ms=T0))
+
+    async def claim(url, published=None, settle=None, trust=0.9, status="provisional",
+                    check=None):
+        row = await store.create_claim(ClaimRow(
+            hotkey="m1", signature="s", nonce=uuid.uuid4().hex, signed_at=T0 // 1000,
+            body_hash=uuid.uuid4().hex, body="{}", received_ms=T0, bucket=0, kind="event",
+            category="finance", event_type="merger_acquisition",
+            payload=payload(source_url=url), source_url=url, status=status, route="event",
+            event_id=ev.id, source_id=src[url.split("/")[2].removeprefix("www.")].id,
+            trust=trust, settle_ms=settle))
+        if published is not None or check is not None:
+            await store.add_source_fetch(SourceFetchRow(claim_id=row.id, verdict="supported",
+                                                        published_ms=published, check=check))
+        return row
+
+    lead = await claim(lead_url, T0 + 600_000, T0 + 3_600_000)
+    await store.update_event(ev.id, first_claim_id=lead.id)
+    return replace(ev, first_claim_id=lead.id), lead, claim, src
+
+
+async def test_sources_name_the_original_publisher_once_per_page():
+    from app.services.store import MemoryStore
+
+    store = MemoryStore()
+    ev, lead, claim, _ = await _story(store)
+    await claim("https://www.newsone.com/a", T0, T0 + 7_200_000)
+    await claim("https://www.newsone.com/a", None, T0 + 1_800_000)
+    await claim("https://prnewswire.com/news-releases/acme-beta", T0 + 1_200_000,
+                T0 + 3_600_000)
+    await claim("https://banned.com/a", T0 - 60_000, T0)
+    await claim("https://lowblog.net/a", T0 - 60_000, T0, trust=0.1)
+    await claim("https://dailythree.net/a", T0 - 60_000, T0, status="rejected")
+    got = (await product.sources_of(store, [ev]))[ev.id]
+    assert [(s["publisher"], s["kind"], s["original"]) for s in got] == [
+        ("newsone.com", "news", True), ("finance.yahoo.com", "aggregator", False),
+        ("prnewswire.com", "press_release", False)]
+    assert got[0]["published_at"] == "2026-10-13T12:00:00.000Z"
+    assert got[0][product.OPEN_AT] == T0 + 1_800_000
+    s = await product.summary(store, ev, EntityIndex())
+    assert (s["publisher"], s["source_kind"]) == ("newsone.com", "news")
+    assert s["source_url"] == lead.source_url
+    d = await product.detail(store, ev, EntityIndex())
+    assert d["sources"] == got and d["publisher"] == "newsone.com"
+    out = json.dumps(product.hide_sources(d, T0 + 10 * 3_600_000))
+    assert "_published_ms" not in out and "trust" not in out and "m1" not in out
+
+
+async def test_an_undated_page_loses_to_a_dated_one_and_a_copy_to_the_original():
+    from app.services.store import MemoryStore
+
+    store = MemoryStore()
+    ev, lead, claim, _ = await _story(store, "https://uk.finance.yahoo.com/news/acme")
+    s = await product.summary(store, ev, EntityIndex())
+    assert (s["publisher"], s["source_kind"]) == ("uk.finance.yahoo.com", "aggregator")
+    await store.update_claim(lead.id, "provisional", trust=0.1)
+    s = await product.summary(store, ev, EntityIndex())
+    assert (s["publisher"], s["source_kind"]) == ("uk.finance.yahoo.com", "aggregator")
+    store.fetches.clear()
+    await store.update_claim(lead.id, "provisional", trust=0.9)
+    await claim("https://wiretwo.org/a")
+    got = (await product.sources_of(store, [ev]))[ev.id]
+    assert [(s["publisher"], s["original"]) for s in got] == [
+        ("wiretwo.org", True), ("uk.finance.yahoo.com", False)]
+    await claim("https://dailythree.net/a", T0 + 3_600_000)
+    got = (await product.sources_of(store, [ev]))[ev.id]
+    assert [s["publisher"] for s in got] == ["dailythree.net", "wiretwo.org",
+                                            "uk.finance.yahoo.com"]
+    assert got[1]["published_at"] is None
+
+
+async def test_source_links_open_when_the_claim_behind_them_settles():
+    from app.services import trust
+    from app.services.store import MemoryStore, SourceEventRow
+
+    store = MemoryStore()
+    ev, lead, claim, src = await _story(store)
+    scoop = await claim("https://dailythree.net/tip", T0 - 600_000, T0 + 7_200_000,
+                        check={"judge": {"outcome": "pass",
+                                         "confirm": {"url": "https://wiretwo.org/confirm"}}})
+    report = await claim("https://www.newsone.com/report", status="rejected", trust=0.1)
+    gone = await claim("https://prnewswire.com/news-releases/acme", status="rejected")
+    for source, role, row, published in (
+            ("wiretwo.org", trust.CONFIRM, scoop, T0 + 60_000),
+            ("newsone.com", trust.CONFIRM, report, T0 + 120_000),
+            ("prnewswire.com", trust.FIRST, gone, T0 + 180_000),
+            ("banned.com", trust.CONFIRM, report, T0)):
+        await store.add_source_event(SourceEventRow(
+            source_id=src[source].id, role=role, category="finance", at_ms=T0,
+            event_id=ev.id, claim_id=row.id, published_ms=published))
+    got = {s["publisher"]: s for s in (await product.sources_of(store, [ev]))[ev.id]}
+    assert set(got) == {"dailythree.net", "wiretwo.org", "newsone.com", "prnewswire.com",
+                        "finance.yahoo.com"}
+    assert got["dailythree.net"]["original"]
+    assert got["wiretwo.org"]["url"] == "https://wiretwo.org/confirm"
+    assert got["wiretwo.org"][product.OPEN_AT] == scoop.settle_ms
+    assert got["newsone.com"][product.OPEN_AT] == lead.settle_ms
+    assert got["prnewswire.com"][product.OPEN_AT] is None
+
+    def urls(now_ms):
+        d = product.hide_sources({"sources": list(got.values())}, now_ms)
+        return {s["publisher"]: s["url"] for s in d["sources"]}
+
+    assert set(urls(None).values()) == {None}
+    assert set(urls(lead.settle_ms - 1).values()) == {None}
+    mid = urls(lead.settle_ms)
+    assert mid["newsone.com"] == "https://www.newsone.com/report"
+    assert mid["finance.yahoo.com"] == lead.source_url
+    assert mid["wiretwo.org"] is None and mid["prnewswire.com"] is None
+    late = urls(scoop.settle_ms)
+    assert late["wiretwo.org"] == "https://wiretwo.org/confirm"
+    assert late["prnewswire.com"] is None
+    assert {s["kind"] for s in product.hide_sources(list(got.values()), None)} == {
+        "news", "aggregator", "press_release"}
+
+
+async def test_the_list_serves_each_events_publisher(api, monkeypatch):
+    lane = _lane()
+    await lane.sources()
+    await _event(lane)
+    await _event(lane, url="https://wiretwo.org/h", event_type="trading_halt",
+                 actors=[{"id_scheme": "wikidata", "id": "Q1", "name": "Acme Inc."}],
+                 facts=[{"field": "exchange", "value": "Nasdaq"}])
+    client = api(lane)
+    items = client.get("/events", headers=KEY).json()["items"]
+    assert {(i["publisher"], i["source_kind"]) for i in items} == {
+        ("newsone.com", "news"), ("wiretwo.org", "news")}
+    feed = client.get("/feed", headers=KEY).json()["items"]
+    assert {r["publisher"] for r in feed if r["kind"] == "event"} == {
+        "newsone.com", "wiretwo.org"}
+    detail = client.get(f"/events/{items[0]['id']}", headers=KEY).json()
+    (source,) = detail["sources"]
+    assert source["original"] and source["url"] is None
+    assert product.OPEN_AT not in json.dumps(detail)
+    client.clock["now"] = max(c.settle_ms for c in lane.store.claims.values()) + 1
+    detail = client.get(f"/events/{items[0]['id']}", headers=KEY).json()
+    assert detail["sources"][0]["url"] == detail["source_url"]
+    monkeypatch.setitem(EVENT_LANE, "PRODUCT_KEYS_REQUIRED", False)
+    public = client.get(f"/events/{items[0]['id']}").json()
+    assert public["sources"][0]["url"] is None
+    assert public["sources"][0]["publisher"] == detail["sources"][0]["publisher"]

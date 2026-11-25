@@ -485,6 +485,12 @@ class PrismaStore:
             where={"eventId": event_id, "status": {"in": list(statuses)}}, order={"id": "asc"})
         return [_claim_from(m) for m in rows]
 
+    async def claims_for_events(self, event_ids, statuses):
+        rows = await self.db.claim.find_many(
+            where={"eventId": {"in": sorted(set(event_ids))}, "status": {"in": list(statuses)}},
+            order={"id": "asc"})
+        return [_claim_from(m) for m in rows]
+
     async def claims_to_settle(self, now_ms, limit=200):
         rows = await self.db.claim.find_many(
             where={"status": "provisional", "held": False, "settleAt": {"lte": _dt(now_ms)}},
@@ -880,6 +886,11 @@ class PrismaStore:
         m = await self.db.source.find_unique(where={"id": source_id})
         return _source_from(m) if m else None
 
+    async def sources_by_ids(self, source_ids):
+        rows = await self.db.source.find_many(where={"id": {"in": sorted(set(source_ids))}},
+                                              order={"id": "asc"})
+        return [_source_from(m) for m in rows]
+
     async def add_source(self, row):
         from prisma import Json
 
@@ -950,10 +961,12 @@ class PrismaStore:
         if claim_id is not None:
             where["claimId"] = claim_id
         rows = await self.db.sourceevent.find_many(where=where, order={"id": "asc"})
-        return [SourceEventRow(
-            source_id=m.sourceId, role=m.role, category=m.category, at_ms=_ms(m.at),
-            event_id=m.eventId, claim_id=m.claimId, owner_id=m.ownerId,
-            by_source_id=m.bySourceId, published_ms=_ms(m.publishedAt), id=m.id) for m in rows]
+        return [_source_event_from(m) for m in rows]
+
+    async def source_events_for(self, event_ids):
+        rows = await self.db.sourceevent.find_many(
+            where={"eventId": {"in": sorted(set(event_ids))}}, order={"id": "asc"})
+        return [_source_event_from(m) for m in rows]
 
     async def page_rules(self):
         return [PageRuleRow(m.pattern, m.kind, m.reason, m.createdBy, m.id)
@@ -1311,6 +1324,12 @@ def _source_from(m) -> SourceRow:
     return SourceRow(domain=m.domain, path_rule=m.pathRule, owner_id=m.ownerId, status=m.status,
                      base_trust=m.baseTrust, category_trust=_json(m.categoryTrust),
                      reset_ms=_ms(m.resetAt), id=m.id, host=m.host)
+
+
+def _source_event_from(m) -> SourceEventRow:
+    return SourceEventRow(source_id=m.sourceId, role=m.role, category=m.category, at_ms=_ms(m.at),
+                          event_id=m.eventId, claim_id=m.claimId, owner_id=m.ownerId,
+                          by_source_id=m.bySourceId, published_ms=_ms(m.publishedAt), id=m.id)
 
 
 def _day(d: date) -> datetime:

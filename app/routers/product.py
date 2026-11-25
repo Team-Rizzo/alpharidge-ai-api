@@ -89,7 +89,7 @@ async def _page(store: Store, entities: EntityIndex, q: EventQuery) -> dict:
     rows = await store.list_events(q)
     page = rows[:limit]
     more = len(rows) > limit
-    return {"items": [await product.summary(store, e, entities) for e in page],
+    return {"items": await product.summaries(store, page, entities),
             "next_cursor": f"{page[-1].first_seen_ms or 0}:{page[-1].id}"
             if more and page else None}
 

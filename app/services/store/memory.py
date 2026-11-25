@@ -439,6 +439,12 @@ class MemoryStore:
                 if c.event_id == event_id and c.status in statuses]
         return [replace(c) for c in sorted(rows, key=lambda c: c.id)]
 
+    async def claims_for_events(self, event_ids, statuses):
+        wanted = set(event_ids)
+        rows = [c for c in self.claims.values()
+                if c.event_id in wanted and c.status in statuses]
+        return [replace(c) for c in sorted(rows, key=lambda c: c.id)]
+
     async def claims_to_settle(self, now_ms, limit=200):
         rows = [c for c in self.claims.values() if c.status == "provisional" and not c.held
                 and c.settle_ms is not None and c.settle_ms <= now_ms]
@@ -686,6 +692,10 @@ class MemoryStore:
         r = self.source_rows.get(source_id)
         return replace(r) if r else None
 
+    async def sources_by_ids(self, source_ids):
+        return [replace(self.source_rows[i]) for i in sorted(set(source_ids))
+                if i in self.source_rows]
+
     async def add_source(self, row):
         for r in self.source_rows.values():
             if (r.domain, r.host, r.path_rule) == (row.domain, row.host, row.path_rule):
@@ -722,6 +732,10 @@ class MemoryStore:
                 if (source_id is None or r.source_id == source_id)
                 and (event_id is None or r.event_id == event_id)
                 and (claim_id is None or r.claim_id == claim_id)]
+
+    async def source_events_for(self, event_ids):
+        wanted = set(event_ids)
+        return [replace(r) for r in self.source_event_rows if r.event_id in wanted]
 
     async def page_rules(self):
         return [replace(r) for r in self.rule_rows.values()]

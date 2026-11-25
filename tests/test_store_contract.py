@@ -439,6 +439,30 @@ async def test_source_events_by_claim(store):
     assert len(await store.source_events(src.id)) == 3
 
 
+async def test_an_events_pages_read_in_one_batch(store):
+    from app.services.store.rows import SourceEventRow, SourceRow
+    a, b, c = [await _event(store, "reported") for _ in range(3)]
+    srcs = [await store.add_source(SourceRow(domain=f"c{uuid.uuid4().hex[:10]}.example",
+                                             status=s)) for s in ("active", "banned")]
+    on_a = await _on(store, a, "provisional", "https://a.example/1")
+    on_b = await _on(store, b, "settled", "https://a.example/2")
+    await _on(store, b, "rejected", "https://a.example/3", "judge_reject")
+    await _on(store, c, "provisional", "https://a.example/4")
+    got = await store.claims_for_events([b.id, a.id, a.id], ("provisional", "settled"))
+    assert [r.id for r in got] == [on_a.id, on_b.id]
+    for ev, row, role in ((a, on_a, "first"), (b, on_b, "confirm"), (c, None, "first")):
+        await store.add_source_event(SourceEventRow(
+            source_id=srcs[0].id, role=role, category="finance", at_ms=T0, event_id=ev.id,
+            claim_id=row.id if row else None, published_ms=T0 + 5))
+    got = await store.source_events_for([a.id, b.id])
+    assert [(e.event_id, e.claim_id, e.role, e.published_ms) for e in got] == [
+        (a.id, on_a.id, "first", T0 + 5), (b.id, on_b.id, "confirm", T0 + 5)]
+    assert await store.source_events_for([]) == []
+    got = await store.sources_by_ids([srcs[1].id, srcs[0].id, srcs[1].id])
+    assert [(s.id, s.status) for s in got] == [(srcs[0].id, "active"), (srcs[1].id, "banned")]
+    assert await store.sources_by_ids([]) == []
+
+
 async def _event(store, confidence: str, event_type: str = "merger_acquisition"):
     from datetime import date
     return await store.add_event(EventRecord(event_type, "finance", date(2026, 10, 13),
