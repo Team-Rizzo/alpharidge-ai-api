@@ -27,6 +27,8 @@ QUALITY_PAID = PASSED + ("clawed_back",)
 # rejected), so a fetched claim passed and waits for its line.
 CHECKED = ("fetched", "verified") + QUALITY_PAID
 BEHIND = ("known_event", "lost_line")
+# Also a sighting under the lead pay table: a trusted page the judge could not decide on.
+SIGHTED = BEHIND + ("judge_unclear",)
 # Claims that were paid or rejected; a claim set back to any other status loses its decision
 # time.
 DECIDED = ("rejected",) + QUALITY_PAID
@@ -442,10 +444,11 @@ class Store(Protocol):
                            owners: Iterable[str]) -> Dict[str, Tuple[int, int]]: ...
     async def open_scoops(self, owners: Iterable[str]) -> Dict[str, int]:
         """Scoops each owner (coldkey, else hotkey) holds: verified on the scoop route."""
-    async def first_trusted_ms(self, event_id: int, exclude_id: int,
-                               trust_min: float) -> Optional[int]:
+    async def first_trusted_ms(self, event_id: int, exclude_id: int, trust_min: float,
+                               reasons: Tuple[str, ...] = BEHIND) -> Optional[int]:
         """The earliest receipt or page publish time of another claim on the event whose page
-        had at least `trust_min` trust and passed the check and judge."""
+        had at least `trust_min` trust and passed the check and judge, or was rejected for one
+        of `reasons`."""
     async def bucket_claim_ids(self, buckets: Iterable[int]) -> Dict[int, List[int]]: ...
     async def tie_seeds(self, buckets: Iterable[int]) -> Dict[int, Tuple[int, str]]: ...
     async def put_tie_seed(self, bucket: int, block: int, block_hash: str) -> None: ...

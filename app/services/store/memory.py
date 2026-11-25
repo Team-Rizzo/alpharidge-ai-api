@@ -345,10 +345,10 @@ class MemoryStore:
                 out[owner] = out.get(owner, 0) + 1
         return out
 
-    async def first_trusted_ms(self, event_id, exclude_id, trust_min):
+    async def first_trusted_ms(self, event_id, exclude_id, trust_min, reasons=BEHIND):
         ids = {c.id for c in self.claims.values() if c.event_id == event_id
                and c.id != exclude_id and (c.trust or 0.0) >= trust_min
-               and (c.status in CHECKED or c.reason in BEHIND)}
+               and (c.status in CHECKED or c.reason in reasons)}
         times = [self.claims[i].received_ms for i in ids]
         times += [f.published_ms for f in self.fetches
                   if f.claim_id in ids and f.published_ms is not None]

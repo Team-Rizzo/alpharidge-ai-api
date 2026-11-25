@@ -174,6 +174,7 @@ async def test_open_scoops_and_the_first_trusted_page_on_an_event(store):
                                                 published_ms=T0 - 9000))
     assert await store.first_trusted_ms(ev.id, rows[0].id, 0.75) == T0 - 5000
     assert await store.first_trusted_ms(ev.id, rows[3].id, 0.75) is None
+    assert await store.first_trusted_ms(ev.id, rows[0].id, 0.75, ("judge_reject",)) == T0 - 9000
 
 
 async def test_claims_page_filters_by_type_and_reason(store):

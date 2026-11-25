@@ -371,13 +371,13 @@ class PrismaStore:
             "GROUP BY COALESCE(coldkey, hotkey)", ",".join(owners))
         return {r["owner"]: int(r["n"]) for r in rows}
 
-    async def first_trusted_ms(self, event_id, exclude_id, trust_min):
+    async def first_trusted_ms(self, event_id, exclude_id, trust_min, reasons=BEHIND):
         rows = await self.db.query_raw(
             "SELECT (extract(epoch FROM LEAST(min(c.received_at), min(sf.published_at))) * 1000)"
             "::bigint AS ms FROM \"claim\" c LEFT JOIN \"source_fetch\" sf ON sf.claim_id = c.id "
             "WHERE c.event_id = $1::int AND c.id <> $2::bigint AND c.trust >= $3::double precision "
             "AND (c.status = ANY(string_to_array($4, ',')) OR c.reason = ANY(string_to_array($5, ',')))",
-            int(event_id), int(exclude_id), float(trust_min), ",".join(CHECKED), ",".join(BEHIND))
+            int(event_id), int(exclude_id), float(trust_min), ",".join(CHECKED), ",".join(reasons))
         ms = rows[0]["ms"] if rows else None
         return int(ms) if ms is not None else None
 

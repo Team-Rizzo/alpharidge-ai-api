@@ -11,12 +11,14 @@ from typing import Dict, List, Optional, Tuple
 
 from alpharidge_ai.schema import (Actor, Claim, EventType, IdScheme, category_of, confirm_claim,
                                   judged, renamed)
+from alpharidge_ai.schema.types import lead_pay
 from alpharidge_ai.verify.check import PIVOT_SLOTS, pick_quote
 from app import ROOT
 from app.config import EVENT_LANE
 from app.services import intake, judge as judges, ledger, novelty, trust
 from app.services.entities import LINKED, SEC_NAMES
 from app.services.store import ClaimRow, Job, ScoopCandidateRow, Store
+from app.services.store.rows import BEHIND, SIGHTED
 from app.utils.clock import HOUR_MS, iso, ms as _ms, now_ms as _now_ms
 
 CONFIRM_JOB = "scoop_confirm"
@@ -246,10 +248,12 @@ async def contested(store: Store, scoop: ClaimRow, claim: Claim, entities,
 
 async def first_seen(store: Store, scoop: ClaimRow) -> Optional[int]:
     """When a trusted page about the scoop's event was first out: the earliest receipt or
-    page publish time of another checked claim on the event at trust that can win it."""
+    page publish time of another checked claim on the event at trust that can win it; under
+    the lead pay table, also of one the judge could not decide on."""
     if scoop.event_id is None:
         return None
-    return await store.first_trusted_ms(scoop.event_id, scoop.id, trust.PRIZE_TRUST_MIN)
+    reasons = SIGHTED if lead_pay(scoop.received_ms) else BEHIND
+    return await store.first_trusted_ms(scoop.event_id, scoop.id, trust.PRIZE_TRUST_MIN, reasons)
 
 
 class Wait(Exception):

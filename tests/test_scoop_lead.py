@@ -79,3 +79,39 @@ async def test_before_the_lead_start_the_new_table_still_pays_the_full_premium(l
     url = "https://lowblog.net/P"
     lane.page(url, deal_page("Company QP1", "Company QP2"), published_ms=LEAD - 600_000)
     assert await _scoop(lane, "P", LEAD - 300_000, url, 12 * 60_000) == pytest.approx(10.0)
+
+
+async def _unclear_first(lane, name, t):
+    """A trusted page on the event, out before the scoop, that the judge could not decide on."""
+    s = await lane.submit("m4", t, source_url=f"https://lowblog.net/{name}",
+                          headline=f"{name} deal", actors=actors(f"Q{name}1", f"Q{name}2"))
+    await lane.step(t + 1000)
+    scoop = lane.store.claims[s.id]
+    other = await lane.submit("m5", t - 120_000, source_url=f"https://newsone.com/{name}-early",
+                              headline=f"{name} deal", actors=actors(f"Q{name}1", f"Q{name}2"))
+    assert await lane.store.update_claim(other.id, lane.store.claims[other.id].status,
+                                         status="rejected", reason="judge_unclear", trust=0.8,
+                                         event_id=scoop.event_id)
+    return scoop
+
+
+async def test_a_trusted_page_the_judge_left_unclear_is_a_sighting_under_the_lead_table(lead_on):
+    from app.services import scoops
+    lane = Lane(check=True)
+    await lane.sources()
+    url = "https://lowblog.net/U"
+    lane.page(url, deal_page("Company QU1", "Company QU2"), published_ms=START - 60_000)
+    scoop = await _unclear_first(lane, "U", START)
+    assert scoop.event_id is not None
+    assert await scoops.first_seen(lane.store, scoop) == START - 120_000
+
+
+async def test_before_the_lead_start_an_unclear_page_is_not_a_sighting(lead_on):
+    from app.services import scoops
+    lane = Lane(check=True)
+    await lane.sources()
+    t = LEAD - 300_000
+    url = "https://lowblog.net/V"
+    lane.page(url, deal_page("Company QV1", "Company QV2"), published_ms=t - 60_000)
+    scoop = await _unclear_first(lane, "V", t)
+    assert await scoops.first_seen(lane.store, scoop) is None
