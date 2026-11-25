@@ -3,7 +3,7 @@
     points = tier price × EVENT_PAY_X × T × A, at the pay table in force at the claim's receipt
     a confirmed scoop's points = tier price × M × T × A, M = SCOOP_PREMIUM when the confirming
     page was published after the scoop's receipt and no trusted page about it was seen before,
-    else EVENT_PAY_X
+    else EVENT_PAY_X; under the "lead" table M follows the lead (`schema.types.lead_multiple`)
 
 The type's tier sets the price, T is the trust frozen at verification and A the age factor at
 receipt of the claimed event date or the page's publish date, the earlier. The miner's
@@ -64,7 +64,8 @@ def confirm_multiple(scoop: ClaimRow, confirm: dict) -> float:
     sighting and contested list, as validators recompute it."""
     return scoop_multiple(parse_datetime(confirm.get("published_at")), _utc(scoop.received_ms),
                           contested=bool(confirm.get("contested")),
-                          first_seen=parse_datetime(confirm.get("first_seen")))
+                          first_seen=parse_datetime(confirm.get("first_seen")),
+                          source_url=scoop.source_url)
 
 
 def _utc(ms: int) -> datetime:

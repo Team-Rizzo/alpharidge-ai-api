@@ -69,19 +69,20 @@ def validator_config(hotkey: str) -> dict:
 # stops start-up here rather than at the first claim.
 pay_settings()
 # The pay table switch: EL_PAY_TABLE (a table in the code, "new") applies to claims received from
-# EL_PAY_TABLE_FROM_MS on. Served on /config/subnet as {"pay_table", "from_ms"}; validators read
-# it hourly, so set the start at least PAY_SWITCH_LEAD_MS ahead.
+# EL_PAY_TABLE_FROM_MS on; comma lists ("new,lead" and one start each, rising) give each table
+# from its start. Served on /config/subnet as {"pay_table", "from_ms"}, or a list of them for
+# several; validators read it hourly, so set the last start at least PAY_SWITCH_LEAD_MS ahead.
 PAY_SWITCH_LEAD_MS = 2 * 3_600_000
 
 
 def served_pay_switch():
-    switch = pay_switch()
-    return None if switch is None else {"pay_table": switch[0], "from_ms": switch[1]}
+    steps = [{"pay_table": n, "from_ms": s} for n, s in pay_switch() or ()]
+    return (steps[0] if len(steps) == 1 else steps) or None
 
 
-if pay_switch() is not None and pay_switch()[1] - time.time() * 1000 < PAY_SWITCH_LEAD_MS:
+if pay_switch() is not None and pay_switch()[-1][1] - time.time() * 1000 < PAY_SWITCH_LEAD_MS:
     logging.getLogger(__name__).warning(
-        f"EL_PAY_TABLE_FROM_MS {pay_switch()[1]} is less than 2 h away: a validator that has "
+        f"EL_PAY_TABLE_FROM_MS {pay_switch()[-1][1]} is less than 2 h away: a validator that has "
         f"not read the switch by then prices claims after it at the old table")
 
 # The quality start: EL_QUALITY_FROM_MS (ms; unset or 0 is off) turns the subnet's quality rule
