@@ -53,7 +53,7 @@ async def _scoop(lane, name, t, source_url, lead_ms):
 
 
 @pytest.mark.parametrize("name, lead_min, want", [
-    ("A", 5, 0.25), ("B", 35, 5.125), ("C", 90, 10.0)])
+    ("A", 4, 0.25), ("B", 17.5, 5.5), ("C", 90, 10.0)])
 async def test_a_confirmed_scoop_pays_by_its_lead_and_validators_agree(lead_on, name,
                                                                        lead_min, want):
     lane = Lane(check=True)
