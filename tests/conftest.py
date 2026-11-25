@@ -6,8 +6,9 @@ import pytest
 # Make the `app` package importable from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# The deployment's .env never reaches the tests, nor the subnet checkout's .miner_env and
-# .vali_env, which alpharidge_ai.config loads when a test imports the validator's modules.
+# The deployment's .env never reaches the tests (app/__init__.py and the Prisma client both
+# skip it), nor the subnet checkout's .miner_env and .vali_env, which alpharidge_ai.config loads
+# when a test imports the validator's modules.
 os.environ["API_SKIP_DOTENV"] = "1"
 os.environ["ALPHARIDGE_SKIP_ENV_FILES"] = "1"
 # The suite is hermetic: no EL_ setting from the caller's shell reaches it; every one the tests

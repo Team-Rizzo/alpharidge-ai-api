@@ -42,8 +42,10 @@ LEDGER_LOCK_TIMEOUT_MS = 20_000
 
 _url = pooled_url(os.getenv("DATABASE_URL", ""), config.DB_CONNECTION_LIMIT,
                   config.DB_POOL_TIMEOUT_S)
-# Must exceed the slowest raw dashboard query.
-prisma = Prisma(http={"timeout": 180}, **({"datasource": {"url": _url}} if _url else {}))
+# Must exceed the slowest raw dashboard query. Prisma loads ./.env itself unless told not to,
+# so API_SKIP_DOTENV covers it as well as app/__init__.py.
+prisma = Prisma(http={"timeout": 180}, use_dotenv=not os.getenv("API_SKIP_DOTENV"),
+                **({"datasource": {"url": _url}} if _url else {}))
 
 
 async def connect() -> None:
