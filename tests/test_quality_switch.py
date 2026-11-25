@@ -40,3 +40,14 @@ def test_the_quality_start_does_not_restart_the_budget_score(monkeypatch):
     monkeypatch.setitem(config.EVENT_LANE, "BUDGET_FROM_MS", 0)
     assert svc.start() != START
     assert svc.start() < START
+
+
+def test_the_lead_warning_is_only_for_a_start_still_ahead():
+    now = START
+    lead = config.PAY_SWITCH_LEAD_MS
+    assert config.switch_too_close(now + lead - 1, now)
+    assert not config.switch_too_close(now + lead, now)
+    assert not config.switch_too_close(now, now)
+    assert not config.switch_too_close(now - 1, now)
+    assert not config.switch_too_close(now - 30 * 86_400_000, now)
+    assert not config.switch_too_close(None, now)

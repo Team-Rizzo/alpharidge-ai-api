@@ -79,7 +79,15 @@ def served_pay_switch():
     return None if switch is None else {"pay_table": switch[0], "from_ms": switch[1]}
 
 
-if pay_switch() is not None and pay_switch()[1] - time.time() * 1000 < PAY_SWITCH_LEAD_MS:
+def switch_too_close(start_ms, now_ms=None) -> bool:
+    """A start still ahead but under PAY_SWITCH_LEAD_MS away; one already past is not warned."""
+    if start_ms is None:
+        return False
+    now_ms = time.time() * 1000 if now_ms is None else now_ms
+    return 0 < start_ms - now_ms < PAY_SWITCH_LEAD_MS
+
+
+if pay_switch() is not None and switch_too_close(pay_switch()[1]):
     logging.getLogger(__name__).warning(
         f"EL_PAY_TABLE_FROM_MS {pay_switch()[1]} is less than 2 h away: a validator that has "
         f"not read the switch by then prices claims after it at the old table")
@@ -93,7 +101,7 @@ def served_quality_switch():
     return None if start is None else {"from_ms": start}
 
 
-if qm.start_ms() is not None and qm.start_ms() - time.time() * 1000 < PAY_SWITCH_LEAD_MS:
+if switch_too_close(qm.start_ms()):
     logging.getLogger(__name__).warning(
         f"EL_QUALITY_FROM_MS {qm.start_ms()} is less than 2 h away: a validator that has not "
         f"read it by then scores epochs after it without quality")
