@@ -1317,11 +1317,12 @@ def _day(d: date) -> datetime:
     return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
 
 
-# A line with no claim left but rejected ones and nothing in the ledger.
+# A line with no claim left but rejected ones, nothing in the ledger and no trusted page on it.
 _DEAD_LINE = (
     "e.confidence = 'line' AND NOT EXISTS (SELECT 1 FROM \"claim\" c "
     "WHERE c.event_id = e.id AND c.status <> 'rejected') "
-    "AND NOT EXISTS (SELECT 1 FROM ledger_entry l WHERE l.event_id = e.id)")
+    "AND NOT EXISTS (SELECT 1 FROM ledger_entry l WHERE l.event_id = e.id) "
+    "AND NOT EXISTS (SELECT 1 FROM source_event s WHERE s.event_id = e.id)")
 _EVENT_COLS = (
     "id, event_type, category, event_date::text AS event_date, fingerprint, canonical_title, "
     "entities, place_iso2, place_admin1, identity_key, stage, first_claim_id, confidence, "

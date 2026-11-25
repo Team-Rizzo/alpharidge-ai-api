@@ -96,3 +96,8 @@ def test_the_cleanup_keeps_the_earliest_event_of_each_page():
     merges = _merge_script().merges
     assert merges([[5, 3], [3, 9], [20, 21]]) == {3: [5, 9], 20: [21]}
     assert merges([[7]]) == {}
+
+
+def test_the_worker_leaves_dead_lines_alone_unless_turned_on():
+    from app.config import EVENT_LANE
+    assert EVENT_LANE["DROP_DEAD_LINES"] is False

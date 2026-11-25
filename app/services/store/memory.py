@@ -579,7 +579,8 @@ class MemoryStore:
                 and self.event_added_ms.get(event_id, 0) < before_ms
                 and not any(c.event_id == event_id and c.status != "rejected"
                             for c in self.claims.values())
-                and not any(r.event_id == event_id for r in self.ledger))
+                and not any(r.event_id == event_id for r in self.ledger)
+                and not any(r.event_id == event_id for r in self.source_event_rows))
 
     async def dead_lines(self, before_ms, limit=500):
         return [i for i in sorted(self.events) if self._dead(i, before_ms)][:limit]

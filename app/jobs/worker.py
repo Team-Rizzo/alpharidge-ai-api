@@ -192,7 +192,8 @@ async def tick(store: Store, now_ms: int) -> None:
         await timed("params", ledger.refresh_params())
         await timed("settle", points.settle_due(store, now_ms))
         await timed("close", judge.close_moved(store))
-        await timed("lines", line.drop_dead(store, now_ms))
+        if EVENT_LANE["DROP_DEAD_LINES"]:
+            await timed("lines", line.drop_dead(store, now_ms))
     slow = EVENT_LANE["TICK_LOG_S"]
     if slow > 0 and sum(spent.values()) >= slow:
         logger.info("[TICK] " + " ".join(f"{k}={v:.2f}s" for k, v in spent.items()))

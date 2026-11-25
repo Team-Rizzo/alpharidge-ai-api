@@ -468,21 +468,27 @@ async def test_claims_on_a_page_find_its_events_of_one_type_and_date(store):
 
 
 async def test_a_line_left_with_rejected_claims_only_is_deleted(store):
-    from app.services.store.rows import LedgerRow
+    from app.services.store.rows import LedgerRow, SourceEventRow, SourceRow
     url = f"https://a.example/{uuid.uuid4().hex}"
-    dead, live, paid, event = [await _event(store, c)
-                               for c in ("line", "line", "line", "reported")]
+    dead, live, paid, seen, event = [await _event(store, c)
+                                     for c in ("line", "line", "line", "line", "reported")]
     lost = await _on(store, dead, "rejected", url, "doc_prize_used")
     await _on(store, live, "rejected", url, "judge_reject")
     await _on(store, live, "fetched", url)
+    await _on(store, seen, "rejected", url, "judge_reject")
     await _on(store, event, "rejected", url, "known_event")
     await store.append_ledger(LedgerRow(hotkey="contract-x", claim_id=None, event_id=paid.id,
                                         kind="debt", points=-1.0, epoch=3))
-    mine = {dead.id, live.id, paid.id, event.id}
+    src = await store.add_source(SourceRow(domain=f"c{uuid.uuid4().hex[:10]}.example",
+                                           status="active"))
+    await store.add_source_event(SourceEventRow(source_id=src.id, role="confirm",
+                                                category="finance", at_ms=T0, event_id=seen.id))
+    mine = {dead.id, live.id, paid.id, seen.id, event.id}
     late = T0 * 2
     assert [i for i in await store.dead_lines(late, 10_000_000) if i in mine] == [dead.id]
     assert [i for i in await store.dead_lines(0) if i in mine] == []
-    assert await store.drop_lines([dead.id, live.id, paid.id, event.id]) == 1
+    assert await store.drop_lines([dead.id, live.id, paid.id, seen.id, event.id]) == 1
+    assert await store.get_event(seen.id) is not None
     assert await store.get_event(dead.id) is None
     assert (await store.get_claim(lost.id)).event_id is None
     assert await store.get_event(live.id) is not None

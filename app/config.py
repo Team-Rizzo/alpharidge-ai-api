@@ -197,6 +197,8 @@ EVENT_LANE = {
     "BUDGET_FROM_MS": _el("BUDGET_FROM_MS", 0, int),
     "QUALITY_BUDGET": _flag(os.getenv("EL_QUALITY_BUDGET", "")),
     "QUALITY_BUDGET_MIN": _el("QUALITY_BUDGET_MIN", 20, int),
+    # The worker deletes lines left with rejected claims only (app.services.line.drop_dead).
+    "DROP_DEAD_LINES": _flag(os.getenv("EL_DROP_DEAD_LINES", "")),
     # Answer key: official feeds, private, used for accuracy only.
     # Set but empty means none.
     "AK_ADAPTERS": tuple(_csv("EL_AK_ADAPTERS") if "EL_AK_ADAPTERS" in os.environ
