@@ -380,6 +380,26 @@ class EventQuery:
 
 
 @dataclass
+class EnrichRow:
+    """An event's enrichment: pending, running, done, failed or skipped. Summary, sentiment
+    and the embedding live on the event."""
+    event_id: int
+    status: str = "pending"
+    backfill: bool = False
+    attempts: int = 0
+    run_ms: int = 0
+    confidence: Optional[str] = None
+    summary: Optional[str] = None
+    sentiment: Optional[str] = None
+    sentiment_score: Optional[float] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    cost_usd: float = 0.0
+    error: Optional[str] = None
+    done_ms: Optional[int] = None
+
+
+@dataclass
 class MinerStats:
     claims: int = 0
     verified: int = 0
@@ -605,3 +625,29 @@ class Store(Protocol):
     async def candidates_for_scoops(self, scoop_ids: Sequence[int]) -> List[ScoopCandidateRow]: ...
     async def reverify_reports_since(self, since_ms: int) -> Dict[Tuple[str, int], int]: ...
     async def reverify_in_epochs(self, epochs: Sequence[int]) -> List[ReverifyRow]: ...
+    async def enrich_candidates(self, confidences: Sequence[str], since_ms: int, until_ms: int,
+                                limit: int) -> List[Tuple[EventRecord, Optional[str]]]:
+        """Events published in [since_ms, until_ms], not held, with no enrichment row and one
+        of the confidences or unverified with no first claim (a scoop), oldest first; a scoop
+        with the owner (coldkey, else hotkey) of its first won scoop claim."""
+    async def add_enrichments(self, event_ids: Sequence[int], run_ms: int,
+                              backfill: bool = False, status: str = "pending") -> int:
+        """Rows for the events that have none; returns how many were added."""
+    async def reopen_enrichments(self, confidences: Sequence[str], run_ms: int) -> int:
+        """Skipped rows whose event now has one of the confidences and no hold, back to
+        pending."""
+    async def take_enrichments(self, limit: int, lease_ms: int, now_ms: int,
+                               backfill: bool) -> List[EnrichRow]:
+        """Due rows, pending or with a lapsed lease, marked running with one more attempt;
+        backfill rows only when `backfill`, after the others."""
+    async def finish_enrichment(self, row: EnrichRow,
+                                embedding: Optional[Sequence[float]] = None) -> bool:
+        """Store a taken row's outcome, and on the event its summary, sentiment and embedding,
+        if the row is still running on the same attempt."""
+    async def defer_enrichment(self, event_id: int, attempts: int, run_ms: int,
+                               error: Optional[str], count: bool = True) -> bool:
+        """Back to pending at run_ms, if still running on that attempt; `count` False gives
+        the attempt back."""
+    async def get_enrichment(self, event_id: int) -> Optional[EnrichRow]: ...
+    async def enrich_spend(self, day: date) -> float: ...
+    async def add_enrich_spend(self, day: date, usd: float) -> None: ...

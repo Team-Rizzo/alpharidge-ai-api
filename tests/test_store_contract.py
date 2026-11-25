@@ -517,3 +517,70 @@ async def test_a_line_left_with_rejected_claims_only_is_deleted(store):
     assert await store.get_event(dead.id) is None
     assert (await store.get_claim(lost.id)).event_id is None
     assert await store.get_event(live.id) is not None
+
+
+async def test_enrichment_rows_claim_finish_and_spend(store):
+    from datetime import date
+
+    from app.services.store.rows import EnrichRow
+
+    base = T0 + uuid.uuid4().int % 10**9 * 1000
+
+    async def event(confidence, at, first=True, coldkey="ck-" + uuid.uuid4().hex[:8]):
+        ev = await store.add_event(EventRecord(
+            event_type="merger_acquisition", category="finance", event_date=date(2026, 10, 1),
+            fingerprint=uuid.uuid4().hex, headline="Acme buys Beta", confidence=confidence))
+        row = await store.create_claim(claim("contract-" + uuid.uuid4().hex[:12],
+                                             coldkey=coldkey))
+        await store.update_claim(row.id, "received", status="verified",
+                                 route="event" if first else "scoop", event_id=ev.id)
+        await store.update_event(ev.id, publish_ms=at,
+                                 **({"first_claim_id": row.id} if first else {}))
+        return ev.id, coldkey
+
+    rep, _ = await event("reported", base + 1)
+    scoop, owner = await event("unverified", base + 2, first=False)
+    await event("unverified", base + 3)
+    await event("line", base + 4)
+    found = await store.enrich_candidates(("confirmed", "reported"), base, base + 10, 50)
+    assert [(e.id, o) for e, o in found] == [(rep, None), (scoop, owner)]
+
+    assert await store.add_enrichments([rep], base) == 1
+    assert await store.add_enrichments([rep, scoop], base, status="skipped") == 1
+    assert [e.id for e, _ in await store.enrich_candidates(
+        ("confirmed", "reported"), base, base + 10, 50)] == []
+    await store.update_event(scoop, confidence="confirmed")
+    assert await store.reopen_enrichments(("confirmed", "reported"), base + 5) == 1
+
+    taken = [r for r in await store.take_enrichments(50, 1000, base + 5, False)
+             if r.event_id in (rep, scoop)]
+    assert sorted((r.event_id, r.status, r.attempts) for r in taken) == [
+        (rep, "running", 1), (scoop, "running", 1)]
+    assert [r for r in await store.take_enrichments(50, 1000, base + 7, False)
+            if r.event_id in (rep, scoop)] == []
+
+    assert await store.defer_enrichment(scoop, 1, base + 100, "HTTP 404", count=False)
+    got = await store.get_enrichment(scoop)
+    assert (got.status, got.attempts, got.run_ms, got.error) == ("pending", 0, base + 100,
+                                                                "HTTP 404")
+
+    done = EnrichRow(event_id=rep, status="done", attempts=1, run_ms=base, confidence="reported",
+                     summary="Acme bought Beta.", sentiment="positive", sentiment_score=0.4,
+                     country="US", region="Ohio", cost_usd=0.00024, done_ms=base + 8)
+    assert not await store.finish_enrichment(EnrichRow(**{**done.__dict__, "attempts": 2}))
+    assert await store.finish_enrichment(done, [0.5] * 384)
+    assert not await store.finish_enrichment(done)
+    got = await store.get_enrichment(rep)
+    assert (got.status, got.summary, got.sentiment, got.sentiment_score, got.country,
+            got.region, got.cost_usd, got.done_ms) == (
+        "done", "Acme bought Beta.", "positive", 0.4, "US", "Ohio", 0.00024, base + 8)
+    if hasattr(store, "db"):
+        (r,) = await store.db.query_raw(
+            "SELECT vector_dims(embedding) AS n FROM events WHERE id = $1", rep)
+        assert r["n"] == 384
+
+    day = date(2030, 1, 1 + uuid.uuid4().int % 28)
+    before = await store.enrich_spend(day)
+    await store.add_enrich_spend(day, 0.25)
+    await store.add_enrich_spend(day, 0.5)
+    assert await store.enrich_spend(day) == pytest.approx(before + 0.75)

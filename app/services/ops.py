@@ -14,7 +14,7 @@ from alpharidge_ai.verify.check import PIVOT_SLOTS
 from alpharidge_ai.verify.fetch import BLOCKED, FETCH_FAILED
 from app import config
 from app.config import EVENT_LANE
-from app.services import judge, ledger, novelty, product, trust
+from app.services import enrich, judge, ledger, novelty, product, trust
 from app.services.answer_key import accuracy, match
 from app.services.entities import EntityIndex
 from app.services.store import WON, ClaimRow, Store
@@ -288,6 +288,15 @@ async def _audit(store: Store, now_ms: int) -> List[dict]:
                                                            "alarm_below")}}]
 
 
+async def _enrich_spend(store: Store, now_ms: int) -> List[dict]:
+    if not enrich.enabled():
+        return []
+    day = enrich.utc_day(now_ms)
+    spent, cap = await store.enrich_spend(day), config.ENRICH["DAILY_USD"]
+    return [{"kind": "enrich_spend", "day": day.isoformat(), "usd": round(spent, 6),
+             "cap": cap}] if spent >= cap else []
+
+
 async def alarms(store: Store, now_ms: int, head: Optional[int]) -> dict:
     metric = staleness(head, await store.last_attestation_epoch(ledger.LEDGER_SIGNER))
     out = [*await _reverify(store), *await judge.failing(store, now_ms),
@@ -297,7 +306,8 @@ async def alarms(store: Store, now_ms: int, head: Optional[int]) -> dict:
            *await _missed(store, head),
            *await _categories(store, head), *await _notices(store, now_ms),
            *await _claws(store, now_ms),
-           *await _contradictions(store, now_ms), *await _audit(store, now_ms)]
+           *await _contradictions(store, now_ms), *await _audit(store, now_ms),
+           *await _enrich_spend(store, now_ms)]
     return {"at": _iso(now_ms), "chain_head": head, "ledger": metric, "alarms": out,
             "counts": dict(sorted(Counter(a["kind"] for a in out).items()))}
 

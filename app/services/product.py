@@ -17,8 +17,8 @@ from app.config import EVENT_LANE
 from app.services import ledger, trust
 from app.services.entities import LINKED, EntityIndex, EntityRecord, id_key, normalize_name
 from app.services.store import (
-    PRIZE_ROUTES, WON, ClaimRow, EventFactRow, EventRecord, FeedRow, SourceFetchRow, SourceRow,
-    Store,
+    PRIZE_ROUTES, WON, ClaimRow, EnrichRow, EventFactRow, EventRecord, FeedRow, SourceFetchRow,
+    SourceRow, Store,
 )
 from app.utils.clock import iso
 
@@ -430,7 +430,18 @@ async def detail(store: Store, ev: EventRecord, entities: EntityIndex) -> dict:
         "entities": [_actor(a, entities) for a in v.actors],
         "place": {"iso2": iso2, "admin1": admin1 or None} if iso2 else None,
         "official_match": ev.official_match,
+        "enrichment": enrichment_json(await store.get_enrichment(ev.id)),
     }
+
+
+def enrichment_json(row: Optional[EnrichRow]) -> Optional[dict]:
+    """Model-written summary, sentiment and place."""
+    if row is None or row.status != "done":
+        return None
+    return {"summary": row.summary,
+            "sentiment": ({"label": row.sentiment, "score": row.sentiment_score}
+                          if row.sentiment else None),
+            "country": row.country, "region": row.region}
 
 
 def visible(ev: Optional[EventRecord], now_ms: int, include_unverified: bool = False) -> bool:

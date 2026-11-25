@@ -1486,3 +1486,34 @@ model ReverifyPull {
   @@index([validatorHotkey, epoch], name: "idx_reverify_pull_validator_epoch")
   @@map("reverify_pull")
 }
+
+/// Summary, sentiment and place of a published event, filled by the enrichment worker. Summary,
+/// sentiment label and embedding go to the event's own columns.
+model EventEnrichment {
+  eventId        Int       @id @map("event_id")
+  status         String    @default("pending")
+  backfill       Boolean   @default(false)
+  attempts       Int       @default(0)
+  runAt          DateTime  @default(now()) @map("run_at") @db.Timestamptz(3)
+  lockedAt       DateTime? @map("locked_at") @db.Timestamptz(3)
+  confidence     String?
+  sentimentScore Float?    @map("sentiment_score")
+  country        String?
+  region         String?
+  costUsd        Float     @default(0) @map("cost_usd")
+  error          String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  doneAt         DateTime? @map("done_at") @db.Timestamptz(3)
+
+  @@index([status, backfill, runAt], name: "idx_event_enrichment_due")
+  @@map("event_enrichment")
+}
+
+/// Enrichment spend per UTC day, from each call's reported cost.
+model EnrichmentSpend {
+  day   DateTime @id @db.Date
+  usd   Float    @default(0)
+  calls Int      @default(0)
+
+  @@map("enrichment_spend")
+}

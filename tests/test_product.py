@@ -80,6 +80,24 @@ async def test_publish_hold_and_api_key(api):
     assert "hotkey" not in json.dumps(detail) and "trust" not in json.dumps(detail)
 
 
+async def test_detail_serves_enrichment(api):
+    from app.services.store import EnrichRow
+
+    lane = _lane()
+    await lane.sources()
+    eid = await _event(lane)
+    client = api(lane)
+    assert client.get(f"/events/{eid}", headers=KEY).json()["enrichment"] is None
+    await lane.store.add_enrichments([eid], SEEN)
+    (row,) = await lane.store.take_enrichments(1, 60_000, SEEN, False)
+    await lane.store.finish_enrichment(EnrichRow(
+        event_id=eid, status="done", attempts=row.attempts, summary="Acme bought Beta.",
+        sentiment=None, country="US", region="Delaware"))
+    assert client.get(f"/events/{eid}", headers=KEY).json()["enrichment"] == {
+        "summary": "Acme bought Beta.", "sentiment": None, "country": "US",
+        "region": "Delaware"}
+
+
 @pytest.mark.usefixtures("scoops_on")
 async def test_unverified_is_hidden_by_default(api, monkeypatch):
     lane = _lane()

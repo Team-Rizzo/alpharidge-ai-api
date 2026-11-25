@@ -14,7 +14,7 @@ from app.services.entities import canonical_id, record_from, refreshes
 from app.utils.clock import ms as _ms
 from app.services.store.rows import (
     BEHIND, CHECKED, DECIDED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventRecord, FeedRow, HotkeyStats,
+    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EnrichRow, EventFactRow, EventRecord, FeedRow, HotkeyStats,
     Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow, ReverifyRow,
     ScoopCandidateRow,
     SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
@@ -1291,6 +1291,95 @@ class PrismaStore:
                             _json(m.observed), m.id) for m in rows]
 
 
+    async def enrich_candidates(self, confidences, since_ms, until_ms, limit):
+        rows = await self.db.query_raw(
+            'SELECT q.*, (SELECT COALESCE(c.coldkey, c.hotkey) FROM "claim" c '
+            "WHERE q.first_claim_id IS NULL AND c.event_id = q.id AND c.route = 'scoop' "
+            "AND c.status = ANY(string_to_array($5, ',')) ORDER BY c.id LIMIT 1) AS owner "
+            f"FROM (SELECT {_EVENT_COLS}, publish_at FROM events e "
+            "WHERE (confidence = ANY(string_to_array($1, ',')) "
+            "OR (confidence = 'unverified' AND first_claim_id IS NULL)) AND hold IS NULL "
+            "AND publish_at >= to_timestamp($2::double precision / 1000) "
+            "AND publish_at <= to_timestamp($3::double precision / 1000) "
+            "AND NOT EXISTS (SELECT 1 FROM event_enrichment x WHERE x.event_id = e.id) "
+            "ORDER BY publish_at, id LIMIT $4) q ORDER BY q.publish_at, q.id",
+            ",".join(confidences), since_ms, until_ms, limit, ",".join(WON))
+        return [(_event_from(r), r.get("owner")) for r in rows]
+
+    async def add_enrichments(self, event_ids, run_ms, backfill=False, status="pending"):
+        if not event_ids:
+            return 0
+        return await self.db.execute_raw(
+            "INSERT INTO event_enrichment (event_id, run_at, backfill, status) "
+            "SELECT unnest(string_to_array($1, ','))::int, "
+            "to_timestamp($2::double precision / 1000), $3::boolean, $4 ON CONFLICT DO NOTHING",
+            ",".join(str(int(i)) for i in event_ids), run_ms, bool(backfill), status)
+
+    async def reopen_enrichments(self, confidences, run_ms):
+        return await self.db.execute_raw(
+            "UPDATE event_enrichment x SET status = 'pending', "
+            "run_at = to_timestamp($2::double precision / 1000) FROM events e "
+            "WHERE e.id = x.event_id AND x.status = 'skipped' AND e.hold IS NULL "
+            "AND e.confidence = ANY(string_to_array($1, ','))", ",".join(confidences), run_ms)
+
+    async def take_enrichments(self, limit, lease_ms, now_ms, backfill):
+        rows = await self.db.query_raw(
+            "UPDATE event_enrichment x SET status = 'running', attempts = x.attempts + 1, "
+            "locked_at = to_timestamp($1::double precision / 1000) WHERE x.event_id IN ("
+            "SELECT event_id FROM event_enrichment "
+            "WHERE run_at <= to_timestamp($1::double precision / 1000) "
+            "AND ($4::boolean OR NOT backfill) AND (status = 'pending' OR (status = 'running' "
+            "AND locked_at < to_timestamp($2::double precision / 1000))) "
+            "ORDER BY backfill, run_at, event_id LIMIT $3 FOR UPDATE SKIP LOCKED) "
+            f"RETURNING {_ENRICH_COLS}", now_ms, now_ms - lease_ms, limit, bool(backfill))
+        return sorted((_enrich_from(r) for r in rows),
+                      key=lambda r: (r.backfill, r.run_ms, r.event_id))
+
+    async def finish_enrichment(self, row, embedding=None):
+        vec = None if embedding is None else "[" + ",".join(
+            repr(float(v)) for v in embedding) + "]"
+        async with self.transaction() as tx:
+            n = await tx.db.execute_raw(
+                "UPDATE event_enrichment SET status = $3, confidence = $4, sentiment_score = $5, "
+                "country = $6, region = $7, cost_usd = $8, error = $9, locked_at = NULL, "
+                "done_at = to_timestamp($10::double precision / 1000) "
+                "WHERE event_id = $1 AND status = 'running' AND attempts = $2",
+                row.event_id, row.attempts, row.status, row.confidence, row.sentiment_score,
+                row.country, row.region, float(row.cost_usd), row.error, row.done_ms)
+            if not n:
+                return False
+            await tx.db.execute_raw(
+                "UPDATE events SET summary = $2, sentiment = $3, "
+                "embedding = COALESCE($4::text::vector, embedding), updated_at = now() "
+                "WHERE id = $1", row.event_id, row.summary, row.sentiment, vec)
+            return True
+
+    async def defer_enrichment(self, event_id, attempts, run_ms, error, count=True):
+        n = await self.db.execute_raw(
+            "UPDATE event_enrichment SET status = 'pending', locked_at = NULL, error = $4, "
+            "run_at = to_timestamp($3::double precision / 1000), attempts = attempts - $5::int "
+            "WHERE event_id = $1 AND status = 'running' AND attempts = $2",
+            event_id, attempts, run_ms, error, 0 if count else 1)
+        return bool(n)
+
+    async def get_enrichment(self, event_id):
+        rows = await self.db.query_raw(
+            f"SELECT {_ENRICH_COLS}, e.summary, e.sentiment FROM event_enrichment x "
+            "JOIN events e ON e.id = x.event_id WHERE x.event_id = $1", event_id)
+        return _enrich_from(rows[0]) if rows else None
+
+    async def enrich_spend(self, day):
+        rows = await self.db.query_raw(
+            "SELECT usd FROM enrichment_spend WHERE day = $1::date", day.isoformat())
+        return float(rows[0]["usd"]) if rows else 0.0
+
+    async def add_enrich_spend(self, day, usd):
+        await self.db.execute_raw(
+            "INSERT INTO enrichment_spend (day, usd, calls) VALUES ($1::date, $2, 1) "
+            "ON CONFLICT (day) DO UPDATE SET usd = enrichment_spend.usd + EXCLUDED.usd, "
+            "calls = enrichment_spend.calls + 1", day.isoformat(), float(usd))
+
+
 _EVENT_UPDATE = {"confidence": "confidence", "first_claim_id": "first_claim_id",
                  "stage": "stage", "first_seen_ms": "first_seen_at",
                  "official_match": "official_match", "publish_ms": "publish_at",
@@ -1367,3 +1456,21 @@ def _event_from(r: dict) -> EventRecord:
         first_seen_ms=int(r["first_seen_ms"]) if r["first_seen_ms"] is not None else None,
         publish_ms=int(r["publish_ms"]) if r.get("publish_ms") is not None else None,
         hold=r.get("hold"), storyline_id=r.get("storyline_id"), marked=r.get("marked"))
+
+
+_ENRICH_COLS = (
+    "x.event_id, x.status, x.backfill, x.attempts, "
+    "(extract(epoch FROM x.run_at) * 1000)::bigint AS run_ms, x.confidence, x.sentiment_score, "
+    "x.country, x.region, x.cost_usd, x.error, "
+    "(extract(epoch FROM x.done_at) * 1000)::bigint AS done_ms")
+
+
+def _enrich_from(r: dict) -> EnrichRow:
+    return EnrichRow(
+        event_id=int(r["event_id"]), status=r["status"], backfill=bool(r["backfill"]),
+        attempts=int(r["attempts"]), run_ms=int(r["run_ms"]), confidence=r.get("confidence"),
+        summary=r.get("summary"), sentiment=r.get("sentiment"),
+        sentiment_score=r.get("sentiment_score"), country=r.get("country"),
+        region=r.get("region"), cost_usd=float(r.get("cost_usd") or 0.0),
+        error=r.get("error"),
+        done_ms=int(r["done_ms"]) if r.get("done_ms") is not None else None)

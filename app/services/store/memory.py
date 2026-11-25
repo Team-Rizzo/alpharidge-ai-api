@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from app.services.entities import EntityRecord, refreshes
 from app.services.store.rows import (
     BEHIND, CHECKED, DECIDED, INTAKE_REJECTS, PASSED, PRIZE_ROUTES, QUALITY_PAID, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
+    ClaimHead, ClaimRow, DuplicateClaim, DuplicateEvent, EnrichRow, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow, TrustLogRow,
 )
@@ -121,6 +121,10 @@ class MemoryStore:
     entity_rows: Dict[str, EntityRecord] = field(default_factory=dict)
     candidate_rows: Dict[int, ScoopCandidateRow] = field(default_factory=dict)
     receipt_rows: List[dict] = field(default_factory=list)
+    enrich_rows: Dict[int, EnrichRow] = field(default_factory=dict)
+    enrich_locked: Dict[int, int] = field(default_factory=dict)
+    embeddings: Dict[int, list] = field(default_factory=dict)
+    spend_rows: Dict[object, float] = field(default_factory=dict)
     _ids: itertools.count = field(default_factory=lambda: itertools.count(1))
     _locked: Dict[int, int] = field(default_factory=dict)
     # Claim id -> when it last changed, in ms.
@@ -928,3 +932,82 @@ class MemoryStore:
     async def reverify_in_epochs(self, epochs):
         wanted = set(epochs)
         return [replace(r) for _, r in sorted(self.reverify.items()) if r.epoch in wanted]
+
+    async def enrich_candidates(self, confidences, since_ms, until_ms, limit):
+        out = []
+        for e in sorted(self.events.values(), key=lambda e: (e.publish_ms or 0, e.id)):
+            scoop_like = e.confidence == "unverified" and e.first_claim_id is None
+            if (e.id in self.enrich_rows or not (e.confidence in confidences or scoop_like)
+                    or e.hold is not None or e.publish_ms is None
+                    or not since_ms <= e.publish_ms <= until_ms):
+                continue
+            owner = None
+            if e.first_claim_id is None:
+                scoop = min((c for c in self.claims.values() if c.event_id == e.id
+                             and c.route == "scoop" and c.status in WON),
+                            key=lambda c: c.id, default=None)
+                owner = (scoop.coldkey or scoop.hotkey) if scoop else None
+            out.append((replace(e), owner))
+            if len(out) >= limit:
+                break
+        return out
+
+    async def add_enrichments(self, event_ids, run_ms, backfill=False, status="pending"):
+        added = 0
+        for i in event_ids:
+            if i not in self.enrich_rows:
+                self.enrich_rows[i] = EnrichRow(event_id=i, run_ms=run_ms, backfill=backfill,
+                                                status=status)
+                added += 1
+        return added
+
+    async def reopen_enrichments(self, confidences, run_ms):
+        n = 0
+        for i, r in list(self.enrich_rows.items()):
+            e = self.events.get(i)
+            if (r.status == "skipped" and e is not None and e.confidence in confidences
+                    and e.hold is None):
+                self.enrich_rows[i] = replace(r, status="pending", run_ms=run_ms)
+                n += 1
+        return n
+
+    async def take_enrichments(self, limit, lease_ms, now_ms, backfill):
+        due = [r for r in self.enrich_rows.values()
+               if r.run_ms <= now_ms and (backfill or not r.backfill)
+               and (r.status == "pending" or (r.status == "running" and
+                                              self.enrich_locked.get(r.event_id, 0)
+                                              < now_ms - lease_ms))]
+        taken = []
+        for r in sorted(due, key=lambda r: (r.backfill, r.run_ms, r.event_id))[:limit]:
+            r = replace(r, status="running", attempts=r.attempts + 1)
+            self.enrich_rows[r.event_id] = r
+            self.enrich_locked[r.event_id] = now_ms
+            taken.append(replace(r))
+        return taken
+
+    async def finish_enrichment(self, row, embedding=None):
+        cur = self.enrich_rows.get(row.event_id)
+        if cur is None or cur.status != "running" or cur.attempts != row.attempts:
+            return False
+        self.enrich_rows[row.event_id] = replace(row)
+        if embedding is not None:
+            self.embeddings[row.event_id] = list(embedding)
+        return True
+
+    async def defer_enrichment(self, event_id, attempts, run_ms, error, count=True):
+        cur = self.enrich_rows.get(event_id)
+        if cur is None or cur.status != "running" or cur.attempts != attempts:
+            return False
+        self.enrich_rows[event_id] = replace(cur, status="pending", run_ms=run_ms, error=error,
+                                             attempts=attempts if count else attempts - 1)
+        return True
+
+    async def get_enrichment(self, event_id):
+        r = self.enrich_rows.get(event_id)
+        return replace(r) if r else None
+
+    async def enrich_spend(self, day):
+        return self.spend_rows.get(day, 0.0)
+
+    async def add_enrich_spend(self, day, usd):
+        self.spend_rows[day] = self.spend_rows.get(day, 0.0) + usd

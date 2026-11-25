@@ -275,3 +275,32 @@ def missing_private() -> list[str]:
 # Product API keys from the environment, as sha256 hex; more live in the api_key table.
 PRODUCT_API_KEYS: set[str] = {hashlib.sha256(k.encode()).hexdigest()
                               for k in _csv("PRODUCT_API_KEYS")}
+
+
+# Event enrichment (app/services/enrich.py): off until EL_ENRICH_OPENROUTER_KEY is set, a key
+# for enrichment only. Prices are USD per million tokens, sent as each request's max_price.
+ENRICH_KEY = os.getenv("EL_ENRICH_OPENROUTER_KEY", "").strip()
+ENRICH = {
+    "URL": _el("ENRICH_URL", "https://openrouter.ai/api", str).rstrip("/"),
+    "MODEL": _el("ENRICH_MODEL", "openai/gpt-6-luna", str),
+    "MAX_PROMPT": _el("ENRICH_MAX_PROMPT", 0.12),
+    "MAX_COMPLETION": _el("ENRICH_MAX_COMPLETION", 0.60),
+    "EMBED_MODEL": _el("ENRICH_EMBED_MODEL", "sentence-transformers/all-minilm-l6-v2", str),
+    "EMBED_MAX_PROMPT": _el("ENRICH_EMBED_MAX_PROMPT", 0.01),
+    # Past DAILY_USD (UTC day) the worker pauses and alarms; backfill rows run only while the
+    # day's spend is under BACKFILL_DAILY_USD.
+    "DAILY_USD": _el("ENRICH_DAILY_USD", 1.0),
+    "BACKFILL_DAILY_USD": _el("ENRICH_BACKFILL_DAILY_USD", 0.5),
+    # Scoops are enriched when their coldkey's pay multiplier is at least SCOOP_QUALITY_MIN and
+    # it has SCOOP_MIN_JUDGED decided claims in the quality lookback (a new coldkey has none).
+    "SCOOP_QUALITY_MIN": _el("ENRICH_SCOOP_QUALITY_MIN", 0.8),
+    "SCOOP_MIN_JUDGED": _el("ENRICH_SCOOP_MIN_JUDGED", 20, int),
+    "PAGE_CHARS": _el("ENRICH_PAGE_CHARS", 12000, int),
+    # Events published in the last LOOKBACK_H are picked up; older ones by the backfill script.
+    "LOOKBACK_H": _el("ENRICH_LOOKBACK_H", 24),
+    "CONCURRENCY": _el("ENRICH_CONCURRENCY", 4, int),
+    "INTERVAL_S": _el("ENRICH_INTERVAL_S", 5),
+    "TIMEOUT_S": _el("ENRICH_TIMEOUT_S", 30),
+    "MAX_ATTEMPTS": _el("ENRICH_MAX_ATTEMPTS", 5, int),
+    "RETRY_S": _el("ENRICH_RETRY_S", 300),
+}

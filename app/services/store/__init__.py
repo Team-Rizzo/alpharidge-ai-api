@@ -4,7 +4,7 @@ from app.services.store.memory import MemoryStore
 from app.services.store.prisma import PrismaStore
 from app.services.store.rows import (
     INTAKE_REJECTS, PASSED, PRIZE_ROUTES, SCOOP_MISSES, WON, AccuracyCheckRow, AnswerKeyRow,
-    ClaimRow, DuplicateClaim, DuplicateEvent, EventFactRow, EventQuery, EventRecord, FeedRow,
+    ClaimRow, DuplicateClaim, DuplicateEvent, EnrichRow, EventFactRow, EventQuery, EventRecord, FeedRow,
     HotkeyStats, Job, JudgeItemRow, JudgePostRow, LedgerRow, MinerAccuracyRow, MinerStats, OwnerRow, PageRuleRow,
     ReverifyRow, ScoopCandidateRow, SourceEventRow, SourceFetchRow, SourceRow, SourceTrustRow,
     Store, TrustLogRow,
@@ -12,7 +12,7 @@ from app.services.store.rows import (
 
 __all__ = [
     "INTAKE_REJECTS", "PASSED", "PRIZE_ROUTES", "SCOOP_MISSES", "WON", "AccuracyCheckRow",
-    "AnswerKeyRow", "ClaimRow", "DuplicateClaim", "DuplicateEvent", "EventFactRow",
+    "AnswerKeyRow", "ClaimRow", "DuplicateClaim", "DuplicateEvent", "EnrichRow", "EventFactRow",
     "EventQuery", "EventRecord", "FeedRow", "HotkeyStats", "Job", "JudgeItemRow",
     "JudgePostRow", "LedgerRow", "MemoryStore",
     "MinerAccuracyRow", "MinerStats", "OwnerRow", "PageRuleRow", "PrismaStore", "ReverifyRow",

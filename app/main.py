@@ -138,7 +138,7 @@ async def lifespan(app: FastAPI):
     from app.jobs import answer_key
     from app.jobs.trust_nightly import run_daily
     from app.jobs.worker import run_worker
-    from app.services import recheck, verifier
+    from app.services import enrich, recheck, verifier
 
     logger.info("Starting Alpharidge AI API...")
     _setup_logging()
@@ -147,6 +147,8 @@ async def lifespan(app: FastAPI):
     auth.check_enabled(block.is_mock())
     verifier.check_public_only(block.is_mock())
     recheck.check_proxy()
+    if enrich.enabled():
+        enrich.check_settings()
     if config.missing_private():
         raise RuntimeError(f"set {', '.join(config.missing_private())} (see .env.example)")
     await hotkey_whitelist.sync_async()
@@ -161,6 +163,8 @@ async def lifespan(app: FastAPI):
         tasks += [asyncio.create_task(run_worker(claims.get_store())),
                   asyncio.create_task(run_daily(claims.get_store())),
                   asyncio.create_task(answer_key.run_forever(claims.get_store()))]
+        if enrich.enabled():
+            tasks.append(asyncio.create_task(enrich.run_forever(claims.get_store())))
     if config.EVENT_LANE["PROFILE_S"] > 0:
         tasks.append(asyncio.create_task(_profile(config.EVENT_LANE["PROFILE_S"])))
     yield
