@@ -34,6 +34,8 @@ PUBLIC_PERSON_KINDS = ("official", "athlete")
 logger = logging.getLogger(__name__)
 
 CONFIRMED, REPORTED, UNVERIFIED, LINE = "confirmed", "reported", "unverified", "line"
+# An operator hold (scripts/recheck_sport_types.py) that a sync keeps.
+OFF_TYPE = "off_type"
 PUBLIC = (CONFIRMED, REPORTED)
 # What each stored confidence is called in responses, beside the stored value: two trusted
 # publishers or an official source, one trusted page, a scoop waiting for a trusted page, and a
@@ -521,7 +523,7 @@ async def sync_event(store: Store, event_id: int, now_ms: int,
     confidence = confidence_of(ev, v)
     if confidence != CONFIRMED and labelled(ev.event_type, v.actors, entities):
         confidence = UNVERIFIED
-    fields = {"confidence": confidence, "hold": None}
+    fields = {"confidence": confidence, "hold": ev.hold if ev.hold == OFF_TYPE else None}
     if ev.first_seen_ms is None and v.lead is not None:
         fields["first_seen_ms"] = v.lead.received_ms
     if fields["hold"] is None and ev.publish_ms is None:
