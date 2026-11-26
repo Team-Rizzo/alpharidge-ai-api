@@ -544,6 +544,47 @@ def test_a_republished_release_is_a_press_release(url, kind):
     assert product.source_kind(url) == kind
 
 
+def _ld_page(provider, author="Acme Inc."):
+    node = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": "Acme buys Beta",
+            "author": {"@type": "Person", "name": author},
+            "provider": {"@type": "Organization", **provider},
+            "publisher": {"@type": "Organization", "name": "Yahoo Finance"}}
+    return f'<html><script type="application/ld+json">{json.dumps(node)}</script></html>'
+
+
+@pytest.mark.parametrize("provider, author, want", [
+    ({"name": "GlobeNewswire", "url": "https://www.globenewswire.com/"}, "Acme Inc.",
+     "globenewswire"),
+    ({"name": "ACCESS Newswire"}, "Acme Inc.", "accessnewswire"),
+    ({"name": "Globe Newswire"}, "Acme Inc.", "globenewswire"),
+    ({"name": "Wire Partner", "url": "https://www.businesswire.com/"}, "Acme Inc.",
+     "businesswire"),
+    ({"name": "Yahoo Finance"}, "PR Newswire", "prnewswire"),
+    ({"name": "Simply Wall St.", "url": "https://simplywall.st/"}, "Jane Doe", None),
+    ({"name": "Associated Press"}, "John Roe", None)])
+def test_the_page_signals_keep_the_wire_a_page_credits(provider, author, want):
+    from app.services import page_flags
+
+    got = page_flags.signals(_ld_page(provider, author), "https://finance.yahoo.com/news/a")
+    assert got.get("wire") == want and page_flags.wire_credit(_ld_page(provider, author)) == want
+
+
+async def test_a_page_crediting_a_wire_is_a_press_release():
+    from app.services.store import MemoryStore, SourceFetchRow
+
+    store = MemoryStore()
+    ev, lead, claim, _ = await _story(store, "https://finance.yahoo.com/news/acme-beta-1.html")
+    s = await product.summary(store, ev, EntityIndex())
+    assert (s["publisher"], s["source_kind"]) == ("finance.yahoo.com", "aggregator")
+    await store.add_source_fetch(SourceFetchRow(
+        claim_id=lead.id, verdict="supported", published_ms=T0 + 600_000,
+        check={"page": {"bylines": [], "contributor": False, "wire": "prnewswire"}}))
+    s = await product.summary(store, ev, EntityIndex())
+    assert (s["publisher"], s["source_kind"]) == ("finance.yahoo.com", "press_release")
+    (only,) = (await product.sources_of(store, [ev]))[ev.id]
+    assert only["kind"] == "press_release"
+
+
 async def test_the_feed_serves_the_publisher_as_it_stands_now():
     from app.services.store import FeedRow, MemoryStore
 

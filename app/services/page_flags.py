@@ -8,10 +8,13 @@ to the trust log for `trust review`.
 from __future__ import annotations
 
 import hashlib
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from alpharidge_ai.schema.types import WIRE_NAMES
+from alpharidge_ai.verify.dates import ld_nodes
 from alpharidge_ai.verify.fetch import BLOCKED, FETCH_FAILED, authors
 from app.config import PRIVATE
 from app.services import trust
@@ -26,13 +29,35 @@ def _byline_key(name: str) -> str:
     return hashlib.sha256(" ".join(name.lower().split()).encode()).hexdigest()[:16]
 
 
+def wire_credit(html: str) -> Optional[str]:
+    """The release wire a page credits as its provider or author ("PR Newswire" on a Yahoo
+    copy), as its `WIRE_NAMES` name; None when it credits none."""
+    for node in ld_nodes(html):
+        for key in ("provider", "author", "creator"):
+            for p in node.get(key) if isinstance(node.get(key), list) else [node.get(key)]:
+                if not isinstance(p, dict):
+                    continue
+                name = re.sub(r"[^a-z]", "", str(p.get("name") or "").lower())
+                if name in WIRE_NAMES:
+                    return name
+                hit = WIRE_NAMES.intersection(trust.host_of(str(p.get("url") or "")).split("."))
+                if hit:
+                    return min(hit)
+    return None
+
+
 def signals(html: str, url: str) -> dict:
-    """Page signals kept with the fetch: byline hashes and whether a contributor marker shows."""
+    """Page signals kept with the fetch: byline hashes, whether a contributor marker shows and
+    the release wire the page credits (`wire_credit`)."""
     people = authors(html)
     names = sorted({_byline_key(p["name"]) for p in people if p.get("name", "").strip()})
     text = " ".join([trust.path_of(url), *(v for p in people for v in p.values())]).lower()
-    return {"bylines": names,
-            "contributor": any(m.lower() in text for m in PRIVATE["PAGE_FLAG_MARKERS"])}
+    out = {"bylines": names,
+           "contributor": any(m.lower() in text for m in PRIVATE["PAGE_FLAG_MARKERS"])}
+    wire = wire_credit(html)
+    if wire:
+        out["wire"] = wire
+    return out
 
 
 def section(url: str) -> str:

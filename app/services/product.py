@@ -267,6 +267,10 @@ def _earliest(*times: Optional[int]) -> Optional[int]:
     return min((t for t in times if t is not None), default=None)
 
 
+def _wire_credited(fetches: Sequence[SourceFetchRow]) -> bool:
+    return any(((f.check or {}).get("page") or {}).get("wire") for f in fetches)
+
+
 def _published(fetches: Sequence[SourceFetchRow]) -> Optional[int]:
     return next((f.published_ms for f in reversed(fetches) if f.published_ms is not None), None)
 
@@ -309,20 +313,24 @@ async def sources_of(store: Store, events: Sequence[EventRecord]) -> Dict[int, L
     pages: Dict[int, Dict[str, dict]] = {ev.id: {} for ev in events}
 
     def add(event_id: int, url: Optional[str], published_ms: Optional[int],
-            at: Optional[int]) -> None:
+            at: Optional[int], wire: bool = False) -> None:
         if not url:
             return
         seen = pages[event_id].get(url)
         if seen is None:
-            pages[event_id][url] = {"publisher": publisher_of(url), "kind": source_kind(url),
-                                    "_published_ms": published_ms, "url": url, OPEN_AT: at}
-            return
-        seen["_published_ms"] = _earliest(seen["_published_ms"], published_ms)
-        seen[OPEN_AT] = _earliest(seen[OPEN_AT], at)
+            seen = pages[event_id][url] = {
+                "publisher": publisher_of(url), "kind": source_kind(url),
+                "_published_ms": published_ms, "url": url, OPEN_AT: at}
+        else:
+            seen["_published_ms"] = _earliest(seen["_published_ms"], published_ms)
+            seen[OPEN_AT] = _earliest(seen[OPEN_AT], at)
+        if wire:
+            seen["kind"] = PRESS_RELEASE
 
     for c in won:
         if trusted(c) and shown(c.source_id):
-            add(c.event_id, c.source_url, _published(fetches.get(c.id, ())), open_ms(c))
+            got = fetches.get(c.id, ())
+            add(c.event_id, c.source_url, _published(got), open_ms(c), _wire_credited(got))
     leads = {ev.id: claims.get(ev.first_claim_id) for ev in events}
     for se in rows:
         c = claims.get(se.claim_id)
@@ -330,8 +338,9 @@ async def sources_of(store: Store, events: Sequence[EventRecord]) -> Dict[int, L
             continue
         if se.role == trust.FIRST:
             if trusted(c):
-                add(se.event_id, c.source_url,
-                    _earliest(se.published_ms, _published(fetches.get(c.id, ()))), open_ms(c))
+                got = fetches.get(c.id, ())
+                add(se.event_id, c.source_url, _earliest(se.published_ms, _published(got)),
+                    open_ms(c), _wire_credited(got))
             continue
         confirm = (ledger.judge_record(fetches.get(c.id, ())) or {}).get("confirm")
         if confirm:
@@ -369,7 +378,8 @@ def _summary(ev: EventRecord, lead: Optional[ClaimRow], actors: List[Actor],
             "confidence": ev.confidence, "status": status_of(ev.confidence),
             "marked": ev.marked,
             "publisher": publisher_of(url) if url else None,
-            "source_kind": source_kind(url) if url else None,
+            "source_kind": (sources[0]["kind"] if sources
+                            else source_kind(url) if url else None),
             "source_url": lead.source_url if lead else None, OPEN_AT: open_ms(lead)}
 
 
