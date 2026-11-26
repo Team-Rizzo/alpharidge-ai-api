@@ -531,6 +531,37 @@ async def test_source_links_open_when_the_claim_behind_them_settles():
         "news", "aggregator", "press_release"}
 
 
+@pytest.mark.parametrize("url, kind", [
+    ("https://finance.yahoo.com/news/acme-buy-beta-prnewswire-133000123.html", "press_release"),
+    ("https://finance.yahoo.com/news/acme-buy-beta-globenewswire-1.html", "press_release"),
+    ("https://uk.finance.yahoo.com/news/acme-buy-beta-businesswire-1.html", "press_release"),
+    ("https://www.morningstar.com/news/business-wire/20261013/acme", "press_release"),
+    ("https://www.newswire.ca/news-releases/acme-8.html", "press_release"),
+    ("https://finance.yahoo.com/news/acme-buy-beta-133000123.html", "aggregator"),
+    ("https://finance.yahoo.com/news/wire-maker-acme-1.html", "aggregator"),
+    ("https://www.newsone.com/a", "news")])
+def test_a_republished_release_is_a_press_release(url, kind):
+    assert product.source_kind(url) == kind
+
+
+async def test_the_feed_serves_the_publisher_as_it_stands_now():
+    from app.services.store import FeedRow, MemoryStore
+
+    store = MemoryStore()
+    ev, lead, claim, _ = await _story(store)
+    row = FeedRow(kind=product.EVENT, event_id=ev.id, category="finance",
+                  event_type="merger_acquisition", at_ms=T0,
+                  payload={"publisher": "finance.yahoo.com", "source_kind": "aggregator"})
+    (first,) = await product.feed_json(store, [row])
+    assert first["publisher"] == "finance.yahoo.com" and len(first["sources"]) == 1
+    await claim("https://www.newsone.com/a", T0, T0 + 7_200_000)
+    (now,) = await product.feed_json(store, [row])
+    assert (now["publisher"], now["source_kind"]) == ("newsone.com", "news")
+    assert [s["publisher"] for s in now["sources"]] == ["newsone.com", "finance.yahoo.com"]
+    stage = replace(row, kind=product.STAGE, payload={"stage": "completed"})
+    assert "sources" not in (await product.feed_json(store, [stage]))[0]
+
+
 async def test_the_list_serves_each_events_publisher(api, monkeypatch):
     lane = _lane()
     await lane.sources()
@@ -542,6 +573,8 @@ async def test_the_list_serves_each_events_publisher(api, monkeypatch):
     items = client.get("/events", headers=KEY).json()["items"]
     assert {(i["publisher"], i["source_kind"]) for i in items} == {
         ("newsone.com", "news"), ("wiretwo.org", "news")}
+    assert all(i["sources"][0]["original"] for i in items)
+    assert product.OPEN_AT not in json.dumps(items)
     feed = client.get("/feed", headers=KEY).json()["items"]
     assert {r["publisher"] for r in feed if r["kind"] == "event"} == {
         "newsone.com", "wiretwo.org"}

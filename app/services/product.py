@@ -9,10 +9,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from urllib.parse import urlsplit
 
 from alpharidge_ai.schema import Actor, Claim, IdScheme, headline
-from alpharidge_ai.schema.types import official_release
+from alpharidge_ai.schema.types import WIRE_NAMES, official_release
 from app.config import EVENT_LANE
 from app.services import ledger, trust
 from app.services.entities import LINKED, EntityIndex, EntityRecord, id_key, normalize_name
@@ -244,12 +246,20 @@ def publisher_of(url: str) -> str:
     return trust.host_of(url)
 
 
+@lru_cache(maxsize=1)
+def _seed_rules() -> trust.TrustRegistry:
+    return trust.TrustRegistry()
+
+
 def source_kind(url: str) -> str:
-    if official_release(url):
+    """A release on its wire or republished (a seed "wire" rule, or a wire's name in an
+    aggregator's page name), a syndicating aggregator, or news."""
+    if official_release(url) or _seed_rules().is_wire(url):
         return PRESS_RELEASE
     host = trust.host_of(url)
     if any(host == h or host.endswith("." + h) for h in AGGREGATOR_HOSTS):
-        return AGGREGATOR
+        slug = urlsplit(url).path.rstrip("/").rpartition("/")[2].lower()
+        return PRESS_RELEASE if WIRE_NAMES.intersection(slug.split("-")) else AGGREGATOR
     return NEWS
 
 
@@ -376,7 +386,8 @@ async def summaries(store: Store, events: Sequence[EventRecord],
     out = []
     for ev in events:
         lead, actors = await _lead_actors(store, ev)
-        out.append(_summary(ev, lead, actors, entities, sources.get(ev.id, ())))
+        out.append({**_summary(ev, lead, actors, entities, sources.get(ev.id, ())),
+                    "sources": sources.get(ev.id, [])})
     return out
 
 
@@ -462,9 +473,22 @@ async def labelled_summary(store: Store, ev: Optional[EventRecord], now_ms: int,
             "verification_status": status_of(ev.confidence)}
 
 
-def record_json(r: FeedRow) -> dict:
-    return {"seq": str(r.seq), "at": iso(r.at_ms), "kind": r.kind, "event_id": str(r.event_id),
-            **r.payload}
+def record_json(r: FeedRow, sources: Optional[Sequence[dict]] = None) -> dict:
+    """A feed row; an event row given its event's `sources` takes the publisher, source kind
+    and sources as they stand now."""
+    out = {"seq": str(r.seq), "at": iso(r.at_ms), "kind": r.kind, "event_id": str(r.event_id),
+           **r.payload}
+    if r.kind == EVENT and sources:
+        out.update(publisher=sources[0]["publisher"], source_kind=sources[0]["kind"],
+                   sources=list(sources))
+    return out
+
+
+async def feed_json(store: Store, rows: Sequence[FeedRow]) -> List[dict]:
+    ids = sorted({r.event_id for r in rows if r.kind == EVENT})
+    events = [ev for ev in [await store.get_event(i) for i in ids] if ev is not None]
+    sources = await sources_of(store, events)
+    return [record_json(r, sources.get(r.event_id)) for r in rows]
 
 
 # Sync after every attach

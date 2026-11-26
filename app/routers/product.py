@@ -162,5 +162,5 @@ async def feed(request: Request, since: Optional[str] = None, category: Optional
                             category=category, event_type=type,
                             entity_keys=_keys(entities, entity),
                             limit=_limit(limit, FEED_PAGE_MAX))
-    return {"items": _shown(request, [product.record_json(r) for r in rows]),
+    return {"items": _shown(request, await product.feed_json(store, rows)),
             "next_cursor": str(rows[-1].seq) if rows else str(after)}
