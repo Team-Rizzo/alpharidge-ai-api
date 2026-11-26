@@ -92,16 +92,35 @@ def test_the_decider_posts_one_request_and_keeps_the_cost():
             return httpx.Response(502)
         return httpx.Response(200, json={"answers": OTHER, "usage": {"cost": 0.0001}})
 
-    d = rs.Decider("k", "https://judge.test/x", "m", transport=httpx.MockTransport(handle))
+    waits = []
+    d = rs.Decider("k", "https://judge.test/x", "m", transport=httpx.MockTransport(handle),
+                   sleep=waits.append)
     assert d.ask(_claim(), "https://newsone.com/a", None) == OTHER
     assert len(sent) == 2 and sent[1]["model"] == "m"
     assert set(sent[1]["questions"]) == {"kind", "sport"}
     assert d.calls == 1 and d.cost == pytest.approx(0.0001)
 
-    down = rs.Decider("k", "https://judge.test/x", "m",
-                      transport=httpx.MockTransport(lambda r: httpx.Response(500)))
-    with pytest.raises(RuntimeError):
+    assert waits == [rs.RETRY_WAITS[0]]
+
+    tries = []
+
+    def busy(request):
+        tries.append(1)
+        return httpx.Response(429, headers={"retry-after": "40"})
+
+    down = rs.Decider("k", "https://judge.test/x", "m", transport=httpx.MockTransport(busy),
+                      sleep=waits.append)
+    with pytest.raises(RuntimeError, match="HTTP 429"):
         down.ask(_claim(), "https://newsone.com/a", None)
+    assert len(tries) == len(rs.RETRY_WAITS) + 1
+    assert waits[1:] == [max(w, 40) for w in rs.RETRY_WAITS]
+
+    tries.clear()
+    bad = rs.Decider("k", "https://judge.test/x", "m", sleep=waits.append,
+                     transport=httpx.MockTransport(lambda r: tries.append(1) or httpx.Response(401)))
+    with pytest.raises(RuntimeError, match="HTTP 401"):
+        bad.ask(_claim(), "https://newsone.com/a", None)
+    assert len(tries) == 1
 
 
 class FakeDecider:
@@ -170,7 +189,7 @@ async def test_dry_run_changes_nothing_and_apply_hides_only_the_non_sport_event(
     by_id = {r.event_id: r for r in rows}
     assert (by_id[music].verdict, by_id[music].action) == (rs.NOT_SPORT, "would_hide")
     assert (by_id[move].verdict, by_id[move].action) == (rs.SPORT, "none")
-    assert (by_id[down].verdict, by_id[down].action) == (rs.UNCLEAR, "none")
+    assert (by_id[down].verdict, by_id[down].action) == (rs.FAILED, "none")
     assert _snapshot(lane) == before and len(lane.store.feed_rows) == feed_before
     assert lane.store.events[music].hold is None
 

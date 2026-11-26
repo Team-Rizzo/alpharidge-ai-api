@@ -48,6 +48,10 @@ SPORT_TYPES = ("award", "injury", "match_result", "transfer")
 MIN_PROMPT = 18
 OFF_TYPE = product.OFF_TYPE
 SPORT, NOT_SPORT, UNCLEAR, SKIP = "sport", "not_sport", "unclear", "skip"
+# A judge call that failed after its retries: not a judged unclear, and it changes nothing.
+FAILED = "failed"
+# Waits (s) before each retry of a rate-limited, failing or unreachable judge call.
+RETRY_WAITS = (2, 5, 15, 30, 60)
 DEFAULT_URL = "https://openrouter.ai/api/alpha/decisions"
 DEFAULT_MODEL = "typesafe/jev-1.14"
 DAY_MS = 86_400_000
@@ -118,28 +122,43 @@ class Decider:
     """Posts one decision request per claim; keeps the reported cost."""
 
     def __init__(self, api_key: str, url: str = DEFAULT_URL, model: str = DEFAULT_MODEL,
-                 timeout_s: float = 60, transport: Optional[httpx.BaseTransport] = None):
+                 timeout_s: float = 60, transport: Optional[httpx.BaseTransport] = None,
+                 sleep=time.sleep):
         self.model = model
+        self.sleep = sleep
         self.url = url
         self.client = httpx.Client(timeout=timeout_s, transport=transport, headers={
             "authorization": f"Bearer {api_key}", "content-type": "application/json"})
         self.cost = 0.0
         self.calls = 0
 
-    def ask(self, claim, url: str, published: Optional[str]) -> dict:
-        body = {"model": self.model, "state": state(claim, url, published),
-                "questions": questions(claim)}
-        last = None
-        for _ in range(3):
+    def _post(self, body: dict) -> dict:
+        """The judge's reply, retrying a rate limit, a server error or a dropped connection
+        after each of RETRY_WAITS (or the reply's Retry-After, when longer)."""
+        for wait in (*RETRY_WAITS, None):
             try:
                 r = self.client.post(self.url, json=body)
                 r.raise_for_status()
-                out = r.json()
-                break
+                return r.json()
+            except httpx.HTTPStatusError as e:
+                code = e.response.status_code
+                detail = f"HTTP {code}"
+                if code != 429 and code < 500:
+                    break
+                after = e.response.headers.get("retry-after", "")
+                if wait is not None and after.isdigit():
+                    wait = min(max(wait, int(after)), 120)
             except (httpx.HTTPError, ValueError) as e:
-                last = e
-        else:
-            raise RuntimeError(f"judge call failed: {type(last).__name__}")
+                detail = type(e).__name__
+            if wait is None:
+                break
+            self.sleep(wait)
+        raise RuntimeError(f"judge call failed: {detail}")
+
+    def ask(self, claim, url: str, published: Optional[str]) -> dict:
+        body = {"model": self.model, "state": state(claim, url, published),
+                "questions": questions(claim)}
+        out = self._post(body)
         self.calls += 1
         cost = (out.get("usage") or {}).get("cost")
         if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
@@ -247,7 +266,7 @@ async def check_event(store: Store, decider: Decider, event_id: int) -> Row:
     try:
         answers = await asyncio.to_thread(decider.ask, claim, url, published)
     except RuntimeError as e:
-        row.verdict, row.note = UNCLEAR, str(e)
+        row.verdict, row.note = FAILED, str(e)
         return row
     row.verdict, row.p_sport, row.p_kind_sport, row.kind_pick = classify(answers)
     return row
@@ -343,6 +362,9 @@ async def main_async(args) -> int:
             rows = await recheck(store, decider, now_ms - args.days * DAY_MS, args.apply,
                                  now_ms, args.workers, args.max_usd)
             print(f"{decider.calls} judge calls, ${decider.cost:.4f}")
+            failed = sum(r.verdict == FAILED for r in rows)
+            if failed:
+                print(f"{failed} events not judged (judge call failed): run again to check them")
     finally:
         await db.disconnect()
     write_csv(args.csv, rows)
