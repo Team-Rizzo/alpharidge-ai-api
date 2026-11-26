@@ -34,6 +34,9 @@ DISCOVER_S = 60
 DISCOVER_LIMIT = 500
 SUMMARY_MAX = 800
 RETRY_MAX_S = 6 * 3600
+# A call the router refused (no credit, max price, no model) waits this long and keeps its
+# attempt.
+REFUSED_WAIT_S = 1800
 
 SYSTEM = (
     "You enrich one news event from the page text. Reply with JSON only: "
@@ -313,8 +316,17 @@ async def enrich_one(store: Store, router: Router, spend: Spend, row: EnrichRow,
         await store.defer_enrichment(row.event_id, row.attempts,
                                      now_ms + int(e.wait_s * 1000) + 1, "paced", count=False)
         return "retry"
+    except CallFailed as e:
+        if e.refused:
+            await spend.add(now_ms, cost)
+            logger.warning(f"[ENRICH] event {ev.id} refused: {e}; retrying in {REFUSED_WAIT_S}s")
+            await store.defer_enrichment(row.event_id, row.attempts,
+                                         now_ms + REFUSED_WAIT_S * 1000, str(e)[:300],
+                                         count=False)
+            return "retry"
+        error = str(e)[:300]
     except Exception as e:
-        error = repr(e)[:300] if not isinstance(e, CallFailed) else str(e)[:300]
+        error = repr(e)[:300]
     await spend.add(now_ms, cost)
     if error is not None and not (last and out is not None and out["summary"]):
         if not last:

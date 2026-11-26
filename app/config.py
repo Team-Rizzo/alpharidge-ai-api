@@ -289,8 +289,8 @@ ENRICH = {
     "EMBED_MAX_PROMPT": _el("ENRICH_EMBED_MAX_PROMPT", 0.01),
     # Past DAILY_USD (UTC day) the worker pauses and alarms; backfill rows run only while the
     # day's spend is under BACKFILL_DAILY_USD.
-    "DAILY_USD": _el("ENRICH_DAILY_USD", 1.0),
-    "BACKFILL_DAILY_USD": _el("ENRICH_BACKFILL_DAILY_USD", 0.5),
+    "DAILY_USD": _el("ENRICH_DAILY_USD", 0.30),
+    "BACKFILL_DAILY_USD": _el("ENRICH_BACKFILL_DAILY_USD", 0.15),
     # Scoops are enriched when their coldkey's pay multiplier is at least SCOOP_QUALITY_MIN and
     # it has SCOOP_MIN_JUDGED decided claims in the quality lookback (a new coldkey has none).
     "SCOOP_QUALITY_MIN": _el("ENRICH_SCOOP_QUALITY_MIN", 0.8),

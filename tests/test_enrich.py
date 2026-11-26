@@ -219,19 +219,37 @@ async def test_null_country_is_stored_as_null(on):
     assert product.enrichment_json(row)["country"] is None
 
 
-async def test_price_refusal_is_retried_later_then_fails(on, monkeypatch):
-    monkeypatch.setitem(config.ENRICH, "MAX_ATTEMPTS", 2)
+async def test_price_refusal_waits_and_keeps_its_attempts(on, monkeypatch):
+    monkeypatch.setitem(config.ENRICH, "MAX_ATTEMPTS", 1)
     store = MemoryStore()
     ev = await _event(store)
     on.fail["completions"] = (404, '{"error":{"message":"No endpoints found that satisfy the '
                                     'max price for this request"}}')
     await enrich.discover(store, T0)
+    for n in range(3):
+        await _run(store, on, T0 + n * enrich.REFUSED_WAIT_S * 1000)
+        row = store.enrich_rows[ev.id]
+        assert (row.status, row.attempts) == ("pending", 0)
+        assert row.run_ms == T0 + (n + 1) * enrich.REFUSED_WAIT_S * 1000
+        assert "HTTP 404" in row.error
+    assert await _run(store, on, row.run_ms - 1000) == 0
+
+    del on.fail["completions"]
+    await _run(store, on, row.run_ms)
+    assert store.enrich_rows[ev.id].status == "done" and ev.id in store.embeddings
+
+
+async def test_failed_call_is_retried_later_then_fails(on, monkeypatch):
+    monkeypatch.setitem(config.ENRICH, "MAX_ATTEMPTS", 2)
+    store = MemoryStore()
+    ev = await _event(store)
+    on.fail["completions"] = (500, "server error")
+    await enrich.discover(store, T0)
     await _run(store, on)
     row = store.enrich_rows[ev.id]
     assert (row.status, row.attempts) == ("pending", 1)
     assert row.run_ms == T0 + int(config.ENRICH["RETRY_S"] * 1000)
-    assert "HTTP 404" in row.error
-    assert await _run(store, on, T0 + 1000) == 0
+    assert "HTTP 500" in row.error
 
     await _run(store, on, row.run_ms)
     row = store.enrich_rows[ev.id]
