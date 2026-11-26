@@ -239,6 +239,23 @@ async def test_price_refusal_waits_and_keeps_its_attempts(on, monkeypatch):
     assert store.enrich_rows[ev.id].status == "done" and ev.id in store.embeddings
 
 
+async def test_an_hour_of_refusals_raises_one_alarm(on, monkeypatch):
+    errors = []
+    monkeypatch.setattr(enrich.logger, "error", errors.append)
+    store = MemoryStore()
+    spend, router = enrich.Spend(store), on.router()
+    ev = await _event(store)
+    on.fail["completions"] = (402, '{"error":{"message":"Insufficient credits"}}')
+    await enrich.discover(store, T0)
+    for n in range(4):
+        await enrich.run_once(store, router, spend, T0 + n * enrich.REFUSED_WAIT_S * 1000)
+    assert len(errors) == 1
+    assert errors[0].startswith("[ALARM] enrich_refused: every call refused for 60 min")
+    del on.fail["completions"]
+    await enrich.run_once(store, router, spend, T0 + 4 * enrich.REFUSED_WAIT_S * 1000)
+    assert store.enrich_rows[ev.id].status == "done" and spend._refused_since is None
+
+
 async def test_failed_call_is_retried_later_then_fails(on, monkeypatch):
     monkeypatch.setitem(config.ENRICH, "MAX_ATTEMPTS", 2)
     store = MemoryStore()

@@ -37,6 +37,8 @@ RETRY_MAX_S = 6 * 3600
 # A call the router refused (no credit, max price, no model) waits this long and keeps its
 # attempt.
 REFUSED_WAIT_S = 1800
+# Refusals with no answered call in between for this long raise one alarm.
+REFUSED_ALARM_S = 3600
 
 SYSTEM = (
     "You enrich one news event from the page text. Reply with JSON only: "
@@ -257,6 +259,20 @@ class Spend:
     def __init__(self, store: Store):
         self.store = store
         self._alarmed: Optional[date] = None
+        self._refused_since: Optional[int] = None
+        self._refusal_alarmed = False
+
+    def refused(self, now_ms: int, why: str) -> None:
+        if self._refused_since is None:
+            self._refused_since = now_ms
+        if not self._refusal_alarmed and now_ms - self._refused_since >= REFUSED_ALARM_S * 1000:
+            self._refusal_alarmed = True
+            logger.error(f"[ALARM] enrich_refused: every call refused for "
+                         f"{(now_ms - self._refused_since) // 60_000} min ({why}); check the "
+                         f"key's credit and the pinned models")
+
+    def answered(self) -> None:
+        self._refused_since, self._refusal_alarmed = None, False
 
     async def today(self, now_ms: int) -> float:
         return await self.store.enrich_spend(utc_day(now_ms))
@@ -319,6 +335,7 @@ async def enrich_one(store: Store, router: Router, spend: Spend, row: EnrichRow,
     except CallFailed as e:
         if e.refused:
             await spend.add(now_ms, cost)
+            spend.refused(now_ms, str(e))
             logger.warning(f"[ENRICH] event {ev.id} refused: {e}; retrying in {REFUSED_WAIT_S}s")
             await store.defer_enrichment(row.event_id, row.attempts,
                                          now_ms + REFUSED_WAIT_S * 1000, str(e)[:300],
@@ -338,6 +355,7 @@ async def enrich_one(store: Store, router: Router, spend: Spend, row: EnrichRow,
         await store.finish_enrichment(replace(row, status=FAILED, error=error,
                                               cost_usd=row.cost_usd + cost, done_ms=now_ms))
         return FAILED
+    spend.answered()
     done = replace(row, status=DONE, confidence=ev.confidence, summary=out["summary"],
                    sentiment=out["sentiment"], sentiment_score=out["score"],
                    country=out["country"], region=out["region"],
