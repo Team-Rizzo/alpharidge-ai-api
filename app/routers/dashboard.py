@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from alpharidge_ai.mechanism import quality as qm
 from alpharidge_ai.schema import EventType
+from alpharidge_ai.schema import types as pay_rules
 from app import config
 from app.config import EVENT_LANE
 from app.routers.auth import authenticate
@@ -111,7 +112,34 @@ async def dashboard_mechanism(store: Store = Depends(get_store)):
             "window_epochs": p.window, "epoch_blocks": blocks,
             "epoch_seconds": blocks * ledger.SECONDS_PER_BLOCK,
             "window_hours": round(p.window * blocks * ledger.SECONDS_PER_BLOCK / 3600, 3),
-            "last_signed": {"epoch": last, "total_points": att["totalPoints"]} if att else None}
+            "last_signed": {"epoch": last, "total_points": att["totalPoints"]} if att else None,
+            "pay": pay_schedule()}
+
+
+def _pay_step(table: str, from_ms: Optional[int]) -> dict:
+    values = pay_rules.PAY_TABLES[table]
+    step = {"table": table, "from_ms": from_ms, "event_pay_x": values["EVENT_PAY_X"],
+            "scoop_premium": values["SCOOP_PREMIUM"],
+            "scoop_miss_debt_x": values["SCOOP_MISS_DEBT_X"]}
+    if table in pay_rules.LEAD_TABLES:
+        step["scoop_lead"] = {"min_minutes": pay_rules.SCOOP_LEAD_MIN_M,
+                              "full_minutes": pay_rules.SCOOP_LEAD_FULL_M,
+                              "start_x": pay_rules.SCOOP_LEAD_START_X}
+    return step
+
+
+def pay_schedule(now_ms: Optional[int] = None) -> dict:
+    """The pay tables in force, oldest first: "today" until the first switch step, then each
+    step from its start. A claim is priced by the step in force at its receipt, so the steps
+    price old claims too; "current" is the one in force now."""
+    steps = [_pay_step("today", None)]
+    for table, start in pay_rules.pay_switch() or ():
+        steps.append(_pay_step(table, start))
+    current = _pay_step(pay_rules.pay_table(now_ms), None)
+    for step in steps:
+        if step["table"] == current["table"]:
+            current["from_ms"] = step["from_ms"]
+    return {"current": current, "steps": steps}
 
 
 @router.get("/quality")
@@ -119,13 +147,13 @@ async def dashboard_quality(coldkey: Optional[str] = None, store: Store = Depend
     """Each scored coldkey's quality q, the pay multiplier its next paid claim gets, its check
     budget multiplier and the claims that counted, with the rule's constants. A coldkey with no
     counted claim is at the start. from_ms is where the scoring started: BUDGET_FROM_MS, else
-    the lookback."""
+    the lookback; pay_from_ms is when the pay multiplier started (null while it is off)."""
     rows = await quality.standing(store)
     if coldkey is not None:
         rows = {coldkey: rows.get(coldkey) or {
             "q": qm.START, "pay_multiplier": round(qm.pay_multiplier(qm.START), 4),
             "multiplier": round(qm.multiplier(qm.START), 4), "paid": 0, "junk": 0}}
-    return {"from_ms": quality.start(),
+    return {"from_ms": quality.start(), "pay_from_ms": qm.start_ms(),
             "rule": {"half_life": qm.HALF_LIFE, "start": qm.START, "pay_zero": qm.PAY_ZERO,
                      "pay_full": qm.PAY_FULL, "zero": qm.ZERO, "full": qm.FULL,
                      "junk": list(qm.JUNK) + ["judge_unclear (type)"]},
